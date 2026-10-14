@@ -14,6 +14,12 @@ AI được gọi một lần để trả cả nhóm và tóm tắt, có cache v
 
 Đã kiểm chứng với PDF có chữ thật, AI giả lập và trình duyệt thật. DeepSeek thật chưa được gọi vì chưa có API key; chất lượng phân nhóm/tóm tắt cần đối chiếu tài liệu của khách. Chế độ mẫu luôn dùng rules và trích đoạn miễn phí, không giả vờ là kết quả AI.
 
+## Tổng quan dùng hằng ngày
+
+Trang Tổng quan hiển thị tiền AI hôm nay và tổng chi phí đã biết (USD ước tính), token hôm nay, tài liệu nhận hôm nay, số tài liệu Cần xem lại, trạng thái/lượt chạy gần nhất, lịch tự động và 8 ghi chép gần nhất. Bảng hướng dẫn Bắt đầu đơn giản đã bỏ. Có nút Chạy ngay, Đọc PDF, xem sổ, xem nhóm và sửa nhóm tại dòng ghi chép.
+
+Tiền/token tổng hợp tất cả nguồn; tài liệu/nhóm tính theo nguồn đang xem (Gmail, PDF tải lên hoặc dữ liệu mẫu). Hôm nay tính theo múi giờ cấu hình. Tài liệu nhận hôm nay dùng ngày nhận, không phải ngày chạy; tiền dùng thời gian phản hồi API được ghi nhận. Tài liệu cần xem lại được đếm theo nhóm Cần xem lại, cập nhật ngay khi người dùng sửa nhóm. Chi phí chưa đủ đơn giá/usage được báo rõ, không coi là hóa đơn đầy đủ. Số liệu tự cập nhật khi trang mở, không gọi AI để tính thống kê.
+
 ## Token và tiền AI
 
 Mở **Token & chi phí** để xem tổng token API đã báo, đầu vào/đầu ra, cache đầu vào của nhà cung cấp, cache nội bộ miễn phí, thống kê từng provider/model và 50 lượt gần nhất. Dữ liệu bắt đầu được ghi từ phiên bản này; không dựng lại usage của các lượt cũ.

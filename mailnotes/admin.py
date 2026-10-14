@@ -213,7 +213,7 @@ class Admin:
                     'ai_key_configured': self.has_key(self.settings['summary']['provider']),
                     'ai_provider': self.settings['summary']['provider']}
 
-    def usage(self):
+    def usage(self, now=None):
         rows = []
         for source in ('gmail', 'pdf', 'demo'):
             database = self.root / source / 'notes.sqlite3'
@@ -225,6 +225,9 @@ class Admin:
                     continue
                 rows.extend({**dict(row), 'source': source} for row in connection.execute('SELECT * FROM ai_usage'))
         totals = {'api_calls': 0, 'local_cache_hits': 0, 'input_tokens': 0, 'cached_tokens': 0, 'output_tokens': 0, 'total_tokens': 0, 'estimated_usd': 0.0, 'unknown_usage_calls': 0, 'unpriced_calls': 0}
+        today = {name: 0 for name in totals}
+        zone = ZoneInfo(self.config()['timezone'])
+        today_date = (now or datetime.now(timezone.utc)).astimezone(zone).date()
         groups = {}
         def accumulate(target, row):
             if row['cache_hit']:
@@ -241,14 +244,37 @@ class Admin:
                 target['estimated_usd'] += row['estimated_usd']
         for row in rows:
             accumulate(totals, row)
+            if datetime.fromisoformat(row['created_at']).astimezone(zone).date() == today_date:
+                accumulate(today, row)
             key = (row['provider'], row['model'])
             if key not in groups:
                 groups[key] = {name: 0 for name in totals}
             accumulate(groups[key], row)
         recent = sorted(rows, key=lambda row:(row['created_at'],row['id']), reverse=True)[:50]
         # Return counters only, no stored price payload, email text or identifiers.
-        return {'totals': totals, 'models': [{'provider': provider, 'model': model, **values} for (provider, model), values in groups.items()],
+        return {'totals': totals, 'today': today, 'models': [{'provider': provider, 'model': model, **values} for (provider, model), values in groups.items()],
                 'recent': [{key: row[key] for key in ('created_at','provider','model','source','cache_hit','input_tokens','cached_tokens','output_tokens','total_tokens','estimated_usd')} for row in recent]}
+
+    def dashboard(self, source, now=None):
+        notes = self.notes(source)
+        config = self.config()
+        zone = ZoneInfo(config['timezone'])
+        today = (now or datetime.now(timezone.utc)).astimezone(zone).date()
+        count_today = review_count = 0
+        groups = {}
+        database = self.root / source / 'notes.sqlite3'
+        if database.exists():
+            with sqlite3.connect(f'{database.as_uri()}?mode=ro', uri=True) as connection:
+                for categories, received in connection.execute('SELECT categories,received_at FROM notes'):
+                    categories = json.loads(categories)
+                    count_today += datetime.fromisoformat(received).astimezone(zone).date() == today
+                    review_count += 'Cần xem lại' in categories
+                    for category in set(categories):
+                        groups[category] = groups.get(category, 0) + 1
+        return {'source': source, 'day': today.isoformat(), 'total_notes': notes['total'],
+                'received_today': count_today, 'needs_review': review_count,
+                'groups': [{'name': name, 'count': count} for name, count in sorted(groups.items(), key=lambda item:(-item[1],item[0]))],
+                'recent': notes['notes'][:8], 'usage': self.usage(now)}
 
     def key_path(self, provider):
         return self.private / ('deepseek-key.json' if provider == 'deepseek' else 'ai-key.json')

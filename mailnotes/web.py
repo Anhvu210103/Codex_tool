@@ -176,6 +176,10 @@ def create_app(base=None, data_root=None, public_url=None):
             status['ai_key_configured'] = admin.has_key(requested)
         return jsonify(status)
 
+    @app.get('/api/dashboard')
+    def dashboard():
+        return jsonify(admin.dashboard(request.args.get('source', admin.config()['source'])))
+
     @app.get('/api/usage')
     def usage():
         return jsonify(admin.usage())

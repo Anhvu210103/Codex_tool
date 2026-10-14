@@ -28,6 +28,7 @@ function setTab(tab) {
   document.querySelectorAll('.tab').forEach(node => node.hidden = node.id !== tab);
   document.querySelectorAll('[data-tab]').forEach(node => node.classList.toggle('active',node.dataset.tab === tab));
   $('breadcrumb').textContent = 'Không gian / ' + titles[tab];
+  if (tab === 'overview') loadOverview().catch(error => notice(error.message,true));
   if (tab === 'usage') loadUsage().catch(error => notice(error.message,true));
   if (tab === 'notebook') loadNotes().catch(error => notice(error.message,true));
 }
@@ -80,7 +81,9 @@ async function saveSettings(includeRules = false) {
     next.summary={provider:$('provider').value,mode:$('summary-mode').value,max_chars:Number($('max-chars').value),max_input_chars:Number($('max-input').value),model:$('model').value.trim(),pricing:{input_per_million:priceValue('price-input'),cached_input_per_million:priceValue('price-cache'),output_per_million:priceValue('price-output')},ai_consent:$('ai-consent').checked};
     if (next.summary.mode==='openai' && !next.summary.ai_consent) throw new Error('Hãy xác nhận đồng ý xử lý nội dung qua nhà cung cấp đã chọn trước khi bật AI.');
   }
+  const previousSource=config.source;
   config=await post('/api/settings',next);
+  if(config.source!==previousSource)$('dashboard-source').value=config.source;
   notice(includeRules?'Đã lưu quy tắc. Áp dụng cho email chưa xử lý.':'Đã lưu cài đặt. Lịch chạy và lượt xử lý tiếp theo dùng cấu hình mới.');
   await refreshStatus();
 }
@@ -107,6 +110,8 @@ async function refreshStatus() {
   $('client-state').textContent=status.gmail_client_configured?'Đã lưu cấu hình Google. File bí mật không hiển thị lại.':'Chưa có file cấu hình';
   $('ai-key-state').textContent=status.ai_key_configured?'Đã có key. Giá trị không hiển thị lại.':'Chưa có API key';
   $('connect-gmail').disabled=!status.gmail_client_configured || status.running;
+  $('dashboard-pdf-state').textContent=config.gmail_pdf?'Tự tải và đọc nội dung':'Chưa bật';
+  if (activeTab==='overview') await loadOverview();
   if (activeTab==='notebook') await loadNotes();
   if (activeTab==='usage') await loadUsage();
 }
@@ -157,7 +162,7 @@ async function boot() {
     $('auth-form').dataset.setup=info.needs_setup?'yes':'no';return;
   }
   config=await api('/api/settings'); populateSettings();
-  $('notes-source').value=config.source;
+  $('notes-source').value=config.source;$('dashboard-source').value=config.source;
   const gmail=await api('/api/gmail/info');$('callback').value=gmail.callback;
   await refreshStatus();setTab(activeTab);
   polling=setInterval(()=>refreshStatus().catch(error=>notice(error.message,true)),4000);
@@ -209,6 +214,41 @@ function updateGmailFilter(){
  if(filter.pdf_only&&!advanced)$('gmail-pdf').checked=true;
 }
 for(const id of ['gmail-period','gmail-start','gmail-end','gmail-senders','gmail-label','gmail-only-pdf','gmail-spam'])$(id).addEventListener('input',updateGmailFilter);
+let overviewSequence=0;
+function openNotebook(source,category='',search=''){
+ $('notes-source').value=source;$('notes-category').value='';$('notes-day').value='';$('notes-search').value=search;
+ if(category){if(![...$('notes-category').options].some(option=>option.value===category))$('notes-category').add(new Option(category,category));$('notes-category').value=category;}
+ setTab('notebook');
+}
+async function loadOverview(){
+ const sequence=++overviewSequence;
+ const data=await api('/api/dashboard?'+new URLSearchParams({source:$('dashboard-source').value}));
+ if(sequence!==overviewSequence)return;
+ const today=data.usage.today,total=data.usage.totals;
+ $('dashboard-day').textContent='Ngày '+data.day.split('-').reverse().join('/')+' · Theo dõi tiền AI, tài liệu mới và nội dung cần xem lại.';
+ $('dashboard-cost').textContent=today.unpriced_calls&&!today.estimated_usd?'Chưa đủ đơn giá':money(today.estimated_usd);
+ $('dashboard-cost-detail').textContent=(today.unpriced_calls?today.unpriced_calls+' lượt chưa tính được tiền. ':'')+'Tổng đã biết: '+money(total.estimated_usd)+(total.unpriced_calls?' · chưa đầy đủ':'')+' · tất cả nguồn';
+ $('dashboard-tokens').textContent=number(today.total_tokens);
+ $('dashboard-token-detail').textContent=number(today.api_calls)+' lượt API hôm nay'+(today.unknown_usage_calls?' · '+today.unknown_usage_calls+' lượt thiếu usage':'')+' · tất cả nguồn';
+ $('dashboard-today').textContent=number(data.received_today);$('dashboard-total').textContent='Đã lưu '+number(data.total_notes)+' tài liệu · '+({gmail:'Gmail',pdf:'PDF tải lên',demo:'Dữ liệu mẫu'}[data.source]);
+ $('dashboard-review').textContent=number(data.needs_review);
+ $('dashboard-groups').replaceChildren();$('dashboard-groups-empty').hidden=data.groups.length>0;
+ for(const group of data.groups.slice(0,6)){const row=document.createElement('div');row.className='group-count';const name=document.createElement('button');name.textContent=group.name;name.addEventListener('click',()=>openNotebook(data.source,group.name));const count=document.createElement('strong');count.textContent=number(group.count);row.append(name,count);$('dashboard-groups').append(row);}
+ $('dashboard-recent').replaceChildren();$('dashboard-empty').hidden=data.recent.length>0;
+ for(const note of data.recent){
+  const row=document.createElement('tr');const time=document.createElement('td');time.textContent=dateText(note.received_at);
+  const title=document.createElement('td');const name=document.createElement('strong');name.textContent=note.subject;const sender=document.createElement('small');sender.textContent=note.sender;title.append(name,sender);
+  const groups=document.createElement('td');for(const category of note.categories){const badge=document.createElement('span');badge.className='badge';badge.textContent=category;groups.append(badge,document.createElement('br'));}
+  const summary=document.createElement('td');const text=document.createElement('div');text.className='summary-text';text.textContent=note.summary;summary.append(text);
+  if(note.review_reason){const warning=document.createElement('div');warning.className='review-note';warning.textContent=note.review_reason;summary.append(warning);}
+  const actions=document.createElement('td');const edit=document.createElement('button');edit.className='secondary';edit.textContent='Sửa nhóm';edit.addEventListener('click',()=>openGroupEditor(note));const view=document.createElement('button');view.className='quiet';view.textContent='Xem trong sổ';view.addEventListener('click',()=>openNotebook(data.source,'',note.subject));actions.append(edit,document.createElement('br'),view);
+  row.append(time,title,groups,summary,actions);$('dashboard-recent').append(row);
+ }
+}
+$('dashboard-source').addEventListener('change',()=>loadOverview().catch(error=>notice(error.message,true)));
+for(const id of ['overview-notes','overview-all-notes'])action(id,()=>openNotebook($('dashboard-source').value));
+action('overview-review',()=>openNotebook($('dashboard-source').value,'Cần xem lại'));
+action('overview-pdf',()=>{openNotebook('pdf');$('pdf-file').scrollIntoView({behavior:'smooth',block:'center'});$('pdf-file').focus();});
 function priceValue(id){const value=$(id).value.trim();if(value==='')return null;const price=Number(value);if(!Number.isFinite(price)||price<0)throw new Error('Đơn giá phải là số không âm.');return price;}
 function clearPrices(){for(const id of ['price-input','price-cache','price-output'])$(id).value='';}
 $('model').addEventListener('input',clearPrices);
@@ -237,7 +277,7 @@ function openGroupEditor(note){
 $('cancel-edit').addEventListener('click',()=>$('edit-groups').close());
 $('edit-groups-form').addEventListener('submit',async event=>{
   event.preventDefault();const button=event.submitter;button.disabled=true;
-  try{const categories=[...$('edit-group-options').querySelectorAll('input:checked')].map(input=>input.value);await post('/api/notes/categories',{source:editingNote.source,id:editingNote.id,categories});$('edit-groups').close();notice('Đã sửa nhóm và cập nhật sổ. Không gọi AI lại.');await loadNotes();}
+  try{const categories=[...$('edit-group-options').querySelectorAll('input:checked')].map(input=>input.value);await post('/api/notes/categories',{source:editingNote.source,id:editingNote.id,categories});$('edit-groups').close();notice('Đã sửa nhóm và cập nhật sổ. Không gọi AI lại.');if(activeTab==='overview')await loadOverview();else await loadNotes();}
   catch(error){$('edit-error').textContent=error.message;}finally{button.disabled=false;}
 });
 $('provider').addEventListener('change',()=>{$('model').value=$('provider').value==='deepseek'?'deepseek-chat':'gpt-4o-mini';$('ai-key').value='';clearPrices();refreshStatus().catch(error=>notice(error.message,true));});
