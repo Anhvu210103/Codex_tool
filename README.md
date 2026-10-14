@@ -22,9 +22,15 @@ Trong **Cài đặt → Nội dung & chi phí**, nhập đơn giá model hiện 
 
 Lượt API có phản hồi vẫn ghi usage trước khi kiểm tra JSON, vì phản hồi không hợp lệ vẫn có thể tính phí. API không trả usage được đánh dấu chưa biết; request lỗi/timeout không có usage có thể thiếu trong thống kê. Cache nội bộ không gọi API, token/chi phí mới bằng 0. Email/PDF đã xử lý và bị bỏ qua không tạo thêm lượt thống kê. Cache đầu vào API là một khái niệm khác, vẫn có thể bị tính phí theo bảng giá nhà cung cấp.
 
+## Chọn thư Gmail bằng nút và lịch
+
+Trong Cài đặt → Bạn muốn đọc thư nào?, chọn **Hôm nay**, **7 ngày gần đây (tính cả hôm nay)**, **Chọn khoảng ngày** hoặc **Tất cả thư**. Hôm nay được tính theo múi giờ đã lưu và tự đổi mỗi lượt chạy, không phải 24 giờ gần nhất. Khoảng ngày bao gồm cả ngày bắt đầu và đến hết ngày kết thúc. Có thể nhập email người gửi, tên nhãn và chọn Chỉ lấy thư có PDF; để trống để không giới hạn các điều kiện đó. Thư rác/Thùng rác mặc định không lấy.
+
+Giao diện hiển thị câu mô tả dễ đọc thay cho cú pháp tìm kiếm. Chọn PDF tự bật đọc file đính kèm. Tất cả thư có thông báo về thời gian/chi phí; thư đã xử lý vẫn được bỏ qua. Thiết lập cũ được giữ ở chế độ nâng cao khi nâng cấp; chuyển sang Hôm nay rồi lưu để dùng bộ chọn mới. Khách mới mặc định Hôm nay. Chế độ nâng cao chỉ dành cho người cần cú pháp Gmail, không kết hợp các lựa chọn đơn giản.
+
 ## PDF đính kèm Gmail — không cần tải lên thủ công
 
-Trong Cài đặt, chọn nguồn **Gmail — email và PDF đính kèm**, bật **Tự tải và ĐỌC PDF đính kèm Gmail**, giữ bộ lọc phù hợp rồi lưu và Chạy ngay/bật lịch. Tool tự lấy file qua Gmail API, đọc chữ hoặc OCR và phân nhóm/tóm tắt nội dung bên trong. Mỗi PDF là một ghi chép. Email không có PDF vẫn xử lý thân thư. Email có PDF không tạo ghi chép riêng cho thân thư.
+Trong Cài đặt, chọn nguồn **Gmail — email và PDF đính kèm**, bật **Tự tải và ĐỌC PDF đính kèm Gmail**, chọn thời gian/người gửi phù hợp rồi lưu và Chạy ngay/bật lịch. Tool tự lấy file qua Gmail API, đọc chữ hoặc OCR và phân nhóm/tóm tắt nội dung bên trong. Mỗi PDF là một ghi chép. Email không có PDF vẫn xử lý thân thư. Email có PDF không tạo ghi chép riêng cho thân thư.
 
 Trong sổ chọn nguồn Gmail, xem tên PDF, nội dung ngắn và nhóm; có link email gốc, Tải PDF và **Đọc lại PDF**. Nút đọc lại dùng cấu hình hiện tại, có thể tốn phí và thay nội dung/nhóm đã sửa tay; cache được dùng lại nếu input/prompt không đổi. Scan chưa OCR được đánh dấu Cần xem lại, không được giả vờ đã đọc.
 
@@ -85,7 +91,8 @@ Sổ Gmail nằm tại `.local/notebooks/`; database tại `.local/notes.sqlite3
 
 Sửa `config.json`:
 
-- `gmail_query`: cú pháp tìm kiếm Gmail, mặc định `label:codex-demo`. Lần đầu lấy tất cả email khớp query; có thể thêm `newer_than:7d` để giới hạn dữ liệu.
+- `gmail_filter`: các lựa chọn đơn giản trong web, mặc định Hôm nay cho cấu hình mới.
+- `gmail_query`: cú pháp Gmail chỉ dùng ở chế độ nâng cao hoặc cấu hình CLI cũ chưa có gmail_filter. Các điều kiện ngày đơn giản được tính lại mỗi lượt theo múi giờ.
 - `interval_seconds`: chu kỳ kiểm tra.
 - `timezone`: múi giờ chia sổ, mặc định `Asia/Ho_Chi_Minh`.
 - `rules`: mỗi rule có `category`, `keywords` và tùy chọn `senders`. Một từ khóa bất kỳ phải khớp và một người gửi bất kỳ phải khớp nếu trường tương ứng có giá trị. So khớp chuỗi con, không phân biệt hoa thường, có phân biệt dấu tiếng Việt. Một email có thể vào nhiều nhóm.

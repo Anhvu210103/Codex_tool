@@ -131,14 +131,21 @@ def messages(config, credentials, token_path):
     if database.exists():
         with sqlite3.connect(database) as connection:
             known = {row[0] for row in connection.execute('SELECT id FROM notes')}
+    from .gmail_filters import build_query, date_bounds
+    filter_time = datetime.now(timezone.utc)
+    query_text = build_query(config, filter_time)
+    bounds = date_bounds(config, filter_time)
     page = None
     while True:
-        query = {'q': config['gmail_query'], 'maxResults': 100}
+        query = {'q': query_text, 'maxResults': 100}
         if page:
             query['pageToken'] = page
         listing = request_json(base + '?' + urllib.parse.urlencode(query), headers=headers)
         for item in listing.get('messages', []):
             detail = request_json(base + '/' + item['id'] + '?format=full', headers=headers)
+            received = int(detail['internalDate']) / 1000
+            if bounds and not bounds[0] <= received < bounds[1]:
+                continue
             payload = detail['payload']
             fields = {h['name'].lower(): h['value'] for h in payload.get('headers', [])}
             metadata = {'sender': fields.get('from', ''),

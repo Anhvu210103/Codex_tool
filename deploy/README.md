@@ -80,3 +80,8 @@ Kiểm tra `tesseract --list-langs` có `vie` và `eng`, rồi bật OCR trên w
 Usage lưu trong bảng `ai_usage` của từng SQLite nguồn, cần sao lưu cùng dữ liệu. Token dựa trên trường `usage` API trả về; không ước lượng token từ số ký tự. Đơn giá USD/triệu token nhập trên UI và chụp lại trong từng lượt. Cache input API được tách khỏi cache nội bộ không gọi API. Chưa có đồng bộ hóa đơn/số dư hay chuyển USD sang VND. Lượt cũ trước nâng cấp không có lịch sử usage; lỗi/timeout không có usage từ API có thể thiếu trong tổng. Không gọi số liệu này là chi phí hóa đơn đầy đủ.
 
 Nút Đọc lại PDF hỗ trợ cả Gmail và upload, giữ một dòng ghi chép, đọc lại bản PDF gốc đã lưu và dùng cấu hình hiện tại. Những ghi chép cũ không có file gốc cần lấy lại tài liệu. Endpoint usage và tải/đọc lại PDF đều yêu cầu đăng nhập; không trả email text hoặc key trong API usage.
+
+
+## Bộ chọn Gmail đơn giản
+
+Cấu hình mới có gmail_filter mặc định Hôm nay. Thiết lập cũ thiếu trường này được giữ như bộ lọc nâng cao, không tự mở rộng phạm vi đọc. Khi người dùng chọn Hôm nay/7 ngày/khoảng ngày, server tính ranh giới ngày theo timezone từng lượt và kiểm tra internalDate của email để không lấy nhầm thư ở ngày bên cạnh; dùng số giây timestamp cho Gmail, không phụ thuộc cách Gmail diễn giải múi giờ của chuỗi ngày. “7 ngày” là 7 ngày lịch tính cả hôm nay. Bộ lọc người gửi và nhãn được kiểm tra trước khi tạo query; cú pháp thô chỉ hoạt động ở chế độ nâng cao.

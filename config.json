@@ -32,5 +32,14 @@
   "unmatched_category": "Khác",
   "classification_mode": "rules",
   "gmail_pdf": true,
-  "pdf_ocr": false
+  "pdf_ocr": false,
+  "gmail_filter": {
+    "period": "today",
+    "start_date": "",
+    "end_date": "",
+    "senders": [],
+    "label": "",
+    "pdf_only": false,
+    "include_spam_trash": false
+  }
 }

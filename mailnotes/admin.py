@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .core import process, ensure_schema, render_notes
 from .gmail import messages
+from .gmail_filters import validate_filter
 
 
 def private_json(path, value):
@@ -58,6 +59,7 @@ def validate_settings(value):
         ZoneInfo(zone)
     except (ZoneInfoNotFoundError, ValueError):
         raise ValueError('Múi giờ không hợp lệ.') from None
+    gmail_filter = validate_filter(value.get('gmail_filter', {'period':'advanced'}))
     classification = value.get('classification_mode', 'rules')
     if classification not in ('rules', 'ai'):
         raise ValueError('Chế độ phân loại không hợp lệ.')
@@ -99,8 +101,9 @@ def validate_settings(value):
     if not isinstance(enabled, bool):
         raise ValueError('Trạng thái lịch chạy không hợp lệ.')
     return {'source': source, 'schedule_enabled': enabled, 'classification_mode': classification,
-            'gmail_pdf': value.get('gmail_pdf', True) is True, 'pdf_ocr': value.get('pdf_ocr', False) is True,
-            'gmail_query': text('Bộ lọc Gmail', value.get('gmail_query'), 1000),
+            'gmail_pdf': value.get('gmail_pdf', True) is True or (gmail_filter['period'] != 'advanced' and gmail_filter['pdf_only']), 'pdf_ocr': value.get('pdf_ocr', False) is True,
+            'gmail_query': text('Bộ lọc Gmail', value.get('gmail_query', ''), 1000, empty=gmail_filter['period'] != 'advanced'),
+            'gmail_filter': gmail_filter,
             'interval_seconds': integer('Chu kỳ (giây)', value.get('interval_seconds'), 60, 604800),
             'timezone': zone, 'rules': clean_rules, 'unmatched_category': unmatched,
             'summary': {'mode': summary['mode'], 'provider': provider,

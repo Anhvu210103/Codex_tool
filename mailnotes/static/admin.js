@@ -42,7 +42,11 @@ function addRule(rule = {category:'',description:'',keywords:[],senders:[]}) {
   $('rule-list').append(card);
 }
 function populateSettings() {
-  $('source').value=config.source; $('gmail-query').value=config.gmail_query; $('interval').value=config.interval_seconds/60;
+  $('source').value=config.source; $('gmail-query').value=config.gmail_query;
+  const filter=config.gmail_filter || {period:'advanced'};
+  $('gmail-period').value=filter.period; $('gmail-start').value=filter.start_date || ''; $('gmail-end').value=filter.end_date || '';
+  $('gmail-senders').value=(filter.senders || []).join(', ');$('gmail-label').value=filter.label || '';
+  $('gmail-only-pdf').checked=!!filter.pdf_only;$('gmail-spam').checked=!!filter.include_spam_trash;updateGmailFilter(); $('interval').value=config.interval_seconds/60;
   $('timezone').value=config.timezone; $('schedule').checked=config.schedule_enabled;
   $('summary-mode').value=config.summary.mode; $('max-chars').value=config.summary.max_chars;
   $('max-input').value=config.summary.max_input_chars; $('model').value=config.summary.model;
@@ -67,10 +71,12 @@ async function saveSettings(includeRules = false) {
   } else {
     const minutes=Number($('interval').value);
     if (!Number.isInteger(minutes) || minutes<1 || minutes>10080) throw new Error('Chu kỳ phải là số nguyên từ 1 đến 10080 phút.');
+    next.gmail_filter=readGmailFilter();
+    if(next.gmail_filter.pdf_only)next.gmail_pdf=true;
     next.source=$('source').value; next.gmail_query=$('gmail-query').value.trim(); next.interval_seconds=minutes*60;
     next.timezone=$('timezone').value.trim(); next.schedule_enabled=$('schedule').checked;
     next.classification_mode=$('summary-mode').value==='openai'?'ai':'rules';
-    next.gmail_pdf=$('gmail-pdf').checked;next.pdf_ocr=$('pdf-ocr').checked;
+    next.gmail_pdf=$('gmail-pdf').checked || (next.gmail_filter.period!=='advanced' && next.gmail_filter.pdf_only);next.pdf_ocr=$('pdf-ocr').checked;
     next.summary={provider:$('provider').value,mode:$('summary-mode').value,max_chars:Number($('max-chars').value),max_input_chars:Number($('max-input').value),model:$('model').value.trim(),pricing:{input_per_million:priceValue('price-input'),cached_input_per_million:priceValue('price-cache'),output_per_million:priceValue('price-output')},ai_consent:$('ai-consent').checked};
     if (next.summary.mode==='openai' && !next.summary.ai_consent) throw new Error('Hãy xác nhận đồng ý xử lý nội dung qua nhà cung cấp đã chọn trước khi bật AI.');
   }
@@ -94,7 +100,7 @@ async function refreshStatus() {
   $('run-error').hidden=!status.error; $('run-error').textContent=status.error || '';
   $('source-name').textContent=config.source==='gmail'?'Gmail':'Dữ liệu mẫu';
   $('source-badge').textContent=config.source==='gmail'?(status.gmail_connected?'Đã lưu kết nối':'Cần kết nối'):'Sẵn sàng thử';
-  $('source-description').textContent=config.source==='gmail'?'Đọc email khớp bộ lọc: '+config.gmail_query:'Email giả lập giúp thử quy trình mà không cần tài khoản hay AI.';
+  $('source-description').textContent=config.source==='gmail'?gmailFilterDescription(config.gmail_filter || {period:'advanced'}):'Email giả lập giúp thử quy trình mà không cần tài khoản hay AI.';
   $('summary-state').textContent=config.summary.mode==='openai'?config.summary.provider+' · Phân nhóm + tóm tắt':'Trích đoạn · Không dùng AI';
   $('interval-state').textContent=(config.interval_seconds/60)+' phút';
   $('gmail-badge').textContent=status.gmail_connected?'Đã lưu kết nối':'Chưa kết nối';
@@ -183,6 +189,26 @@ action('disconnect-gmail',async()=>{if(!confirm('Ngắt Gmail và tắt lịch t
 action('save-key',async()=>{if(!$('ai-key').value.trim())throw new Error('Nhập API key trước khi lưu.');await post('/api/ai-key',{provider:$('provider').value,key:$('ai-key').value});$('ai-key').value='';notice('Đã lưu API key riêng. Giá trị không hiển thị lại.');await refreshStatus();});
 action('delete-key',async()=>{if(!confirm('Xóa API key lưu trên máy chủ? Nếu bật AI, lượt Gmail tiếp theo sẽ cần key.'))return;await post('/api/ai-key',{provider:$('provider').value,key:''});$('ai-key').value='';notice('Đã xóa key lưu qua web. Key từ biến môi trường, nếu có, vẫn do quản trị viên máy chủ quản lý.');await refreshStatus();});
 action('change-password',async()=>{await post('/api/password',{current:$('current-password').value,password:$('new-password').value});$('current-password').value='';$('new-password').value='';await boot();});
+function readGmailFilter(){return {period:$('gmail-period').value,start_date:$('gmail-start').value,end_date:$('gmail-end').value,senders:$('gmail-senders').value.split(',').map(value=>value.trim()).filter(Boolean),label:$('gmail-label').value.trim(),pdf_only:$('gmail-only-pdf').checked,include_spam_trash:$('gmail-spam').checked};}
+function gmailFilterDescription(filter){
+ const periods={today:'Đọc thư của hôm nay, tự cập nhật ngày',week:'Đọc thư trong 7 ngày gần đây, tính cả hôm nay',range:'Đọc thư từ '+(filter.start_date?filter.start_date.split('-').reverse().join('/'):'chưa chọn ngày')+' đến hết '+(filter.end_date?filter.end_date.split('-').reverse().join('/'):'chưa chọn ngày'),all:'Đọc tất cả thư',advanced:'Đang dùng bộ lọc nâng cao đã lưu'};
+ if(filter.period==='advanced')return periods.advanced;
+ const details=[periods[filter.period]];
+ if(filter.senders?.length)details.push('từ '+filter.senders.join(', '));
+ if(filter.label)details.push('nhãn “'+filter.label+'”');
+ if(filter.pdf_only)details.push('chỉ thư có PDF');
+ details.push(filter.include_spam_trash?'gồm cả thư rác và thùng rác':'không lấy thư rác và thùng rác');
+ return details.join(' · ');
+}
+function updateGmailFilter(){
+ const filter=readGmailFilter();const advanced=filter.period==='advanced';
+ $('gmail-date-range').hidden=filter.period!=='range';$('gmail-all-warning').hidden=filter.period!=='all';
+ $('gmail-advanced').open=advanced;$('gmail-query').disabled=!advanced;
+ for(const id of ['gmail-senders','gmail-label','gmail-only-pdf','gmail-spam'])$(id).disabled=advanced;
+ $('gmail-filter-preview').textContent=gmailFilterDescription(filter);
+ if(filter.pdf_only&&!advanced)$('gmail-pdf').checked=true;
+}
+for(const id of ['gmail-period','gmail-start','gmail-end','gmail-senders','gmail-label','gmail-only-pdf','gmail-spam'])$(id).addEventListener('input',updateGmailFilter);
 function priceValue(id){const value=$(id).value.trim();if(value==='')return null;const price=Number(value);if(!Number.isFinite(price)||price<0)throw new Error('Đơn giá phải là số không âm.');return price;}
 function clearPrices(){for(const id of ['price-input','price-cache','price-output'])$(id).value='';}
 $('model').addEventListener('input',clearPrices);

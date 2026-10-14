@@ -61,7 +61,7 @@ class UsageTests(unittest.TestCase):
             if '/attachments/' in url:return {'data':encoded}
             if '?format=full' in url:return detail
             return {'messages':[{'id':'email1'}]}
-        settings=self.admin.config();settings.update(source='gmail',classification_mode='ai',gmail_pdf=True)
+        settings=self.admin.config();settings.update(source='gmail',classification_mode='ai',gmail_pdf=True,gmail_filter={'period':'all'})
         settings['rules']=self.config['rules'];settings['summary']={**self.config['summary'],'ai_consent':True}
         self.admin.save_settings(settings)
         private_json(self.admin.key_path('deepseek'),{'key':'test-key'})
