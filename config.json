@@ -1,0 +1,12 @@
+{
+  "gmail_query": "label:codex-demo",
+  "interval_seconds": 1800,
+  "data_dir": ".local",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "summary": {"mode": "extractive", "max_chars": 1200},
+  "rules": [
+    {"category": "Văn bản pháp luật", "keywords": ["nghị định", "thông tư", "quyết định"]},
+    {"category": "Công việc cần xử lý", "keywords": ["hạn chót", "yêu cầu", "báo cáo"]}
+  ],
+  "unmatched_category": "Khác"
+}
