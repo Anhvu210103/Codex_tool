@@ -6,6 +6,7 @@ import copy
 import hashlib
 import hmac
 import json
+import math
 import os
 import secrets
 import sqlite3
@@ -68,6 +69,15 @@ def validate_settings(value):
         raise ValueError('Nhà cung cấp AI không hợp lệ.')
     if (classification == 'ai' or summary['mode'] == 'openai') and summary.get('ai_consent') is not True:
         raise ValueError('Cần xác nhận đồng ý xử lý nội dung qua nhà cung cấp AI đã chọn.')
+    raw_prices = summary.get('pricing', {})
+    if not isinstance(raw_prices, dict):
+        raise ValueError('Đơn giá không hợp lệ.')
+    prices = {}
+    for field in ('input_per_million', 'cached_input_per_million', 'output_per_million'):
+        price = raw_prices.get(field)
+        if price is not None and (isinstance(price, bool) or not isinstance(price, (int, float)) or not math.isfinite(price) or not 0 <= price <= 100000):
+            raise ValueError('Đơn giá phải là số không âm, tối đa 100.000 USD / triệu token.')
+        prices[field] = price
     rules = value.get('rules')
     if not isinstance(rules, list) or len(rules) > 100:
         raise ValueError('Tối đa 100 quy tắc.')
@@ -97,7 +107,7 @@ def validate_settings(value):
                         'max_chars': integer('Độ dài trích đoạn', summary.get('max_chars', 1200), 100, 10000),
                         'max_input_chars': integer('Giới hạn đầu vào AI', summary.get('max_input_chars', 12000), 1000, 100000),
                         'model': text('Mô hình', summary.get('model', 'deepseek-chat' if provider == 'deepseek' else 'gpt-4o-mini'), 100),
-                        'ai_consent': summary.get('ai_consent') is True}}
+                        'ai_consent': summary.get('ai_consent') is True, 'pricing': prices}}
 
 
 class MissingAIKey(RuntimeError):
@@ -200,6 +210,43 @@ class Admin:
                     'ai_key_configured': self.has_key(self.settings['summary']['provider']),
                     'ai_provider': self.settings['summary']['provider']}
 
+    def usage(self):
+        rows = []
+        for source in ('gmail', 'pdf', 'demo'):
+            database = self.root / source / 'notes.sqlite3'
+            if not database.exists():
+                continue
+            with sqlite3.connect(f'{database.as_uri()}?mode=ro', uri=True) as connection:
+                connection.row_factory = sqlite3.Row
+                if not connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ai_usage'").fetchone():
+                    continue
+                rows.extend({**dict(row), 'source': source} for row in connection.execute('SELECT * FROM ai_usage'))
+        totals = {'api_calls': 0, 'local_cache_hits': 0, 'input_tokens': 0, 'cached_tokens': 0, 'output_tokens': 0, 'total_tokens': 0, 'estimated_usd': 0.0, 'unknown_usage_calls': 0, 'unpriced_calls': 0}
+        groups = {}
+        def accumulate(target, row):
+            if row['cache_hit']:
+                target['local_cache_hits'] += 1
+                return
+            target['api_calls'] += 1
+            for field in ('input_tokens','cached_tokens','output_tokens','total_tokens'):
+                target[field] += row[field] or 0
+            if row['input_tokens'] is None or row['output_tokens'] is None:
+                target['unknown_usage_calls'] += 1
+            if row['estimated_usd'] is None:
+                target['unpriced_calls'] += 1
+            else:
+                target['estimated_usd'] += row['estimated_usd']
+        for row in rows:
+            accumulate(totals, row)
+            key = (row['provider'], row['model'])
+            if key not in groups:
+                groups[key] = {name: 0 for name in totals}
+            accumulate(groups[key], row)
+        recent = sorted(rows, key=lambda row:(row['created_at'],row['id']), reverse=True)[:50]
+        # Return counters only, no stored price payload, email text or identifiers.
+        return {'totals': totals, 'models': [{'provider': provider, 'model': model, **values} for (provider, model), values in groups.items()],
+                'recent': [{key: row[key] for key in ('created_at','provider','model','source','cache_hit','input_tokens','cached_tokens','output_tokens','total_tokens','estimated_usd')} for row in recent]}
+
     def key_path(self, provider):
         return self.private / ('deepseek-key.json' if provider == 'deepseek' else 'ai-key.json')
 
@@ -233,6 +280,33 @@ class Admin:
                 config['_reprocess_id'] = 'pdf:' + sha256(data).hexdigest()
             document = pdf_message(data, filename, config, id=sha256(data).hexdigest(), sender='PDF tải lên', received_at=datetime.now(timezone.utc).isoformat())
             return process([document], config, 'pdf')
+        finally:
+            self.run_lock.release()
+
+    def reprocess_note(self, source, identifier):
+        from .documents import pdf_message
+        if source not in ('gmail', 'pdf'):
+            raise ValueError('Chỉ xử lý lại ghi chép có PDF gốc.')
+        if not self.run_lock.acquire(blocking=False):
+            raise ValueError('Đang có lượt xử lý. Vui lòng chờ.')
+        try:
+            database = self.root / source / 'notes.sqlite3'
+            if not database.exists():
+                raise ValueError('Không tìm thấy ghi chép.')
+            with sqlite3.connect(database) as connection:
+                connection.row_factory = sqlite3.Row
+                row = connection.execute('SELECT * FROM notes WHERE id=?', (identifier,)).fetchone()
+            if not row or not row['file_hash']:
+                raise ValueError('Ghi chép này không có bản PDF gốc đã lưu.')
+            path = database.parent / 'files' / (row['file_hash'] + '.pdf')
+            if not path.exists():
+                raise ValueError('File PDF gốc đã bị xóa trên máy chủ.')
+            config = self.runtime_config(source)
+            config['_reprocess_id'] = identifier
+            message = pdf_message(path.read_bytes(), row['subject'], config,
+                                  id=identifier.split(':', 1)[1], sender=row['sender'],
+                                  received_at=row['received_at'], origin_id=row['origin_id'])
+            return process([message], config, source)
         finally:
             self.run_lock.release()
 

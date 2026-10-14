@@ -176,6 +176,10 @@ def create_app(base=None, data_root=None, public_url=None):
             status['ai_key_configured'] = admin.has_key(requested)
         return jsonify(status)
 
+    @app.get('/api/usage')
+    def usage():
+        return jsonify(admin.usage())
+
     @app.post('/api/run')
     def run():
         source = payload().get('source')
@@ -210,6 +214,17 @@ def create_app(base=None, data_root=None, public_url=None):
         data = file.stream.read(MAX_PDF_BYTES + 1)
         try:
             added = admin.process_pdf(data, Path(file.filename).name, request.form.get('reprocess') == 'true')
+        except ValueError:
+            raise
+        except Exception as error:
+            return jsonify(error=error_message(error)), 400
+        return jsonify(added=added)
+
+    @app.post('/api/notes/reprocess')
+    def reprocess_note():
+        data = payload()
+        try:
+            added = admin.reprocess_note(data.get('source'), data.get('id'))
         except ValueError:
             raise
         except Exception as error:

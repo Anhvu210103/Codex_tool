@@ -1,7 +1,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
 let csrf = '', config = null, activeTab = 'overview', polling = null, currentNotes = null;
-const titles = {overview:'Tổng quan',notebook:'Sổ ghi chép',rules:'Nhóm tài liệu',settings:'Cài đặt'};
+const titles = {overview:'Tổng quan',notebook:'Sổ ghi chép',usage:'Token & chi phí',rules:'Nhóm tài liệu',settings:'Cài đặt'};
 async function api(path, options = {}) {
   const response = await fetch(path, {credentials:'same-origin', ...options, headers:{'Content-Type':'application/json','X-CSRF-Token':csrf,...options.headers}});
   const data = await response.json();
@@ -28,6 +28,7 @@ function setTab(tab) {
   document.querySelectorAll('.tab').forEach(node => node.hidden = node.id !== tab);
   document.querySelectorAll('[data-tab]').forEach(node => node.classList.toggle('active',node.dataset.tab === tab));
   $('breadcrumb').textContent = 'Không gian / ' + titles[tab];
+  if (tab === 'usage') loadUsage().catch(error => notice(error.message,true));
   if (tab === 'notebook') loadNotes().catch(error => notice(error.message,true));
 }
 function addRule(rule = {category:'',description:'',keywords:[],senders:[]}) {
@@ -47,6 +48,8 @@ function populateSettings() {
   $('max-input').value=config.summary.max_input_chars; $('model').value=config.summary.model;
   $('ai-consent').checked=config.summary.ai_consent || false;
   $('provider').value=config.summary.provider || 'deepseek';
+  const prices=config.summary.pricing || {};
+  $('price-input').value=prices.input_per_million ?? ''; $('price-cache').value=prices.cached_input_per_million ?? ''; $('price-output').value=prices.output_per_million ?? '';
   $('gmail-pdf').checked=config.gmail_pdf; $('pdf-ocr').checked=config.pdf_ocr;
   $('ai-options').hidden=config.summary.mode !== 'openai';
   $('keep-unmatched').checked=!!config.unmatched_category; $('unmatched').value=config.unmatched_category || 'Khác';
@@ -68,7 +71,7 @@ async function saveSettings(includeRules = false) {
     next.timezone=$('timezone').value.trim(); next.schedule_enabled=$('schedule').checked;
     next.classification_mode=$('summary-mode').value==='openai'?'ai':'rules';
     next.gmail_pdf=$('gmail-pdf').checked;next.pdf_ocr=$('pdf-ocr').checked;
-    next.summary={provider:$('provider').value,mode:$('summary-mode').value,max_chars:Number($('max-chars').value),max_input_chars:Number($('max-input').value),model:$('model').value.trim(),ai_consent:$('ai-consent').checked};
+    next.summary={provider:$('provider').value,mode:$('summary-mode').value,max_chars:Number($('max-chars').value),max_input_chars:Number($('max-input').value),model:$('model').value.trim(),pricing:{input_per_million:priceValue('price-input'),cached_input_per_million:priceValue('price-cache'),output_per_million:priceValue('price-output')},ai_consent:$('ai-consent').checked};
     if (next.summary.mode==='openai' && !next.summary.ai_consent) throw new Error('Hãy xác nhận đồng ý xử lý nội dung qua nhà cung cấp đã chọn trước khi bật AI.');
   }
   config=await post('/api/settings',next);
@@ -99,6 +102,7 @@ async function refreshStatus() {
   $('ai-key-state').textContent=status.ai_key_configured?'Đã có key. Giá trị không hiển thị lại.':'Chưa có API key';
   $('connect-gmail').disabled=!status.gmail_client_configured || status.running;
   if (activeTab==='notebook') await loadNotes();
+  if (activeTab==='usage') await loadUsage();
 }
 function updateOptions(select,values,placeholder) {
   const previous=select.value; select.replaceChildren(new Option(placeholder,''));
@@ -124,7 +128,7 @@ async function loadNotes() {
     const content=document.createElement('td');const summary=document.createElement('div');summary.className='summary-text';summary.textContent=note.summary;content.append(summary);if(note.review_reason){const warning=document.createElement('div');warning.className='review-note';warning.textContent=note.review_reason;content.append(warning);}
     const source=document.createElement('td');
     if(note.source==='gmail') {const link=document.createElement('a');link.textContent='Mở email ↗';link.href='https://mail.google.com/mail/u/0/#all/'+encodeURIComponent(note.origin_id || note.id.split(':').slice(1).join(':'));link.target='_blank';link.rel='noopener noreferrer';source.append(link);} else source.textContent=note.source==='pdf'?'PDF tải lên':'Dữ liệu mẫu';
-    if(note.file_hash){const pdf=document.createElement('a');pdf.textContent='Tải PDF ↓';pdf.href='/api/document?'+new URLSearchParams({source:note.source,id:note.id});source.append(document.createElement('br'),pdf);}
+    if(note.file_hash){const pdf=document.createElement('a');pdf.textContent='Tải PDF ↓';pdf.href='/api/document?'+new URLSearchParams({source:note.source,id:note.id});source.append(document.createElement('br'),pdf);const again=document.createElement('button');again.className='secondary edit-button';again.textContent='Đọc lại PDF';again.addEventListener('click',async()=>{if(!confirm('Đọc lại PDF theo cấu hình hiện tại? Có thể tốn phí AI và thay nhóm/tóm tắt đã chỉnh tay.'))return;again.disabled=true;try{await post('/api/notes/reprocess',{source:note.source,id:note.id});notice('Đã đọc lại PDF và cập nhật sổ.');await loadNotes();}catch(error){notice(error.message,true);}finally{again.disabled=false;}});source.append(document.createElement('br'),again);}
     row.append(time,title,categories,content,source);$('notes-body').append(row);
   }
   $('notes-count').textContent=(data.total>500?'Hiển thị 500 / ':'')+data.total+' ghi chép';
@@ -179,6 +183,24 @@ action('disconnect-gmail',async()=>{if(!confirm('Ngắt Gmail và tắt lịch t
 action('save-key',async()=>{if(!$('ai-key').value.trim())throw new Error('Nhập API key trước khi lưu.');await post('/api/ai-key',{provider:$('provider').value,key:$('ai-key').value});$('ai-key').value='';notice('Đã lưu API key riêng. Giá trị không hiển thị lại.');await refreshStatus();});
 action('delete-key',async()=>{if(!confirm('Xóa API key lưu trên máy chủ? Nếu bật AI, lượt Gmail tiếp theo sẽ cần key.'))return;await post('/api/ai-key',{provider:$('provider').value,key:''});$('ai-key').value='';notice('Đã xóa key lưu qua web. Key từ biến môi trường, nếu có, vẫn do quản trị viên máy chủ quản lý.');await refreshStatus();});
 action('change-password',async()=>{await post('/api/password',{current:$('current-password').value,password:$('new-password').value});$('current-password').value='';$('new-password').value='';await boot();});
+function priceValue(id){const value=$(id).value.trim();if(value==='')return null;const price=Number(value);if(!Number.isFinite(price)||price<0)throw new Error('Đơn giá phải là số không âm.');return price;}
+function clearPrices(){for(const id of ['price-input','price-cache','price-output'])$(id).value='';}
+$('model').addEventListener('input',clearPrices);
+const number=value=>value==null?'—':new Intl.NumberFormat('vi-VN').format(value);
+const money=value=>value==null?'Chưa đủ dữ liệu':value>0&&value<.000001?'<$0.000001':'$'+Number(value).toFixed(6);
+async function loadUsage(){
+ const data=await api('/api/usage');const total=data.totals;
+ $('usage-tokens').textContent=number(total.total_tokens);
+ $('usage-token-detail').textContent=number(total.api_calls)+' lượt API có phản hồi · Vào '+number(total.input_tokens)+' / Ra '+number(total.output_tokens)+(total.unknown_usage_calls?' · '+number(total.unknown_usage_calls)+' lượt thiếu usage':'');
+ $('usage-cost').textContent=total.unpriced_calls && !total.estimated_usd?'Chưa đủ đơn giá':money(total.estimated_usd);
+ $('usage-cost-detail').textContent=total.unpriced_calls?number(total.unpriced_calls)+' lượt chưa tính được tiền; tổng tiền chưa đầy đủ':'Ước tính theo đơn giá đã lưu, không phải hóa đơn';
+ $('usage-cache').textContent=number(total.local_cache_hits);
+ $('usage-models').replaceChildren();$('usage-history').replaceChildren();
+ function row(parent,values){const tr=document.createElement('tr');values.forEach(value=>{const td=document.createElement('td');td.textContent=value;tr.append(td);});parent.append(tr);}
+ for(const model of data.models)row($('usage-models'),[model.provider+' / '+model.model+(model.unknown_usage_calls?' · '+number(model.unknown_usage_calls)+' lượt thiếu usage':''),number(model.api_calls),number(model.input_tokens),number(model.cached_tokens),number(model.output_tokens),model.unpriced_calls?money(model.estimated_usd)+' (chưa đầy đủ)':money(model.estimated_usd)]);
+ for(const item of data.recent)row($('usage-history'),[dateText(item.created_at),item.source+' / '+item.provider+' / '+item.model,item.cache_hit?'Cache nội bộ':'API',number(item.input_tokens)+' / '+number(item.output_tokens),money(item.estimated_usd)]);
+ if(!data.models.length)row($('usage-models'),['Chưa có dữ liệu AI từ bản cập nhật này.']);
+}
 let editingNote=null;
 function openGroupEditor(note){
   editingNote=note;$('edit-error').textContent='';$('edit-group-options').replaceChildren();
@@ -192,7 +214,7 @@ $('edit-groups-form').addEventListener('submit',async event=>{
   try{const categories=[...$('edit-group-options').querySelectorAll('input:checked')].map(input=>input.value);await post('/api/notes/categories',{source:editingNote.source,id:editingNote.id,categories});$('edit-groups').close();notice('Đã sửa nhóm và cập nhật sổ. Không gọi AI lại.');await loadNotes();}
   catch(error){$('edit-error').textContent=error.message;}finally{button.disabled=false;}
 });
-$('provider').addEventListener('change',()=>{$('model').value=$('provider').value==='deepseek'?'deepseek-chat':'gpt-4o-mini';$('ai-key').value='';refreshStatus().catch(error=>notice(error.message,true));});
+$('provider').addEventListener('change',()=>{$('model').value=$('provider').value==='deepseek'?'deepseek-chat':'gpt-4o-mini';$('ai-key').value='';clearPrices();refreshStatus().catch(error=>notice(error.message,true));});
 action('upload-pdf',async()=>{
   const file=$('pdf-file').files[0];if(!file)throw new Error('Chọn file PDF trước.');
   if(file.size>20*1024*1024)throw new Error('PDF tối đa 20 MB.');

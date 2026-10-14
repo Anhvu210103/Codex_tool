@@ -73,3 +73,10 @@ brew install poppler tesseract tesseract-lang
 ```
 
 Kiểm tra `tesseract --list-langs` có `vie` và `eng`, rồi bật OCR trên web. Kết quả OCR vẫn đánh dấu Cần xem lại để đối chiếu bản gốc. Môi trường phát triển hiện thiếu ngôn ngữ `vie`, nên chưa kiểm chứng OCR tiếng Việt thật; PDF có chữ và cơ chế chuyển scan sang review đã được kiểm chứng.
+
+
+## Usage và đơn giá
+
+Usage lưu trong bảng `ai_usage` của từng SQLite nguồn, cần sao lưu cùng dữ liệu. Token dựa trên trường `usage` API trả về; không ước lượng token từ số ký tự. Đơn giá USD/triệu token nhập trên UI và chụp lại trong từng lượt. Cache input API được tách khỏi cache nội bộ không gọi API. Chưa có đồng bộ hóa đơn/số dư hay chuyển USD sang VND. Lượt cũ trước nâng cấp không có lịch sử usage; lỗi/timeout không có usage từ API có thể thiếu trong tổng. Không gọi số liệu này là chi phí hóa đơn đầy đủ.
+
+Nút Đọc lại PDF hỗ trợ cả Gmail và upload, giữ một dòng ghi chép, đọc lại bản PDF gốc đã lưu và dùng cấu hình hiện tại. Những ghi chép cũ không có file gốc cần lấy lại tài liệu. Endpoint usage và tải/đọc lại PDF đều yêu cầu đăng nhập; không trả email text hoặc key trong API usage.

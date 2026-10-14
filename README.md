@@ -14,6 +14,20 @@ AI được gọi một lần để trả cả nhóm và tóm tắt, có cache v
 
 Đã kiểm chứng với PDF có chữ thật, AI giả lập và trình duyệt thật. DeepSeek thật chưa được gọi vì chưa có API key; chất lượng phân nhóm/tóm tắt cần đối chiếu tài liệu của khách. Chế độ mẫu luôn dùng rules và trích đoạn miễn phí, không giả vờ là kết quả AI.
 
+## Token và tiền AI
+
+Mở **Token & chi phí** để xem tổng token API đã báo, đầu vào/đầu ra, cache đầu vào của nhà cung cấp, cache nội bộ miễn phí, thống kê từng provider/model và 50 lượt gần nhất. Dữ liệu bắt đầu được ghi từ phiên bản này; không dựng lại usage của các lượt cũ.
+
+Trong **Cài đặt → Nội dung & chi phí**, nhập đơn giá model hiện tại bằng **USD / 1 triệu token** cho đầu vào không cache, đầu vào cache API và đầu ra. Để trống nếu chưa biết. Tiền là **ước tính**, không phải số dư hay hóa đơn thực tế. Đơn giá được chụp tại thời điểm có phản hồi API; đổi giá không làm thay đổi chi phí lịch sử. Đổi provider/model trên UI sẽ xóa các ô đơn giá để tránh dùng nhầm giá cũ.
+
+Lượt API có phản hồi vẫn ghi usage trước khi kiểm tra JSON, vì phản hồi không hợp lệ vẫn có thể tính phí. API không trả usage được đánh dấu chưa biết; request lỗi/timeout không có usage có thể thiếu trong thống kê. Cache nội bộ không gọi API, token/chi phí mới bằng 0. Email/PDF đã xử lý và bị bỏ qua không tạo thêm lượt thống kê. Cache đầu vào API là một khái niệm khác, vẫn có thể bị tính phí theo bảng giá nhà cung cấp.
+
+## PDF đính kèm Gmail — không cần tải lên thủ công
+
+Trong Cài đặt, chọn nguồn **Gmail — email và PDF đính kèm**, bật **Tự tải và ĐỌC PDF đính kèm Gmail**, giữ bộ lọc phù hợp rồi lưu và Chạy ngay/bật lịch. Tool tự lấy file qua Gmail API, đọc chữ hoặc OCR và phân nhóm/tóm tắt nội dung bên trong. Mỗi PDF là một ghi chép. Email không có PDF vẫn xử lý thân thư. Email có PDF không tạo ghi chép riêng cho thân thư.
+
+Trong sổ chọn nguồn Gmail, xem tên PDF, nội dung ngắn và nhóm; có link email gốc, Tải PDF và **Đọc lại PDF**. Nút đọc lại dùng cấu hình hiện tại, có thể tốn phí và thay nội dung/nhóm đã sửa tay; cache được dùng lại nếu input/prompt không đổi. Scan chưa OCR được đánh dấu Cần xem lại, không được giả vờ đã đọc.
+
 ## Trang quản trị web
 
 Khách tự chỉnh nguồn Gmail, lịch chạy, rules phân loại, múi giờ, độ dài trích đoạn hoặc mô hình AI. Sổ dạng bảng có tìm kiếm, lọc theo ngày/nhóm và tải Markdown. Có đăng nhập, đổi mật khẩu và trạng thái xử lý gần nhất.

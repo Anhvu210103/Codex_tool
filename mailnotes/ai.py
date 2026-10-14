@@ -31,7 +31,10 @@ def analyze(message, config, connection):
     signature = hashlib.sha256(json.dumps([provider, model, system, payload], ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     connection.execute('CREATE TABLE IF NOT EXISTS ai_cache (signature TEXT PRIMARY KEY, result TEXT NOT NULL)')
     cached = connection.execute('SELECT result FROM ai_cache WHERE signature=?', (signature,)).fetchone()
+    from .usage import record_usage
+    prices = settings.get('pricing', {})
     if cached:
+        record_usage(connection, {}, provider, model, message.get('id'), prices, cache_hit=True)
         result = json.loads(cached[0])
     else:
         response = request_json(endpoint, data={'model': model, 'temperature': 0, 'max_tokens': 1200,
@@ -39,6 +42,7 @@ def analyze(message, config, connection):
                                    {'role': 'system', 'content': system},
                                    {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}]},
                                headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'})
+        record_usage(connection, response, provider, model, message.get('id'), prices)
         choice = response['choices'][0]
         if choice.get('finish_reason') not in (None, 'stop'):
             raise ValueError('Incomplete AI response')
