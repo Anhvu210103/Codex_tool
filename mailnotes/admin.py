@@ -14,6 +14,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .core import process
@@ -102,6 +103,40 @@ def error_message(error):
     if isinstance(error, FileNotFoundError):
         return 'Thiếu thông tin kết nối. Vào Cài đặt để kết nối Gmail.'
     if isinstance(error, HTTPError):
+        host = urlsplit(error.geturl()).hostname
+        # Interpret only known error codes; never display upstream messages,
+        # which can include private email details, credentials or request data.
+        try:
+            body = json.loads(error.read(65536))
+            info = body.get('error', {}) if isinstance(body, dict) else {}
+            reasons = set()
+            if isinstance(info, str):
+                reasons.add(info)
+            elif isinstance(info, dict):
+                for field in ('errors', 'details'):
+                    entries = info.get(field, [])
+                    if isinstance(entries, list):
+                        for item in entries:
+                            if isinstance(item, dict) and isinstance(item.get('reason'), str):
+                                reasons.add(item['reason'])
+        except (ValueError, TypeError, OSError):
+            reasons = set()
+        if host == 'gmail.googleapis.com':
+            if reasons & {'accessNotConfigured', 'SERVICE_DISABLED'}:
+                return 'Gmail API chưa được bật trong project của file OAuth đang dùng. Vào Google Cloud → chọn đúng project → Gmail API → Enable, chờ vài phút rồi Chạy ngay.'
+            if reasons & {'insufficientPermissions', 'ACCESS_TOKEN_SCOPE_INSUFFICIENT'}:
+                return 'Kết nối hiện tại thiếu quyền đọc Gmail. Ngắt kết nối rồi Kết nối Gmail lại và cấp quyền đọc email.'
+            if reasons & {'domainPolicy', 'ORG_RESTRICTION_VIOLATION'}:
+                return 'Chính sách Google Workspace chặn ứng dụng. Cần quản trị viên tổ chức cho phép ứng dụng truy cập Gmail.'
+            if error.code == 401:
+                return 'Gmail không chấp nhận phiên truy cập. Kết nối Gmail lại rồi Chạy ngay.'
+        if host == 'oauth2.googleapis.com':
+            if 'invalid_grant' in reasons:
+                return 'Quyền Gmail đã hết hạn hoặc bị thu hồi. Kết nối lại Gmail; token của ứng dụng Google ở chế độ Testing có thể hết hạn sau 7 ngày.'
+            if reasons & {'invalid_client', 'unauthorized_client'}:
+                return 'Cấu hình OAuth không còn hợp lệ. Kiểm tra OAuth client và tải lại file JSON đúng project.'
+        if host == 'api.openai.com' and error.code in (401, 403):
+            return 'OpenAI từ chối API key hoặc quyền sử dụng. Kiểm tra key trong Cài đặt, hoặc chuyển sang Trích đoạn để thử Gmail miễn phí.'
         if error.code in (401, 403):
             return 'Dịch vụ từ chối truy cập. Kiểm tra quyền Gmail/API hoặc kết nối lại tài khoản.'
         if error.code == 429:

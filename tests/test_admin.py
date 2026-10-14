@@ -1,5 +1,6 @@
 import copy
 import json
+import io
 import os
 import tempfile
 import threading
@@ -8,7 +9,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from mailnotes.admin import Admin
+from urllib.error import HTTPError
+
+from mailnotes.admin import Admin, error_message
 from mailnotes.web import create_app
 
 BASE = Path(__file__).resolve().parent.parent
@@ -165,6 +168,23 @@ class AdminTests(unittest.TestCase):
         for _ in range(5):
             self.assertEqual(self.post('/api/login',{'password':'incorrect'},other,csrf).status_code,401)
         self.assertEqual(self.post('/api/login',{'password':'incorrect'},other,csrf).status_code,429)
+
+
+class ServiceErrorTests(unittest.TestCase):
+    def test_known_google_reasons_and_secret_redaction(self):
+        cases = [
+            ('https://gmail.googleapis.com/test', 403, {'error': {'errors': [{'reason': 'accessNotConfigured'}]}}, 'Gmail API chưa được bật'),
+            ('https://gmail.googleapis.com/test', 403, {'error': {'details': [{'reason': 'ACCESS_TOKEN_SCOPE_INSUFFICIENT'}]}}, 'thiếu quyền đọc Gmail'),
+            ('https://oauth2.googleapis.com/token', 400, {'error': 'invalid_grant'}, 'hết hạn hoặc bị thu hồi'),
+            ('https://api.openai.com/test', 401, {'error': {'message': 'SECRET'}}, 'OpenAI từ chối'),
+            ('https://gmail.googleapis.com/test', 403, {'error': {'message': 'SECRET'}}, 'Dịch vụ từ chối'),
+        ]
+        for url, code, body, expected in cases:
+            with self.subTest(expected=expected):
+                error = HTTPError(url, code, 'SECRET', {}, io.BytesIO(json.dumps(body).encode()))
+                message = error_message(error)
+                self.assertIn(expected, message)
+                self.assertNotIn('SECRET', message)
 
 
 if __name__=='__main__':
