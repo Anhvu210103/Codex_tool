@@ -33,7 +33,7 @@ def create_app(base=None, data_root=None, public_url=None):
         raise ValueError('Public URL must be a plain HTTP(S) origin')
     if parsed.scheme != 'https' and parsed.hostname not in ('localhost', '127.0.0.1', '::1'):
         raise ValueError('Use HTTPS for remote deployment')
-    app.config.update(SECRET_KEY=read_json(secret_path, {})['key'], MAX_CONTENT_LENGTH=128 * 1024,
+    app.config.update(SECRET_KEY=read_json(secret_path, {})['key'], MAX_CONTENT_LENGTH=22 * 1024 * 1024,
                       SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax',
                       SESSION_COOKIE_SECURE=parsed.scheme == 'https', PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
                       TRUSTED_HOSTS=[parsed.hostname, 'localhost', '127.0.0.1'])
@@ -90,13 +90,15 @@ def create_app(base=None, data_root=None, public_url=None):
 
     @app.errorhandler(413)
     def too_large(error):
-        return jsonify(error='Dữ liệu quá lớn. Giới hạn mỗi yêu cầu là 128 KB.'), 413
+        return jsonify(error='Dữ liệu quá lớn. File PDF tối đa 20 MB.'), 413
 
     @app.errorhandler(500)
     def internal(error):
         return jsonify(error='Lỗi hệ thống. Kiểm tra cấu hình máy chủ rồi thử lại.'), 500
 
     def payload():
+        if request.content_length and request.content_length > 128 * 1024:
+            raise ValueError('Cấu hình vượt giới hạn 128 KB.')
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
             raise ValueError('Yêu cầu JSON không hợp lệ.')
@@ -168,7 +170,11 @@ def create_app(base=None, data_root=None, public_url=None):
 
     @app.get('/api/status')
     def status():
-        return jsonify(admin.status())
+        status = admin.status()
+        requested = request.args.get('provider')
+        if requested in ('deepseek', 'openai'):
+            status['ai_key_configured'] = admin.has_key(requested)
+        return jsonify(status)
 
     @app.post('/api/run')
     def run():
@@ -186,7 +192,7 @@ def create_app(base=None, data_root=None, public_url=None):
     @app.get('/api/export')
     def export():
         source, day = request.args.get('source', 'demo'), request.args.get('day', '')
-        if source not in ('demo', 'gmail') or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
+        if source not in ('demo', 'gmail', 'pdf') or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
             raise ValueError('Chọn nguồn và ngày hợp lệ để tải sổ.')
         path = admin.root / source / 'notebooks' / (day + '.md')
         if not path.exists():
@@ -194,6 +200,45 @@ def create_app(base=None, data_root=None, public_url=None):
         # Read a snapshot, so an atomic notebook replacement cannot affect transfer.
         return send_file(io.BytesIO(path.read_bytes()), mimetype='text/markdown; charset=utf-8',
                          as_attachment=True, download_name=f'so-ghi-chep-{day}.md')
+
+    @app.post('/api/pdf')
+    def upload_pdf():
+        from .documents import MAX_PDF_BYTES
+        file = request.files.get('file')
+        if not file or not file.filename:
+            raise ValueError('Chọn file PDF.')
+        data = file.stream.read(MAX_PDF_BYTES + 1)
+        try:
+            added = admin.process_pdf(data, Path(file.filename).name, request.form.get('reprocess') == 'true')
+        except ValueError:
+            raise
+        except Exception as error:
+            return jsonify(error=error_message(error)), 400
+        return jsonify(added=added)
+
+    @app.post('/api/notes/categories')
+    def edit_categories():
+        data = payload()
+        admin.edit_categories(data.get('source'), data.get('id'), data.get('categories'))
+        return jsonify(ok=True)
+
+    @app.get('/api/document')
+    def document():
+        source = request.args.get('source')
+        if source not in ('gmail', 'pdf'):
+            raise ValueError('Nguồn không hợp lệ.')
+        database = admin.root / source / 'notes.sqlite3'
+        if not database.exists():
+            return jsonify(error='Không tìm thấy PDF.'), 404
+        import sqlite3
+        with sqlite3.connect(database) as connection:
+            row = connection.execute('SELECT file_hash FROM notes WHERE id=?', (request.args.get('id'),)).fetchone()
+        if not row or not row[0] or not re.fullmatch(r'[a-f0-9]{64}', row[0]):
+            return jsonify(error='Không tìm thấy PDF.'), 404
+        path = database.parent / 'files' / (row[0] + '.pdf')
+        if not path.exists():
+            return jsonify(error='File PDF đã bị xóa trên máy chủ.'), 404
+        return send_file(path, mimetype='application/pdf', as_attachment=True, download_name='tai-lieu.pdf')
 
     @app.post('/api/gmail/client')
     def gmail_client():
@@ -268,13 +313,17 @@ def create_app(base=None, data_root=None, public_url=None):
 
     @app.post('/api/ai-key')
     def ai_key():
-        key = payload().get('key')
+        data = payload()
+        provider = data.get('provider', admin.config()['summary']['provider'])
+        if provider not in ('deepseek', 'openai'):
+            raise ValueError('Nhà cung cấp AI không hợp lệ.')
+        key = data.get('key')
         if not isinstance(key, str) or len(key) > 1000:
             raise ValueError('API key không hợp lệ.')
         if key.strip():
-            private_json(admin.private / 'ai-key.json', {'key': key.strip()})
+            private_json(admin.key_path(provider), {'key': key.strip()})
         else:
-            (admin.private / 'ai-key.json').unlink(missing_ok=True)
+            admin.key_path(provider).unlink(missing_ok=True)
         return jsonify(ok=True)
 
     return app

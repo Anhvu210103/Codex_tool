@@ -1,6 +1,18 @@
 # Mailnotes — Gmail → sổ ghi chép theo ngày
 
-MVP đọc nội dung Gmail (không tải file đính kèm), phân loại theo rules, chống xử lý trùng bằng SQLite và xuất Sổ ghi chép dạng bảng Markdown theo ngày nhận email. Bảng gồm giờ nhận, tiêu đề, người gửi, phân loại, nội dung ngắn và nguồn; giờ hiển thị theo múi giờ cấu hình. Chỉ đọc Gmail, không gửi thư, không đổi nhãn hoặc đánh dấu đã đọc.
+MVP đọc nội dung Gmail, PDF đính kèm và PDF tải lên, phân loại theo rules, chống xử lý trùng bằng SQLite và xuất Sổ ghi chép dạng bảng Markdown theo ngày nhận email. Bảng gồm giờ nhận, tiêu đề, người gửi, phân loại, nội dung ngắn và nguồn; giờ hiển thị theo múi giờ cấu hình. Chỉ đọc Gmail, không gửi thư, không đổi nhãn hoặc đánh dấu đã đọc.
+
+## Phân loại + tóm tắt bằng DeepSeek
+
+1. Vào **Nhóm tài liệu**, đặt tên nhóm và mô tả, bấm Lưu quy tắc. Từ khóa/người gửi chỉ dùng trong chế độ rules miễn phí.
+2. Vào **Cài đặt → Nội dung & chi phí**, chọn **AI phân nhóm + tóm tắt**, nhà cung cấp **DeepSeek**, model **deepseek-chat**.
+3. Xác nhận đồng ý gửi nội dung đến nhà cung cấp, nhập API key DeepSeek, bấm **Lưu key riêng** rồi **Lưu cài đặt**. Không gửi key vào chat.
+4. Vào **Sổ ghi chép**, chọn PDF và bấm **Đọc & ghi vào sổ**; hoặc bật **Đọc PDF đính kèm Gmail** rồi chạy nguồn Gmail. Một tài liệu có thể thuộc nhiều nhóm.
+5. Bấm **Sửa nhóm** tại dòng ghi chép khi cần điều chỉnh. Không gọi AI lại khi sửa nhóm. Có nút tải PDF gốc.
+
+AI được gọi một lần để trả cả nhóm và tóm tắt, có cache và chống xử lý trùng. Không chắc chắn/nhóm lạ sẽ vào **Cần xem lại**. PDF scan cần OCR cục bộ; xem hướng dẫn cài OCR trong deploy/README.md. PDF quá dài bị giới hạn và có cảnh báo; không coi trích đoạn hoặc tóm tắt phần đầu là đã đọc toàn bộ tài liệu. Lần tải lại PDF đã có mặc định không xử lý lại; chỉ chọn Xử lý lại khi cần áp dụng cấu hình mới, có thể tốn phí và thay nội dung/nhóm đã chỉnh tay.
+
+Đã kiểm chứng với PDF có chữ thật, AI giả lập và trình duyệt thật. DeepSeek thật chưa được gọi vì chưa có API key; chất lượng phân nhóm/tóm tắt cần đối chiếu tài liệu của khách. Chế độ mẫu luôn dùng rules và trích đoạn miễn phí, không giả vờ là kết quả AI.
 
 ## Trang quản trị web
 
@@ -77,19 +89,13 @@ Rules mới áp dụng cho email chưa xử lý; MVP chưa hỗ trợ phân lo�
 
 Mặc định `summary.mode = "extractive"`: bỏ một số chữ ký và trích dẫn phổ biến rồi lấy tối đa `max_chars` ký tự đầu. **Đây là trích đoạn, không phải tóm tắt ngữ nghĩa**; có thể bỏ sót thời hạn nằm cuối thư. Loại chữ ký/trích dẫn là heuristic, cần xem bản gốc khi ra quyết định.
 
-Để bật tóm tắt AI, cấu hình:
-
-```json
-{"mode": "openai", "model": "gpt-4o-mini", "max_input_chars": 12000}
-```
-
-Đặt `OPENAI_API_KEY` qua cơ chế secrets của máy triển khai, không lưu vào repository. Chế độ này gửi tiêu đề và tối đa `max_input_chars` ký tự nội dung đến OpenAI; chỉ bật khi khách cho phép xử lý dữ liệu qua nhà cung cấp đó. Email có thể dài hơn giới hạn nên tóm tắt không bao quát toàn bộ. Chỉ email qua rules và chưa có trong SQLite được tóm tắt; kết quả được lưu để tránh gọi lại. Không có quyền thao tác công cụ được cấp cho mô hình.
+Để bật AI qua CLI, cấu hình `classification_mode: "ai"`, `summary.mode: "openai"` (tên legacy của chế độ AI), `summary.provider: "deepseek"`, `summary.model: "deepseek-chat"`, `summary.ai_consent: true` và đặt `DEEPSEEK_API_KEY` bằng cơ chế secrets. CLI chưa có lệnh upload PDF; dùng trang web cho upload. OpenAI tùy chọn dùng `provider: "openai"`, `model: "gpt-4o-mini"` và `OPENAI_API_KEY`. Không đặt key trong config.json.
 
 ## Mạng cần thiết
 
 - Gmail: `gmail.googleapis.com`
 - OAuth: `accounts.google.com`, `oauth2.googleapis.com`
-- AI tùy chọn: `api.openai.com`
+- AI tùy chọn: `api.deepseek.com`, `api.openai.com`
 
 TLS được xác minh mặc định. Không cần API key để chạy demo/extractive. Việc có domain trong cấu hình không đồng nghĩa OAuth/API đã hoạt động.
 
@@ -99,4 +105,4 @@ Module Gmail trả các trường `id`, `sender`, `subject`, `received_at`, `bod
 
 ## Tình trạng kiểm chứng
 
-Đã chạy demo và kiểm thử tự động cho phân loại, MIME/HTML, chống xử lý trùng, chia ngày theo múi giờ, link Gmail và khả năng thử lại khi tóm tắt lỗi. Đã kiểm thử API quản trị và OAuth giả lập, lưu cấu hình/lịch chạy; đã thử trình duyệt thật cho đăng nhập, demo, tìm kiếm, tải file, thêm/xóa rules và lưu cài đặt trên desktop/mobile. Chưa kiểm chứng OAuth với Google, Gmail thật hoặc OpenAI thật vì chưa có credentials. Không coi demo là bằng chứng kết nối tài khoản đã hoạt động.
+Đã chạy demo và kiểm thử tự động cho phân loại, MIME/HTML, chống xử lý trùng, chia ngày theo múi giờ, link Gmail và khả năng thử lại khi tóm tắt lỗi. Đã kiểm thử API quản trị và OAuth giả lập, lưu cấu hình/lịch chạy; đã thử trình duyệt thật cho đăng nhập, demo, tìm kiếm, tải file, thêm/xóa rules và lưu cài đặt trên desktop/mobile. Đã bổ sung kiểm thử AI JSON/cache/review, PDF có chữ, PDF scan vào review, Gmail PDF qua API giả lập, nâng cấp database và sửa nhóm. Chưa kiểm chứng OAuth với Google, Gmail thật, DeepSeek/OpenAI thật hoặc OCR tiếng Việt thật vì chưa có credentials. Không coi demo là bằng chứng kết nối tài khoản đã hoạt động.

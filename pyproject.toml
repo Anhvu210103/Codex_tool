@@ -3,7 +3,7 @@ name = "mailnotes"
 version = "0.1.0"
 description = "Rule-based Gmail document notebook"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["pypdf==6.1.1"]
 
 [project.optional-dependencies]
 web = ["Flask==3.1.2", "waitress==3.0.2"]

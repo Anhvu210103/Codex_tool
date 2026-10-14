@@ -17,7 +17,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from .core import process
+from .core import process, ensure_schema, render_notes
 from .gmail import messages
 
 
@@ -50,18 +50,24 @@ def validate_settings(value):
             raise ValueError(f'{name} không hợp lệ (tối đa {maximum} ký tự).')
         return raw.strip()
     source = value.get('source', 'demo')
-    if source not in ('demo', 'gmail'):
+    if source not in ('demo', 'gmail', 'pdf'):
         raise ValueError('Nguồn chưa được hỗ trợ.')
     zone = text('Múi giờ', value.get('timezone'))
     try:
         ZoneInfo(zone)
     except (ZoneInfoNotFoundError, ValueError):
         raise ValueError('Múi giờ không hợp lệ.') from None
+    classification = value.get('classification_mode', 'rules')
+    if classification not in ('rules', 'ai'):
+        raise ValueError('Chế độ phân loại không hợp lệ.')
     summary = value.get('summary')
     if not isinstance(summary, dict) or summary.get('mode') not in ('extractive', 'openai'):
         raise ValueError('Chế độ tóm tắt không hợp lệ.')
-    if summary['mode'] == 'openai' and summary.get('ai_consent') is not True:
-        raise ValueError('Cần xác nhận đồng ý xử lý nội dung qua OpenAI.')
+    provider = summary.get('provider', 'openai')
+    if provider not in ('deepseek', 'openai'):
+        raise ValueError('Nhà cung cấp AI không hợp lệ.')
+    if (classification == 'ai' or summary['mode'] == 'openai') and summary.get('ai_consent') is not True:
+        raise ValueError('Cần xác nhận đồng ý xử lý nội dung qua nhà cung cấp AI đã chọn.')
     rules = value.get('rules')
     if not isinstance(rules, list) or len(rules) > 100:
         raise ValueError('Tối đa 100 quy tắc.')
@@ -69,7 +75,7 @@ def validate_settings(value):
     for rule in rules:
         if not isinstance(rule, dict):
             raise ValueError('Quy tắc không hợp lệ.')
-        clean = {'category': text('Tên nhóm', rule.get('category'), 100)}
+        clean = {'category': text('Tên nhóm', rule.get('category'), 100), 'description': text('Mô tả nhóm', rule.get('description', ''), 1000, empty=True)}
         for field in ('keywords', 'senders'):
             entries = rule.get(field, [])
             if not isinstance(entries, list) or len(entries) > 100:
@@ -82,14 +88,15 @@ def validate_settings(value):
     enabled = value.get('schedule_enabled', False)
     if not isinstance(enabled, bool):
         raise ValueError('Trạng thái lịch chạy không hợp lệ.')
-    return {'source': source, 'schedule_enabled': enabled,
+    return {'source': source, 'schedule_enabled': enabled, 'classification_mode': classification,
+            'gmail_pdf': value.get('gmail_pdf', True) is True, 'pdf_ocr': value.get('pdf_ocr', False) is True,
             'gmail_query': text('Bộ lọc Gmail', value.get('gmail_query'), 1000),
             'interval_seconds': integer('Chu kỳ (giây)', value.get('interval_seconds'), 60, 604800),
             'timezone': zone, 'rules': clean_rules, 'unmatched_category': unmatched,
-            'summary': {'mode': summary['mode'],
+            'summary': {'mode': summary['mode'], 'provider': provider,
                         'max_chars': integer('Độ dài trích đoạn', summary.get('max_chars', 1200), 100, 10000),
                         'max_input_chars': integer('Giới hạn đầu vào AI', summary.get('max_input_chars', 12000), 1000, 100000),
-                        'model': text('Mô hình', summary.get('model', 'gpt-4o-mini'), 100),
+                        'model': text('Mô hình', summary.get('model', 'deepseek-chat' if provider == 'deepseek' else 'gpt-4o-mini'), 100),
                         'ai_consent': summary.get('ai_consent') is True}}
 
 
@@ -99,7 +106,7 @@ class MissingAIKey(RuntimeError):
 
 def error_message(error):
     if isinstance(error, MissingAIKey):
-        return 'Chưa có OpenAI API key. Lưu key trong Cài đặt hoặc chọn trích đoạn miễn phí.'
+        return 'Chưa có API key cho nhà cung cấp AI đã chọn. Lưu key trong Cài đặt hoặc dùng rules và trích đoạn miễn phí.'
     if isinstance(error, FileNotFoundError):
         return 'Thiếu thông tin kết nối. Vào Cài đặt để kết nối Gmail.'
     if isinstance(error, HTTPError):
@@ -135,6 +142,10 @@ def error_message(error):
                 return 'Quyền Gmail đã hết hạn hoặc bị thu hồi. Kết nối lại Gmail; token của ứng dụng Google ở chế độ Testing có thể hết hạn sau 7 ngày.'
             if reasons & {'invalid_client', 'unauthorized_client'}:
                 return 'Cấu hình OAuth không còn hợp lệ. Kiểm tra OAuth client và tải lại file JSON đúng project.'
+        if host == 'api.deepseek.com' and error.code == 402:
+            return 'Tài khoản DeepSeek chưa đủ số dư. Kiểm tra tài khoản thanh toán của bạn.'
+        if host == 'api.deepseek.com' and error.code in (401, 403):
+            return 'DeepSeek từ chối API key hoặc quyền sử dụng. Kiểm tra key DeepSeek trong Cài đặt.'
         if host == 'api.openai.com' and error.code in (401, 403):
             return 'OpenAI từ chối API key hoặc quyền sử dụng. Kiểm tra key trong Cài đặt, hoặc chuyển sang Trích đoạn để thử Gmail miễn phí.'
         if error.code in (401, 403):
@@ -186,7 +197,64 @@ class Admin:
             return {**self.state, 'next_run': self.next_due if self.settings['schedule_enabled'] else None,
                     'schedule_enabled': self.settings['schedule_enabled'],
                     'gmail_connected': self.token.exists(), 'gmail_client_configured': self.credentials.exists(),
-                    'ai_key_configured': bool(os.environ.get('OPENAI_API_KEY') or (self.private / 'ai-key.json').exists())}
+                    'ai_key_configured': self.has_key(self.settings['summary']['provider']),
+                    'ai_provider': self.settings['summary']['provider']}
+
+    def key_path(self, provider):
+        return self.private / ('deepseek-key.json' if provider == 'deepseek' else 'ai-key.json')
+
+    def has_key(self, provider):
+        return bool(os.environ.get('DEEPSEEK_API_KEY' if provider == 'deepseek' else 'OPENAI_API_KEY') or self.key_path(provider).exists())
+
+    def runtime_config(self, source):
+        config = self.config()
+        config['data_dir'] = str(self.root / source)
+        key = read_json(self.key_path(config['summary']['provider']), {}).get('key')
+        config['_api_key'] = key
+        if source == 'demo':
+            config['classification_mode'] = 'rules'
+            config['summary']['mode'] = 'extractive'
+        return config
+
+    def process_pdf(self, data, filename, reprocess=False):
+        from .documents import pdf_message
+        if not self.run_lock.acquire(blocking=False):
+            raise ValueError('Đang có lượt xử lý. Chờ hoàn tất rồi tải PDF.')
+        try:
+            config = self.runtime_config('pdf')
+            from hashlib import sha256
+            identifier = 'pdf:' + sha256(data).hexdigest()
+            database = Path(config['data_dir']) / 'notes.sqlite3'
+            if not reprocess and database.exists():
+                with sqlite3.connect(database) as connection:
+                    if connection.execute('SELECT 1 FROM notes WHERE id=?', (identifier,)).fetchone():
+                        return 0
+            if reprocess:
+                config['_reprocess_id'] = 'pdf:' + sha256(data).hexdigest()
+            document = pdf_message(data, filename, config, id=sha256(data).hexdigest(), sender='PDF tải lên', received_at=datetime.now(timezone.utc).isoformat())
+            return process([document], config, 'pdf')
+        finally:
+            self.run_lock.release()
+
+    def edit_categories(self, source, identifier, categories):
+        if source not in ('demo', 'gmail', 'pdf') or not isinstance(categories, list) or not categories:
+            raise ValueError('Chọn ít nhất một nhóm hợp lệ.')
+        allowed = {rule['category'] for rule in self.config()['rules']} | {'Cần xem lại'}
+        if self.config().get('unmatched_category'):
+            allowed.add(self.config()['unmatched_category'])
+        if any(not isinstance(item, str) or item not in allowed for item in categories):
+            raise ValueError('Nhóm không tồn tại trong cấu hình.')
+        with self.run_lock:
+            database = self.root / source / 'notes.sqlite3'
+            if not database.exists():
+                raise ValueError('Không tìm thấy ghi chép.')
+            with sqlite3.connect(database) as connection:
+                ensure_schema(connection)
+                cursor = connection.execute('UPDATE notes SET categories=? WHERE id=?', (json.dumps(list(dict.fromkeys(categories)), ensure_ascii=False), identifier))
+                if not cursor.rowcount:
+                    raise ValueError('Không tìm thấy ghi chép.')
+                connection.commit()
+                render_notes(connection, database.parent / 'notebooks', self.config()['timezone'])
 
     def start_run(self, source=None):
         if not self.run_lock.acquire(blocking=False):
@@ -210,11 +278,12 @@ class Admin:
             config['data_dir'] = str(self.root / ('demo' if source == 'demo' else 'gmail'))
             if source == 'demo':
                 config['summary']['mode'] = 'extractive'
+                config['classification_mode'] = 'rules'
                 incoming = read_json(self.base / 'examples/messages.json', [])
             else:
-                key = read_json(self.private / 'ai-key.json', {}).get('key')
+                key = read_json(self.key_path(config['summary']['provider']), {}).get('key')
                 config['_api_key'] = key
-                if config['summary']['mode'] == 'openai' and not (key or os.environ.get('OPENAI_API_KEY')):
+                if (config['classification_mode'] == 'ai' or config['summary']['mode'] == 'openai') and not self.has_key(config['summary']['provider']):
                     raise MissingAIKey()
                 incoming = messages(config, self.credentials, self.token)
             added = process(incoming, config, source)
@@ -248,14 +317,16 @@ class Admin:
         self.scheduler.start()
 
     def notes(self, source, day='', search='', category=''):
-        if source not in ('demo', 'gmail'):
+        if source not in ('demo', 'gmail', 'pdf'):
             raise ValueError('Nguồn không hợp lệ.')
         database = self.root / source / 'notes.sqlite3'
         if not database.exists():
             return {'notes': [], 'total': 0, 'categories': [], 'days': []}
+        with sqlite3.connect(database) as migration:
+            ensure_schema(migration)
         with sqlite3.connect(f'{database.as_uri()}?mode=ro', uri=True) as connection:
             connection.row_factory = sqlite3.Row
-            rows = [dict(row) for row in connection.execute('SELECT id,sender,subject,categories,summary,received_at,day,source FROM notes ORDER BY received_at DESC,id')]
+            rows = [dict(row) for row in connection.execute('SELECT id,sender,subject,categories,summary,received_at,day,source,origin_id,review_reason,file_hash FROM notes ORDER BY received_at DESC,id')]
         for row in rows:
             row['categories'] = json.loads(row['categories'])
         categories = sorted({item for row in rows for item in row['categories']})

@@ -83,23 +83,35 @@ def table_cell(value):
     return value.replace('\r\n', '\n').replace('\r', '\n').replace('\n', '<br>')
 
 
+
+def ensure_schema(connection):
+    connection.execute('CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, sender TEXT, subject TEXT, categories TEXT, summary TEXT, received_at TEXT, day TEXT, source TEXT, content_hash TEXT)')
+    columns = {row[1] for row in connection.execute('PRAGMA table_info(notes)')}
+    for name in ('origin_id', 'review_reason', 'file_hash'):
+        if name not in columns:
+            connection.execute(f'ALTER TABLE notes ADD COLUMN {name} TEXT')
+    connection.commit()
+
+
 def render_notes(connection, directory, timezone='Asia/Ho_Chi_Minh'):
     directory.mkdir(parents=True, exist_ok=True)
     days = connection.execute('SELECT DISTINCT day FROM notes').fetchall()
     for (day,) in days:
-        rows = connection.execute('SELECT id,sender,subject,categories,summary,received_at,source FROM notes WHERE day=? ORDER BY received_at,id', (day,)).fetchall()
+        rows = connection.execute('SELECT id,sender,subject,categories,summary,received_at,source,origin_id,review_reason FROM notes WHERE day=? ORDER BY received_at,id', (day,)).fetchall()
         chunks = [f'# Sổ ghi chép — {day}\n\n',
                   f'{len(rows)} ghi chép · Giờ hiển thị: {timezone}\n\n',
                   '| Giờ nhận | Tiêu đề | Người gửi | Phân loại | Nội dung ngắn | Nguồn |\n',
                   '| --- | --- | --- | --- | --- | --- |\n']
-        for identifier, sender, subject, categories, summary, received, source in rows:
+        for identifier, sender, subject, categories, summary, received, source, origin_id, review_reason in rows:
             local_time = datetime.fromisoformat(received).astimezone(ZoneInfo(timezone)).strftime('%H:%M')
             if source == 'gmail':
-                email_id = identifier.split(':', 1)[1]
+                email_id = origin_id or identifier.split(':', 1)[1]
                 link = f'[Mở email](https://mail.google.com/mail/u/0/#all/{email_id})'
+            elif source == 'pdf':
+                link = 'PDF tải lên'
             else:
                 link = 'Dữ liệu mẫu'
-            cells = [local_time, subject, sender, ', '.join(json.loads(categories)), summary]
+            cells = [local_time, subject, sender, ', '.join(json.loads(categories)), summary + ('\nLưu ý: ' + review_reason if review_reason else '')]
             chunks.append('| ' + ' | '.join(table_cell(cell) for cell in cells) + ' | ' + link + ' |\n')
         target = directory / (day + '.md')
         temporary = target.with_suffix('.md.tmp')
@@ -111,22 +123,31 @@ def process(messages, config, source):
     root = Path(config['data_dir'])
     root.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(root / 'notes.sqlite3') as connection:
-        connection.execute('CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, sender TEXT, subject TEXT, categories TEXT, summary TEXT, received_at TEXT, day TEXT, source TEXT, content_hash TEXT)')
+        ensure_schema(connection)
         added = 0
         for message in messages:
             identifier = source + ':' + message['id']
-            if connection.execute('SELECT 1 FROM notes WHERE id=?', (identifier,)).fetchone():
+            if connection.execute('SELECT 1 FROM notes WHERE id=?', (identifier,)).fetchone() and identifier != config.get('_reprocess_id'):
                 continue
-            categories = classify(message, config)
-            if not categories:
-                continue
-            summary = summarize(message, config)
+            reason = message.get('review_reason', '')
+            if reason and not message['body'].strip():
+                categories, summary = ['Cần xem lại'], 'Chưa đọc được nội dung PDF. Cần kiểm tra bản gốc.'
+            elif config.get('classification_mode', 'rules') == 'ai' or config.get('summary', {}).get('mode') == 'openai':
+                from .ai import analyze
+                categories, summary, reason = analyze(message, config, connection)
+            else:
+                categories = classify(message, config)
+                if reason and 'Cần xem lại' not in categories:
+                    categories.append('Cần xem lại')
+                if not categories:
+                    continue
+                summary = summarize(message, config)
             received = datetime.fromisoformat(message['received_at'])
             if received.tzinfo is None:
                 raise ValueError('received_at must include a timezone')
             day = received.astimezone(ZoneInfo(config.get('timezone', 'Asia/Ho_Chi_Minh'))).date().isoformat()
             digest = hashlib.sha256(message['body'].encode()).hexdigest()
-            connection.execute('INSERT INTO notes VALUES (?,?,?,?,?,?,?,?,?)', (identifier, message['sender'], message['subject'], json.dumps(categories, ensure_ascii=False), summary, message['received_at'], day, source, digest))
+            connection.execute('INSERT INTO notes (id,sender,subject,categories,summary,received_at,day,source,content_hash,origin_id,review_reason,file_hash) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET categories=excluded.categories, summary=excluded.summary, review_reason=excluded.review_reason, file_hash=excluded.file_hash, content_hash=excluded.content_hash', (identifier, message['sender'], message['subject'], json.dumps(categories, ensure_ascii=False), summary, message['received_at'], day, source, digest, message.get('origin_id'), reason, message.get('file_hash')))
             connection.commit()
             added += 1
         render_notes(connection, root / 'notebooks', config.get('timezone', 'Asia/Ho_Chi_Minh'))

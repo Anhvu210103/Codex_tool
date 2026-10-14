@@ -121,6 +121,7 @@ class AdminTests(unittest.TestCase):
 
     def test_secrets_are_private_and_never_returned(self):
         self.setup_login()
+        config=self.admin.config();config['summary']['provider']='openai';self.admin.save_settings(config)
         key='test-secret-do-not-return'
         self.assertEqual(self.post('/api/ai-key',{'key':key}).status_code,200)
         self.assertEqual((self.admin.private/'ai-key.json').stat().st_mode & 0o777,0o600)

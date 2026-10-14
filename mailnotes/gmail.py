@@ -2,6 +2,8 @@ import base64
 import json
 import os
 import secrets
+import hashlib
+import sqlite3
 import time
 import urllib.parse
 import urllib.request
@@ -123,6 +125,12 @@ def messages(config, credentials, token_path):
     token = access_token(credentials, token_path)
     headers = {'Authorization': 'Bearer ' + token}
     base = 'https://gmail.googleapis.com/gmail/v1/users/me/messages'
+    from .documents import pdf_message, MAX_PDF_BYTES
+    known = set()
+    database = Path(config['data_dir']) / 'notes.sqlite3'
+    if database.exists():
+        with sqlite3.connect(database) as connection:
+            known = {row[0] for row in connection.execute('SELECT id FROM notes')}
     page = None
     while True:
         query = {'q': config['gmail_query'], 'maxResults': 100}
@@ -133,10 +141,39 @@ def messages(config, credentials, token_path):
             detail = request_json(base + '/' + item['id'] + '?format=full', headers=headers)
             payload = detail['payload']
             fields = {h['name'].lower(): h['value'] for h in payload.get('headers', [])}
-            yield {'id': detail['id'], 'sender': fields.get('from', ''),
-                   'subject': fields.get('subject', '(không có tiêu đề)'),
-                   'received_at': datetime.fromtimestamp(int(detail['internalDate']) / 1000, timezone.utc).isoformat(),
-                   'body': body_text(payload)}
+            metadata = {'sender': fields.get('from', ''),
+                        'received_at': datetime.fromtimestamp(int(detail['internalDate']) / 1000, timezone.utc).isoformat(),
+                        'origin_id': detail['id']}
+            attachments = []
+            def collect(part):
+                filename = part.get('filename', '')
+                if config.get('gmail_pdf', True) and (filename.lower().endswith('.pdf') or part.get('mimeType') == 'application/pdf'):
+                    attachments.append(part)
+                for child in part.get('parts', []):
+                    collect(child)
+            collect(payload)
+            if not attachments:
+                yield {**metadata, 'id': detail['id'], 'subject': fields.get('subject', '(không có tiêu đề)'), 'body': body_text(payload)}
+            for index, part in enumerate(attachments):
+                body = part.get('body', {})
+                attachment_id = body.get('attachmentId')
+                identifier = detail['id'] + ':pdf:' + hashlib.sha256((attachment_id or str(index)).encode()).hexdigest()[:24]
+                if 'gmail:' + identifier in known:
+                    continue
+                if body.get('size', 0) > MAX_PDF_BYTES:
+                    yield {**metadata, 'id': identifier, 'subject': part.get('filename') or 'PDF', 'body': '',
+                           'file_hash': '', 'review_reason': 'PDF vượt 20 MB; cần xử lý riêng.'}
+                    continue
+                data = body.get('data')
+                if attachment_id:
+                    downloaded = request_json(base + '/' + detail['id'] + '/attachments/' + urllib.parse.quote(attachment_id, safe=''), headers=headers)
+                    data = downloaded['data']
+                raw = base64.urlsafe_b64decode((data or '') + '=' * (-len(data or '') % 4))
+                if len(raw) > MAX_PDF_BYTES or not raw.startswith(b'%PDF-'):
+                    yield {**metadata, 'id': identifier, 'subject': part.get('filename') or 'PDF', 'body': '',
+                           'review_reason': 'File đính kèm không phải PDF hợp lệ hoặc vượt 20 MB.'}
+                    continue
+                yield pdf_message(raw, part.get('filename') or 'PDF', config, id=identifier, **metadata)
         page = listing.get('nextPageToken')
         if not page:
             break

@@ -3,10 +3,34 @@
   "interval_seconds": 1800,
   "data_dir": ".local",
   "timezone": "Asia/Ho_Chi_Minh",
-  "summary": {"mode": "extractive", "max_chars": 1200},
+  "summary": {
+    "mode": "extractive",
+    "max_chars": 1200,
+    "provider": "deepseek",
+    "model": "deepseek-chat"
+  },
   "rules": [
-    {"category": "Văn bản pháp luật", "keywords": ["nghị định", "thông tư", "quyết định"]},
-    {"category": "Công việc cần xử lý", "keywords": ["hạn chót", "yêu cầu", "báo cáo"]}
+    {
+      "category": "Văn bản pháp luật",
+      "keywords": [
+        "nghị định",
+        "thông tư",
+        "quyết định"
+      ],
+      "description": "Thông tư, nghị định, quyết định và các quy định pháp luật."
+    },
+    {
+      "category": "Công việc cần xử lý",
+      "keywords": [
+        "hạn chót",
+        "yêu cầu",
+        "báo cáo"
+      ],
+      "description": "Yêu cầu thực hiện, gửi báo cáo hoặc công việc có thời hạn."
+    }
   ],
-  "unmatched_category": "Khác"
+  "unmatched_category": "Khác",
+  "classification_mode": "rules",
+  "gmail_pdf": true,
+  "pdf_ocr": false
 }
