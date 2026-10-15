@@ -67,7 +67,7 @@ def create_app(base=None, data_root=None, public_url=None):
             origin = request.headers.get('Origin')
             if origin and origin != public_url:
                 return jsonify(error='Nguồn yêu cầu không hợp lệ.'), 403
-        public = {'/', '/api/session', '/api/login', '/api/setup'}
+        public = {'/', '/health', '/api/session', '/api/login', '/api/setup'}
         if request.path not in public and not session.get('authenticated'):
             if request.path.startswith('/api/'):
                 return jsonify(error='Vui lòng đăng nhập.'), 401
@@ -103,6 +103,10 @@ def create_app(base=None, data_root=None, public_url=None):
         if not isinstance(data, dict):
             raise ValueError('Yêu cầu JSON không hợp lệ.')
         return data
+
+    @app.get('/health')
+    def health():
+        return jsonify(app='mailnotes', instance=app.config.get('DESKTOP_INSTANCE'))
 
     @app.get('/')
     def home():
@@ -174,6 +178,7 @@ def create_app(base=None, data_root=None, public_url=None):
         requested = request.args.get('provider')
         if requested in ('deepseek', 'openai'):
             status['ai_key_configured'] = admin.has_key(requested)
+        status['desktop_mode'] = 'desktop_shutdown' in app.extensions
         return jsonify(status)
 
     @app.get('/api/dashboard')
@@ -183,6 +188,18 @@ def create_app(base=None, data_root=None, public_url=None):
     @app.get('/api/usage')
     def usage():
         return jsonify(admin.usage())
+
+    @app.post('/api/desktop/stop')
+    def desktop_stop():
+        shutdown = app.extensions.get('desktop_shutdown')
+        if not shutdown:
+            return jsonify(error='Phiên này chạy theo chế độ máy chủ, không tắt từ trình duyệt.'), 400
+        if admin.run_lock.locked():
+            return jsonify(error='Đang xử lý tài liệu. Chờ hoàn tất rồi tắt tool.'), 409
+        timer = threading.Timer(1, shutdown)
+        timer.daemon = True
+        timer.start()
+        return jsonify(ok=True)
 
     @app.post('/api/run')
     def run():

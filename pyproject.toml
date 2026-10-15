@@ -11,6 +11,7 @@ web = ["Flask==3.1.2", "waitress==3.0.2"]
 [project.scripts]
 mailnotes = "mailnotes.cli:main"
 mailnotes-web = "mailnotes.web:main"
+mailnotes-app = "mailnotes.desktop:main"
 
 [build-system]
 requires = ["setuptools>=68"]

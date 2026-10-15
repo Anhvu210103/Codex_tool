@@ -93,6 +93,7 @@ function dateText(value) {
 }
 async function refreshStatus() {
   const status=await api('/api/status?provider='+encodeURIComponent($('provider').value || 'deepseek'));
+  $('stop-app').hidden=!status.desktop_mode;
   $('run-state').textContent=status.running?'Đang xử lý':status.error?'Cần kiểm tra':'Sẵn sàng';
   $('run-detail').textContent=status.last_finished?'Hoàn tất: '+dateText(status.last_finished):'Chưa có lượt xử lý';
   $('added-count').textContent=status.last_added ?? '—';
@@ -174,6 +175,7 @@ $('auth-form').addEventListener('submit',async event=>{
 });
 document.querySelectorAll('[data-tab]').forEach(node=>node.addEventListener('click',()=>setTab(node.dataset.tab)));
 document.querySelectorAll('[data-go]').forEach(node=>node.addEventListener('click',()=>setTab(node.dataset.go)));
+action('stop-app',async()=>{if(!confirm('Tắt tool và dừng lịch tự động trên máy này?'))return;await post('/api/desktop/stop');if(polling)clearInterval(polling);notice('Đã yêu cầu tắt tool. Bạn có thể đóng trang. Bấm biểu tượng Sổ ghi chép để mở lại.');});
 action('logout',async()=>{await post('/api/logout');await boot();});
 action('run-now',()=>run());action('demo-run',()=>run('demo'));
 action('save-settings',()=>saveSettings());action('save-rules',()=>saveSettings(true));

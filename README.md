@@ -2,6 +2,12 @@
 
 MVP đọc nội dung Gmail, PDF đính kèm và PDF tải lên, phân loại theo rules, chống xử lý trùng bằng SQLite và xuất Sổ ghi chép dạng bảng Markdown theo ngày nhận email. Bảng gồm giờ nhận, tiêu đề, người gửi, phân loại, nội dung ngắn và nguồn; giờ hiển thị theo múi giờ cấu hình. Chỉ đọc Gmail, không gửi thư, không đổi nhãn hoặc đánh dấu đã đọc.
 
+## Mở bằng app, không gõ lệnh mỗi lần
+
+Có launcher **Mo-So-Ghi-Chep.sh** cho bản mã nguồn Linux đã cài và gói app tự chứa Python/thư viện cho Linux/macOS. Bấm app để tự chạy nền và mở trang quản trị. Lần bấm tiếp theo mở lại phiên đang chạy. Đăng nhập rồi dùng nút **Tắt tool** để dừng hẳn; đóng tab chỉ đóng giao diện.
+
+Xem [cách tải app, cài và giữ dữ liệu](packaging/README.md). Bản Linux đã build và kiểm chứng chạy độc lập tại môi trường phát triển; bản Mac có quy trình build GitHub Actions riêng cho Apple Silicon/Intel, chưa khẳng định hoạt động trên máy khách trước khi có kết quả build và kiểm thử. App Mac thử nghiệm chưa ký/notarize. Dữ liệu riêng được giữ ngoài app để không mất khi cập nhật.
+
 ## Phân loại + tóm tắt bằng DeepSeek
 
 1. Vào **Nhóm tài liệu**, đặt tên nhóm và mô tả, bấm Lưu quy tắc. Từ khóa/người gửi chỉ dùng trong chế độ rules miễn phí.
