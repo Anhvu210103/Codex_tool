@@ -67,7 +67,7 @@ def validate_settings(value):
     if not isinstance(summary, dict) or summary.get('mode') not in ('extractive', 'openai'):
         raise ValueError('Chế độ tóm tắt không hợp lệ.')
     provider = summary.get('provider', 'openai')
-    if provider not in ('deepseek', 'openai'):
+    if provider not in ('deepseek', 'openai', 'gemini'):
         raise ValueError('Nhà cung cấp AI không hợp lệ.')
     if (classification == 'ai' or summary['mode'] == 'openai') and summary.get('ai_consent') is not True:
         raise ValueError('Cần xác nhận đồng ý xử lý nội dung qua nhà cung cấp AI đã chọn.')
@@ -109,7 +109,7 @@ def validate_settings(value):
             'summary': {'mode': summary['mode'], 'provider': provider,
                         'max_chars': integer('Độ dài trích đoạn', summary.get('max_chars', 1200), 100, 10000),
                         'max_input_chars': integer('Giới hạn đầu vào AI', summary.get('max_input_chars', 12000), 1000, 100000),
-                        'model': text('Mô hình', summary.get('model', 'deepseek-chat' if provider == 'deepseek' else 'gpt-4o-mini'), 100),
+                        'model': text('Mô hình', summary.get('model', {'deepseek':'deepseek-chat','openai':'gpt-4o-mini','gemini':'gemini-flash-latest'}[provider]), 100),
                         'ai_consent': summary.get('ai_consent') is True, 'pricing': prices}}
 
 
@@ -155,6 +155,19 @@ def error_message(error):
                 return 'Quyền Gmail đã hết hạn hoặc bị thu hồi. Kết nối lại Gmail; token của ứng dụng Google ở chế độ Testing có thể hết hạn sau 7 ngày.'
             if reasons & {'invalid_client', 'unauthorized_client'}:
                 return 'Cấu hình OAuth không còn hợp lệ. Kiểm tra OAuth client và tải lại file JSON đúng project.'
+        if host == 'generativelanguage.googleapis.com':
+            if reasons & {'API_KEY_INVALID','API_KEY_EXPIRED','API_KEY_SERVICE_BLOCKED','API_KEY_HTTP_REFERRER_BLOCKED','API_KEY_IP_ADDRESS_BLOCKED'}:
+                return 'Gemini API key không hợp lệ, hết hạn hoặc bị giới hạn không đúng ứng dụng. Kiểm tra key và API restrictions trong Google AI Studio/Google Cloud.'
+            if reasons & {'SERVICE_DISABLED','accessNotConfigured'}:
+                return 'Generative Language API chưa bật trong project chứa Gemini key. Bật API đó trong Google Cloud rồi kiểm tra lại.'
+            if error.code in (401, 403):
+                return 'Gemini từ chối API key hoặc quyền truy cập. Kiểm tra key trong Google AI Studio và quyền Gemini API của project.'
+            if error.code == 404:
+                return 'Không tìm thấy model Gemini. Bấm Kiểm tra key & model trong Cài đặt rồi chọn tên model được tài khoản hỗ trợ.'
+            if error.code == 429:
+                return 'Gemini đang hết quota hoặc giới hạn lượt gọi. Kiểm tra quota/billing trong Google AI Studio, rồi thử lại.'
+            if error.code == 400:
+                return 'Gemini không nhận PDF hoặc cấu hình này. Kiểm tra file có mật khẩu, giới hạn tài liệu và model hỗ trợ PDF/JSON.'
         if host == 'api.deepseek.com' and error.code == 402:
             return 'Tài khoản DeepSeek chưa đủ số dư. Kiểm tra tài khoản thanh toán của bạn.'
         if host == 'api.deepseek.com' and error.code in (401, 403):
@@ -277,10 +290,10 @@ class Admin:
                 'recent': notes['notes'][:8], 'usage': self.usage(now)}
 
     def key_path(self, provider):
-        return self.private / ('deepseek-key.json' if provider == 'deepseek' else 'ai-key.json')
+        return self.private / {'deepseek':'deepseek-key.json','openai':'ai-key.json','gemini':'gemini-key.json'}[provider]
 
     def has_key(self, provider):
-        return bool(os.environ.get('DEEPSEEK_API_KEY' if provider == 'deepseek' else 'OPENAI_API_KEY') or self.key_path(provider).exists())
+        return bool(os.environ.get({'deepseek':'DEEPSEEK_API_KEY','openai':'OPENAI_API_KEY','gemini':'GEMINI_API_KEY'}[provider]) or self.key_path(provider).exists())
 
     def runtime_config(self, source):
         config = self.config()

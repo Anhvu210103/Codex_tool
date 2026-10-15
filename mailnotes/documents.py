@@ -66,6 +66,7 @@ def save_pdf(data, root):
 def pdf_message(data, filename, config, **metadata):
     if len(data) > MAX_PDF_BYTES or not data.startswith(b'%PDF-'):
         raise ValueError('Chọn file PDF hợp lệ, tối đa 20 MB.')
-    text, warning = pdf_text(data, config.get('pdf_ocr', False))
+    cloud_pdf = config.get('summary', {}).get('provider') == 'gemini' and (config.get('classification_mode') == 'ai' or config.get('summary', {}).get('mode') == 'openai')
+    text, warning = ('', '') if cloud_pdf else pdf_text(data, config.get('pdf_ocr', False))
     digest = save_pdf(data, config['data_dir'])
     return {**metadata, 'subject': filename[:250], 'body': text, 'review_reason': warning, 'file_hash': digest}

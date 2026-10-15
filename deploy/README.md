@@ -85,3 +85,12 @@ Nút Đọc lại PDF hỗ trợ cả Gmail và upload, giữ một dòng ghi ch
 ## Bộ chọn Gmail đơn giản
 
 Cấu hình mới có gmail_filter mặc định Hôm nay. Thiết lập cũ thiếu trường này được giữ như bộ lọc nâng cao, không tự mở rộng phạm vi đọc. Khi người dùng chọn Hôm nay/7 ngày/khoảng ngày, server tính ranh giới ngày theo timezone từng lượt và kiểm tra internalDate của email để không lấy nhầm thư ở ngày bên cạnh; dùng số giây timestamp cho Gmail, không phụ thuộc cách Gmail diễn giải múi giờ của chuỗi ngày. “7 ngày” là 7 ngày lịch tính cả hôm nay. Bộ lọc người gửi và nhãn được kiểm tra trước khi tạo query; cú pháp thô chỉ hoạt động ở chế độ nâng cao.
+
+
+## Gemini cloud PDF
+
+Không cần cài OCR khi chọn provider Gemini và bật AI. Gốc PDF lưu trong files/ như trước, nguyên file được gửi Google để đọc/phân nhóm/tóm tắt. Lưu key qua UI hoặc GEMINI_API_KEY, yêu cầu mạng tới generativelanguage.googleapis.com. Bí danh model mặc định gemini-flash-latest có thể đổi theo Google, nên chọn model cụ thể và cập nhật đơn giá khi vận hành có kiểm soát chi phí. Model list check dùng quyền key hiện tại; cần thử file thực tế để xác nhận PDF/JSON hoạt động.
+
+PDF ≤8 MB gửi inline; lớn hơn dùng resumable Files API, poll trạng thái trong ngân sách chờ, rồi generateContent và yêu cầu xóa file tạm. Không dùng endpoint do khách nhập, không gửi key qua URL/query hoặc redirect. Giới hạn upload của tool vẫn 20 MB. Cloud PDF không bị cắt theo giới hạn ký tự; giới hạn trang/dung lượng/chính sách của model do Google áp dụng. File scan cũ có bản gốc trong files/ được xử lý lại bằng nút Đọc lại PDF. Nếu bản gốc đã bị xóa thì cần tải lại file.
+
+Token Gemini chuẩn hóa từ usageMetadata: promptTokenCount, cachedContentTokenCount, candidatesTokenCount + thoughtsTokenCount, totalTokenCount. Files upload/poll/delete không được đếm thành lượt generation; không gọi đồng bộ hóa đơn/số dư. Chưa kiểm chứng API thật khi thiếu key. Giá nhập tay là ước tính, không giả định free tier áp dụng cho mọi tài khoản. Dữ liệu test dùng transport giả lập, không gửi tài liệu khách.

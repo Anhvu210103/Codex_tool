@@ -8,6 +8,22 @@ Có launcher **Mo-So-Ghi-Chep.sh** cho bản mã nguồn Linux đã cài và gó
 
 Xem [cách tải app, cài và giữ dữ liệu](packaging/README.md). Bản Linux đã build và kiểm chứng chạy độc lập tại môi trường phát triển; bản Mac có quy trình build GitHub Actions riêng cho Apple Silicon/Intel, chưa khẳng định hoạt động trên máy khách trước khi có kết quả build và kiểm thử. App Mac thử nghiệm chưa ký/notarize. Dữ liệu riêng được giữ ngoài app để không mất khi cập nhật.
 
+## Gemini: đọc PDF trên cloud, không OCR trên máy
+
+1. Cập nhật code và mở lại tool. Vào Sổ ghi chép → **Cài Gemini để đọc PDF trên cloud**, hoặc Cài đặt → chọn AI phân nhóm + tóm tắt và nhà cung cấp Gemini.
+2. Tạo Gemini API key tại [Google AI Studio](https://aistudio.google.com/apikey). Đây là key riêng, không phải file OAuth Gmail. Nhập vào Cài đặt và bấm **Lưu key riêng**; không gửi key qua chat.
+3. Bấm **Kiểm tra key & model** để xem model tài khoản truy cập được. Mặc định `gemini-flash-latest` theo ví dụ SDK chính thức; đây là bí danh có thể đổi phiên bản. Chọn model cố định được tài khoản hỗ trợ PDF/JSON nếu muốn theo dõi đơn giá ổn định. Kiểm tra danh sách model chưa chứng minh đọc PDF thành công.
+4. Đọc thông báo gửi nguyên PDF tới Google, xác nhận đồng ý, rồi **Lưu cài đặt**. Sau đó upload PDF hoặc chạy Gmail với Đọc PDF đính kèm được bật.
+5. Tài liệu scan đã lưu trước đây: bấm **Đọc lại PDF**. Bản cũ được cập nhật, không tạo dòng trùng. Thao tác có thể phát sinh phí AI và thay nhóm/tóm tắt chỉnh tay.
+
+Chế độ Gemini AI gửi nguyên PDF (cả scan), không gọi pypdf để trích chữ, Poppler hoặc Tesseract. File gốc vẫn được lưu trên đĩa để mở lại; đọc hiểu diễn ra trên API Google. Tối đa 20 MB theo giới hạn upload của tool. File tối đa 8 MB được gửi inline; file lớn hơn dùng Files API, chờ xử lý và yêu cầu xóa file tạm sau lượt gọi, kể cả khi generation lỗi. Nếu chưa xác nhận xóa được, ghi chép có cảnh báo. Việc xóa file tạm không có nghĩa Google không lưu dữ liệu theo chính sách dịch vụ của họ.
+
+Phân nhóm và tóm tắt dùng một lượt generateContent. Có cache theo hash PDF, model, nhóm và prompt. Token đọc PDF do API báo, không ước lượng từ ký tự; token đầu ra cộng cả thoughtsTokenCount nếu có. Giá Gemini nhập riêng trong Cài đặt theo model, không tự lấy giá của DeepSeek. Đơn giá chưa cấu hình sẽ hiển thị chưa đủ dữ liệu. Giới hạn ký tự chỉ áp dụng nội dung văn bản, không cắt PDF gửi Gemini.
+
+Chế độ thử miễn phí vẫn dùng rules/trích đoạn và không gọi Gemini. DeepSeek/OpenAI vẫn được giữ; các chế độ đó đọc chữ/OCR cục bộ như trước. Chỉ khi chọn Gemini + bật AI và lưu, PDF mới được gửi lên cloud. Key được lưu tại `.local/admin/gemini-key.json` quyền 0600 hoặc dùng biến `GEMINI_API_KEY`. API chỉ trả trạng thái có key, không trả lại giá trị. Backend dùng domain `generativelanguage.googleapis.com`; TLS được xác minh và không chuyển tiếp API key qua redirect.
+
+Đã kiểm chứng PDF scan đi qua adapter API, Gmail PDF, upload, đọc lại bản cũ, token/cache và giao diện bằng Gemini giả lập. Chưa có key trong môi trường phát triển để gọi Gemini thật hoặc xác nhận độ chính xác, quota, chi phí thực tế. Tham khảo [SDK chính thức](https://github.com/googleapis/python-genai) và [tài liệu PDF](https://ai.google.dev/gemini-api/docs/document-processing). File có mật khẩu, model không phù hợp, quota/billing hoặc file vượt giới hạn Google có thể bị API từ chối; tool báo lỗi thay vì giả vờ đã đọc.
+
 ## Phân loại + tóm tắt bằng DeepSeek
 
 1. Vào **Nhóm tài liệu**, đặt tên nhóm và mô tả, bấm Lưu quy tắc. Từ khóa/người gửi chỉ dùng trong chế độ rules miễn phí.
@@ -134,7 +150,7 @@ Mặc định `summary.mode = "extractive"`: bỏ một số chữ ký và tríc
 
 - Gmail: `gmail.googleapis.com`
 - OAuth: `accounts.google.com`, `oauth2.googleapis.com`
-- AI tùy chọn: `api.deepseek.com`, `api.openai.com`
+- AI tùy chọn: `generativelanguage.googleapis.com`, `api.deepseek.com`, `api.openai.com`
 
 TLS được xác minh mặc định. Không cần API key để chạy demo/extractive. Việc có domain trong cấu hình không đồng nghĩa OAuth/API đã hoạt động.
 
