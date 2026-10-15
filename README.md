@@ -20,6 +20,12 @@ AI được gọi một lần để trả cả nhóm và tóm tắt, có cache v
 
 Đã kiểm chứng với PDF có chữ thật, AI giả lập và trình duyệt thật. DeepSeek thật chưa được gọi vì chưa có API key; chất lượng phân nhóm/tóm tắt cần đối chiếu tài liệu của khách. Chế độ mẫu luôn dùng rules và trích đoạn miễn phí, không giả vờ là kết quả AI.
 
+## Giao diện dễ đọc
+
+Mặc định chữ nội dung 18px, màu chữ phụ có tương phản rõ, nút/ô nhập khoảng 48–50px và nhãn nhóm lớn hơn. Góc trên có **Cỡ chữ → Dễ đọc / Lớn / Rất lớn** (18/20/22px); lựa chọn được ghi nhớ trên trình duyệt, không đổi cấu hình xử lý tài liệu. Các cỡ dùng đơn vị rem để toàn bộ giao diện tăng cùng nhau.
+
+Ghi chép gần nhất nằm trước cấu hình nguồn trên Tổng quan. Nội dung tóm tắt không còn bị nhốt trong vùng cuộn nhỏ; bảng có hàng xen kẽ, tiêu đề rõ, vùng cuộn ngang có thể focus bằng bàn phím và có hướng dẫn vuốt trên điện thoại. Điều hướng mobile xếp thành các nút thay vì chữ nhỏ phải kéo ngang. Đã kiểm tra năm màn hình ở các độ rộng 1440, 1280, 1024, 390 và 320px, gồm chế độ chữ rất lớn; các cặp màu chữ chính kiểm tra đều đạt tương phản ít nhất 4.5:1. Chưa coi đây là đánh giá khả năng tiếp cận toàn diện bằng công nghệ hỗ trợ.
+
 ## Tổng quan dùng hằng ngày
 
 Trang Tổng quan hiển thị tiền AI hôm nay và tổng chi phí đã biết (USD ước tính), token hôm nay, tài liệu nhận hôm nay, số tài liệu Cần xem lại, trạng thái/lượt chạy gần nhất, lịch tự động và 8 ghi chép gần nhất. Bảng hướng dẫn Bắt đầu đơn giản đã bỏ. Có nút Chạy ngay, Đọc PDF, xem sổ, xem nhóm và sửa nhóm tại dòng ghi chép.

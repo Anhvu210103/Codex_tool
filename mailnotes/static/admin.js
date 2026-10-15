@@ -2,6 +2,14 @@
 const $ = id => document.getElementById(id);
 let csrf = '', config = null, activeTab = 'overview', polling = null, currentNotes = null;
 const titles = {overview:'Tổng quan',notebook:'Sổ ghi chép',usage:'Token & chi phí',rules:'Nhóm tài liệu',settings:'Cài đặt'};
+function applyTextSize(size){
+ const safe=['comfortable','large','xlarge'].includes(size)?size:'comfortable';
+ document.documentElement.dataset.textSize=safe;$('text-size').value=safe;
+ try{localStorage.setItem('mailnotes.textSize',safe);}catch{}
+}
+let savedTextSize='comfortable';try{savedTextSize=localStorage.getItem('mailnotes.textSize') || 'comfortable';}catch{}
+applyTextSize(savedTextSize);
+$('text-size').addEventListener('change',()=>applyTextSize($('text-size').value));
 async function api(path, options = {}) {
   const response = await fetch(path, {credentials:'same-origin', ...options, headers:{'Content-Type':'application/json','X-CSRF-Token':csrf,...options.headers}});
   const data = await response.json();
@@ -139,8 +147,8 @@ async function loadNotes() {
     const edit=document.createElement('button');edit.className='secondary edit-button';edit.textContent='Sửa nhóm';edit.addEventListener('click',()=>openGroupEditor(note));categories.append(edit);
     const content=document.createElement('td');const summary=document.createElement('div');summary.className='summary-text';summary.textContent=note.summary;content.append(summary);if(note.review_reason){const warning=document.createElement('div');warning.className='review-note';warning.textContent=note.review_reason;content.append(warning);}
     const source=document.createElement('td');
-    if(note.source==='gmail') {const link=document.createElement('a');link.textContent='Mở email ↗';link.href='https://mail.google.com/mail/u/0/#all/'+encodeURIComponent(note.origin_id || note.id.split(':').slice(1).join(':'));link.target='_blank';link.rel='noopener noreferrer';source.append(link);} else source.textContent=note.source==='pdf'?'PDF tải lên':'Dữ liệu mẫu';
-    if(note.file_hash){const pdf=document.createElement('a');pdf.textContent='Tải PDF ↓';pdf.href='/api/document?'+new URLSearchParams({source:note.source,id:note.id});source.append(document.createElement('br'),pdf);const again=document.createElement('button');again.className='secondary edit-button';again.textContent='Đọc lại PDF';again.addEventListener('click',async()=>{if(!confirm('Đọc lại PDF theo cấu hình hiện tại? Có thể tốn phí AI và thay nhóm/tóm tắt đã chỉnh tay.'))return;again.disabled=true;try{await post('/api/notes/reprocess',{source:note.source,id:note.id});notice('Đã đọc lại PDF và cập nhật sổ.');await loadNotes();}catch(error){notice(error.message,true);}finally{again.disabled=false;}});source.append(document.createElement('br'),again);}
+    if(note.source==='gmail') {const link=document.createElement('a');link.textContent='Mở email';link.href='https://mail.google.com/mail/u/0/#all/'+encodeURIComponent(note.origin_id || note.id.split(':').slice(1).join(':'));link.target='_blank';link.rel='noopener noreferrer';source.append(link);} else source.textContent=note.source==='pdf'?'PDF tải lên':'Dữ liệu mẫu';
+    if(note.file_hash){const pdf=document.createElement('a');pdf.textContent='Tải PDF';pdf.href='/api/document?'+new URLSearchParams({source:note.source,id:note.id});source.append(document.createElement('br'),pdf);const again=document.createElement('button');again.className='secondary edit-button';again.textContent='Đọc lại PDF';again.addEventListener('click',async()=>{if(!confirm('Đọc lại PDF theo cấu hình hiện tại? Có thể tốn phí AI và thay nhóm/tóm tắt đã chỉnh tay.'))return;again.disabled=true;try{await post('/api/notes/reprocess',{source:note.source,id:note.id});notice('Đã đọc lại PDF và cập nhật sổ.');await loadNotes();}catch(error){notice(error.message,true);}finally{again.disabled=false;}});source.append(document.createElement('br'),again);}
     row.append(time,title,categories,content,source);$('notes-body').append(row);
   }
   $('notes-count').textContent=(data.total>500?'Hiển thị 500 / ':'')+data.total+' ghi chép';
