@@ -14,6 +14,8 @@ Mac: giải nén ZIP artifact rồi ZIP chứa app, kéo `SoGhiChep.app` vào Ap
 
 GitHub yêu cầu đăng nhập và quyền đọc repository để tải artifact. Có thể cần bật Actions cho repository nếu đang bị tắt. Quy trình build tự chạy khi nhánh codex/admin-web thay đổi các file app, hoặc chủ repository chọn Run workflow. Artifact chỉ có sau khi job tương ứng thành công; chưa coi bản Mac đã chạy được nếu chưa test trên Mac thật.
 
+CI chạy kiểm thử ứng dụng, đóng gói trên từng hệ điều hành, rồi khởi động bản vừa đóng gói và kiểm tra trang web cùng API phiên làm việc trước khi tải artifact lên. Đây là phép thử tự động trên máy Mac của GitHub; vẫn cần thử trên iMac của khách để xác nhận phiên bản macOS, chip và quyền mở ứng dụng.
+
 ## Dùng bản mã nguồn đã cài trên máy bạn
 
 Với repository đã có `.venv` và thư viện như các bước trước: cập nhật mã nguồn một lần, dừng phiên Terminal cũ bằng Ctrl+C. Sau đó dùng file **Mo-So-Ghi-Chep.sh** bằng trình quản lý file (Run as a Program / Chạy như chương trình). Nó dùng lại dữ liệu `.local/` hiện có và thêm mục Sổ ghi chép vào danh sách ứng dụng Linux. Không cần chạy lại lệnh Python mỗi lần.
@@ -50,6 +52,7 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-build.txt
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/python packaging/build.py
+.venv/bin/python packaging/smoke_app.py
 ```
 
 Linux tạo `dist/SoGhiChep`; macOS tạo `dist/SoGhiChep.app`. Không cross-build Mac từ Linux. CI dùng Ubuntu 22.04 để có nền glibc cũ hơn; bản Linux build tại môi trường cloud hiện tại chỉ được kiểm chứng trên chính môi trường đó, không cam kết chạy mọi distro/CPU. PDF scan tiếng Việt, OAuth Gmail thật, DeepSeek thật và bản macOS vẫn cần kiểm thử trên máy đích có credentials hợp lệ.

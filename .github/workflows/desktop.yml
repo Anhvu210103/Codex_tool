@@ -32,6 +32,7 @@ jobs:
       - run: python -m pip install -r requirements-build.txt
       - run: python -m unittest discover -s tests -v
       - run: python packaging/build.py
+      - run: python packaging/smoke_app.py
       - name: Archive Linux app
         if: runner.os == 'Linux'
         run: tar -C dist -czf SoGhiChep-Linux.tar.gz SoGhiChep

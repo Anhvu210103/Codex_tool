@@ -59,6 +59,7 @@ function addRule(rule = {category:'',description:'',keywords:[],senders:[]}) {
   $('rule-list').append(card);
 }
 function populateSettings() {
+  $('pdf-reprocess').checked=true;
   $('source').value=config.source; $('gmail-query').value=config.gmail_query;
   const filter=config.gmail_filter || {period:'advanced'};
   $('gmail-period').value=filter.period; $('gmail-start').value=filter.start_date || ''; $('gmail-end').value=filter.end_date || '';
