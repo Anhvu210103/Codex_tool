@@ -200,6 +200,13 @@ action('stop-app',async()=>{if(!confirm('Tắt tool và dừng lịch tự độ
 action('logout',async()=>{await post('/api/logout');await boot();});
 action('run-now',()=>run());action('demo-run',()=>run('demo'));
 action('save-settings',()=>saveSettings());action('save-rules',()=>saveSettings(true));
+action('add-preset-groups',async()=>{
+  const presets=await api('/api/group-presets');
+  const existing=new Set([...document.querySelectorAll('.rule-category')].map(node=>node.value.trim().toLocaleLowerCase('vi-VN')));
+  let added=0;
+  for(const rule of presets){const key=rule.category.toLocaleLowerCase('vi-VN');if(existing.has(key))continue;addRule(rule);existing.add(key);added++;}
+  notice(added?`Đã thêm ${added} nhóm mẫu. Xem lại mô tả rồi bấm Lưu quy tắc.`:'Bạn đã có đủ các nhóm mẫu.');
+});
 $('add-rule').addEventListener('click',()=>addRule());
 $('keep-unmatched').addEventListener('change',()=>{$('unmatched').disabled=!$('keep-unmatched').checked;});
 $('summary-mode').addEventListener('change',()=>{$('ai-options').hidden=$('summary-mode').value!=='openai';updateProviderUI();});

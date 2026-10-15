@@ -8,6 +8,20 @@ Có launcher **Mo-So-Ghi-Chep.sh** cho bản mã nguồn Linux đã cài và gó
 
 Xem [cách tải app, cài và giữ dữ liệu](packaging/README.md). Bản Linux đã build và kiểm chứng chạy độc lập tại môi trường phát triển; bản Mac có quy trình build GitHub Actions riêng cho Apple Silicon/Intel, chưa khẳng định hoạt động trên máy khách trước khi có kết quả build và kiểm thử. App Mac thử nghiệm chưa ký/notarize. Dữ liệu riêng được giữ ngoài app để không mất khi cập nhật.
 
+## Bản thử AI thao tác Gmail bằng trình duyệt
+
+Trên máy Linux đang chạy bản mã nguồn, dùng **Mo-AI-Gmail.sh** để mở bản thử riêng. Lần đầu launcher cài `requirements-browser.txt` vào `.venv` hiện có; cần Chrome hoặc Chromium cài trên máy. Bản thử dùng hồ sơ trình duyệt riêng tại `.local/browser-gmail/profile`; người dùng đăng nhập Gmail ngay trong cửa sổ đó. Không gửi mật khẩu cho tool hay cho người hỗ trợ. Nếu Google từ chối đăng nhập bằng trình duyệt tự động, dừng bản thử và tiếp tục dùng kết nối Gmail API đã có.
+
+Trước khi chạy, trong Cài đặt bật Gemini AI, lưu key và đồng ý xử lý dữ liệu. AI nhận **ảnh chụp giao diện Gmail**, danh sách nút/hàng đang thấy và chọn email hoặc nút PDF; mỗi lượt chọn có thể dùng token. Bản thử áp dụng bộ lọc Gmail đã lưu cộng điều kiện có PDF, thử tối đa 3 thư, tải PDF qua giao diện và ghi vào nguồn **PDF tải lên** trong sổ. Tải lại cùng file sẽ xử lý lại; cache AI có thể tránh một lượt phân loại trùng. Chỉ cho phép mở thư và chọn PDF; lựa chọn gửi/xóa/lưu trữ bị chặn. Mở thư có thể khiến Gmail đánh dấu đã đọc. Bản thử không chạy theo lịch và chưa thay thế bộ kết nối Gmail API.
+
+Đây là phép thử điều khiển trình duyệt trên Gmail, chưa phải bằng chứng hoạt động trên website cơ quan nhà nước. Đã kiểm thử lựa chọn AI, chặn nút nguy hiểm và nhận diện hàng email/nút PDF trên trang mô phỏng; chưa thử Gmail thật vì môi trường phát triển không có phiên đăng nhập của người dùng. Bản macOS đóng gói hiện chưa kèm Playwright; cần kiểm chứng bản thử trên Linux trước khi quyết định cách tích hợp cho iMac.
+
+## Nhóm mẫu cho cơ quan nhà nước
+
+Bản cài mới có 14 nhóm mẫu: văn bản pháp luật, công việc cần xử lý, công văn chỉ đạo, thủ tục hành chính, kinh tế và đầu tư, tài chính và ngân sách, thuế/phí, đấu thầu, doanh nghiệp, đất đai/xây dựng, lao động/an sinh, báo cáo/thống kê, nhân sự nội bộ và thanh tra/kiểm tra. Mỗi nhóm có mô tả để Gemini chọn khi đọc tài liệu và từ khóa để thử chế độ miễn phí. Một tài liệu có thể vào nhiều nhóm.
+
+Bản đã cài giữ nguyên nhóm người dùng đã lưu. Muốn bổ sung nhóm mẫu, vào **Nhóm tài liệu → Thêm nhóm mẫu cơ quan nhà nước**, xem lại mô tả rồi bấm **Lưu quy tắc**. Nút chỉ thêm nhóm còn thiếu theo tên, không xóa hoặc ghi đè nhóm riêng. Nhóm mới áp dụng cho tài liệu xử lý tiếp theo; PDF cũ có thể đọc lại nếu muốn phân loại theo nhóm mới.
+
 ## Gemini: đọc PDF trên cloud, không OCR trên máy
 
 1. Cập nhật code và mở lại tool. Vào Sổ ghi chép → **Cài Gemini để đọc PDF trên cloud**, hoặc Cài đặt → chọn AI phân nhóm + tóm tắt và nhà cung cấp Gemini.
@@ -32,7 +46,7 @@ Chế độ thử miễn phí vẫn dùng rules/trích đoạn và không gọi 
 4. Vào **Sổ ghi chép**, chọn PDF và bấm **Đọc & ghi vào sổ**; hoặc bật **Đọc PDF đính kèm Gmail** rồi chạy nguồn Gmail. Một tài liệu có thể thuộc nhiều nhóm.
 5. Bấm **Sửa nhóm** tại dòng ghi chép khi cần điều chỉnh. Không gọi AI lại khi sửa nhóm. Có nút tải PDF gốc.
 
-AI được gọi một lần để trả cả nhóm và tóm tắt, có cache và chống xử lý trùng. Không chắc chắn/nhóm lạ sẽ vào **Cần xem lại**. PDF scan cần OCR cục bộ; xem hướng dẫn cài OCR trong deploy/README.md. PDF quá dài bị giới hạn và có cảnh báo; không coi trích đoạn hoặc tóm tắt phần đầu là đã đọc toàn bộ tài liệu. Lần tải lại PDF đã có mặc định không xử lý lại; chỉ chọn Xử lý lại khi cần áp dụng cấu hình mới, có thể tốn phí và thay nội dung/nhóm đã chỉnh tay.
+AI được gọi một lần để trả cả nhóm và tóm tắt, có cache và chống xử lý trùng. Không chắc chắn/nhóm lạ sẽ vào **Cần xem lại**. PDF scan cần OCR cục bộ; xem hướng dẫn cài OCR trong deploy/README.md. PDF quá dài bị giới hạn và có cảnh báo; không coi trích đoạn hoặc tóm tắt phần đầu là đã đọc toàn bộ tài liệu. Lần tải lại PDF đã có mặc định xử lý lại theo cấu hình mới; có thể tốn phí và thay nội dung/nhóm đã chỉnh tay. Có thể bỏ dấu chọn nếu muốn giữ bản đã xử lý.
 
 Đã kiểm chứng với PDF có chữ thật, AI giả lập và trình duyệt thật. DeepSeek thật chưa được gọi vì chưa có API key; chất lượng phân nhóm/tóm tắt cần đối chiếu tài liệu của khách. Chế độ mẫu luôn dùng rules và trích đoạn miễn phí, không giả vờ là kết quả AI.
 

@@ -182,6 +182,10 @@ def create_app(base=None, data_root=None, public_url=None):
             return jsonify(admin.config())
         return jsonify(admin.save_settings(payload()))
 
+    @app.get('/api/group-presets')
+    def group_presets():
+        return jsonify(read_json(admin.base / 'config.json', {})['rules'])
+
     @app.get('/api/status')
     def status():
         status = admin.status()
