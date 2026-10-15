@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="vi">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sổ ghi chép · Quản trị</title><link rel="stylesheet" href="/static/admin.css"><script src="/static/admin.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sổ ghi chép · Quản trị</title><link rel="stylesheet" href="{{ url_for('static', filename='admin.css', v=asset_version) }}"><script src="{{ url_for('static', filename='admin.js', v=asset_version) }}" defer></script></head>
 <body>
+<section id="startup" class="auth-body" role="status"><div class="auth-card"><div class="brand-mark">S</div><h1 id="startup-title">Đang mở Sổ ghi chép…</h1><p id="startup-message">Nếu chưa thấy màn hình đăng nhập, hãy tải lại trang. Nếu vừa cập nhật app, hãy tắt phiên chạy cũ rồi mở lại.</p><a class="button primary" href="/">Tải lại trang</a></div></section>
 <noscript>Trang quản trị cần bật JavaScript để hoạt động.</noscript>
 <section id="auth" class="auth-body" hidden><form id="auth-form" class="auth-card"><div class="brand-mark">S</div><p class="eyebrow">KHÔNG GIAN TÀI LIỆU</p><h1 id="auth-title">Đăng nhập quản trị</h1><p id="auth-hint">Quản lý nguồn tài liệu và sổ ghi chép của bạn.</p><label>Mật khẩu<input id="password" type="password" autocomplete="current-password" required maxlength="256"></label><button class="primary" id="auth-submit">Đăng nhập</button><p id="auth-error" role="alert" class="error"></p></form></section>
 <div id="app" class="shell" hidden>

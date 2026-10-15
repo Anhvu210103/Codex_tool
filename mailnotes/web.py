@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import base64
 import hashlib
 import hmac
@@ -33,7 +34,7 @@ def create_app(base=None, data_root=None, public_url=None):
         raise ValueError('Public URL must be a plain HTTP(S) origin')
     if parsed.scheme != 'https' and parsed.hostname not in ('localhost', '127.0.0.1', '::1'):
         raise ValueError('Use HTTPS for remote deployment')
-    app.config.update(SECRET_KEY=read_json(secret_path, {})['key'], MAX_CONTENT_LENGTH=22 * 1024 * 1024,
+    app.config.update(TEMPLATES_AUTO_RELOAD=True, SECRET_KEY=read_json(secret_path, {})['key'], MAX_CONTENT_LENGTH=22 * 1024 * 1024,
                       SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax',
                       SESSION_COOKIE_SECURE=parsed.scheme == 'https', PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
                       TRUSTED_HOSTS=[parsed.hostname, 'localhost', '127.0.0.1'])
@@ -44,6 +45,15 @@ def create_app(base=None, data_root=None, public_url=None):
     attempts = {}
     attempts_lock = threading.Lock()
     operations = threading.Lock()
+
+    @app.context_processor
+    def asset_versions():
+        # Recompute on render: source updates must not mix cached HTML and new JS.
+        static = Path(app.static_folder)
+        digest = hashlib.sha256()
+        for name in ('admin.css', 'admin.js'):
+            digest.update((static / name).read_bytes())
+        return {'asset_version': digest.hexdigest()[:16]}
 
     def csrf():
         if 'csrf' not in session:

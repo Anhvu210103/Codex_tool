@@ -2,14 +2,21 @@
 const $ = id => document.getElementById(id);
 let csrf = '', config = null, activeTab = 'overview', polling = null, currentNotes = null;
 const titles = {overview:'Tổng quan',notebook:'Sổ ghi chép',usage:'Token & chi phí',rules:'Nhóm tài liệu',settings:'Cài đặt'};
+let appBooted=false;
+function showStartupError(){
+ const panel=$('startup');
+ if(panel){panel.hidden=false;const heading=$('startup-title');if(heading)heading.textContent='Chưa mở được giao diện';const message=$('startup-message');if(message)message.textContent='Nếu vừa cập nhật, hãy tắt phiên tool cũ rồi mở lại. Bấm Tải lại trang để thử lại; dữ liệu của bạn vẫn được giữ.';}
+ else{document.body.textContent='Chưa mở được giao diện. Hãy tải lại trang (Ctrl+Shift+R). Nếu vừa cập nhật, tắt phiên tool cũ và mở lại.';}
+}
+window.addEventListener('error',()=>{if(!appBooted)showStartupError();});
 function applyTextSize(size){
  const safe=['comfortable','large','xlarge'].includes(size)?size:'comfortable';
- document.documentElement.dataset.textSize=safe;$('text-size').value=safe;
+ document.documentElement.dataset.textSize=safe;const control=$('text-size');if(control)control.value=safe;
  try{localStorage.setItem('mailnotes.textSize',safe);}catch{}
 }
 let savedTextSize='comfortable';try{savedTextSize=localStorage.getItem('mailnotes.textSize') || 'comfortable';}catch{}
 applyTextSize(savedTextSize);
-$('text-size').addEventListener('change',()=>applyTextSize($('text-size').value));
+$('text-size')?.addEventListener('change',()=>applyTextSize($('text-size').value));
 async function api(path, options = {}) {
   const response = await fetch(path, {credentials:'same-origin', ...options, headers:{'Content-Type':'application/json','X-CSRF-Token':csrf,...options.headers}});
   const data = await response.json();
@@ -163,6 +170,8 @@ async function boot() {
   if (polling) clearInterval(polling);
   const info=await api('/api/session');csrf=info.csrf;
   $('auth').hidden=info.authenticated;$('app').hidden=!info.authenticated;
+  if($('startup'))$('startup').hidden=true;
+  appBooted=true;
   if(!info.authenticated) {
     $('auth-title').textContent=info.needs_setup?'Tạo mật khẩu quản trị':'Đăng nhập quản trị';
     $('auth-hint').textContent=info.needs_setup?'Thiết lập một lần để bảo vệ email và cấu hình. Mật khẩu cần ít nhất 12 ký tự.':'Quản lý nguồn tài liệu và sổ ghi chép của bạn.';
@@ -301,4 +310,4 @@ action('upload-pdf',async()=>{
   $('pdf-file').value='';$('notes-source').value='pdf';$('notes-day').value='';$('notes-category').value='';
   notice(data.added?'Đã ghi/cập nhật PDF vào sổ.':'PDF này đã xử lý, không gọi AI lại.');await loadNotes();
 });
-boot().catch(error=>{document.body.textContent='Không tải được trang quản trị: '+error.message;});
+boot().catch(()=>{if($('auth'))$('auth').hidden=true;if($('app'))$('app').hidden=true;showStartupError();});
