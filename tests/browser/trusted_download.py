@@ -6,8 +6,9 @@ with sync_playwright() as playwright:
     context=browser.new_context(accept_downloads=True)
     page=context.new_page()
     page.set_content('''<button id="download" style="position:absolute;left:80px;top:40px;width:140px;height:45px">Tải xuống</button>
+<button id="close" style="position:absolute;left:240px;top:40px;width:120px;height:45px">Đóng</button>
 <script>
-window.events=[];
+window.events=[];window.viewerClosed=false;
 document.querySelector('button').addEventListener('click', event=>{
  events.push(event.isTrusted);
  if(!event.isTrusted)return;
@@ -15,6 +16,7 @@ document.querySelector('button').addEventListener('click', event=>{
  const url=URL.createObjectURL(blob),link=document.createElement('a');
  link.href=url;link.download='test.pdf';document.body.append(link);link.click();link.remove();
 });
+document.querySelector('#close').addEventListener('click',event=>{if(event.isTrusted)viewerClosed=true;});
 </script>''')
     page.evaluate("document.querySelector('button').click()")
     assert page.evaluate('events')==[False]
@@ -25,5 +27,11 @@ document.querySelector('button').addEventListener('click', event=>{
         session.send('Input.dispatchMouseEvent',{'type':'mouseReleased','x':150,'y':62,'button':'left','clickCount':1})
     assert download.value.suggested_filename=='test.pdf'
     assert page.evaluate('events')==[False,True]
-    print('Browser passed: synthetic .click was ignored; trusted Chrome input triggered a PDF download')
+    page.evaluate("document.querySelector('#close').click()")
+    assert not page.evaluate('viewerClosed')
+    session.send('Input.dispatchMouseEvent',{'type':'mouseMoved','x':300,'y':62,'button':'none'})
+    session.send('Input.dispatchMouseEvent',{'type':'mousePressed','x':300,'y':62,'button':'left','clickCount':1})
+    session.send('Input.dispatchMouseEvent',{'type':'mouseReleased','x':300,'y':62,'button':'left','clickCount':1})
+    assert page.evaluate('viewerClosed')
+    print('Browser passed: trusted Chrome input triggers Download and Close when synthetic .click is ignored')
     browser.close()

@@ -92,5 +92,9 @@ function begin(id, capabilities = []) {
   assert.deepEqual(reply,{});
   assert.deepEqual(mouseEvents.map(event=>event.params.type),['mouseMoved','mousePressed','mouseReleased']);
   assert(mouseEvents.every(event=>event.target.tabId===1 && event.params.x===150 && event.params.y===30));
+  reply=await fromTab({type:'trusted-escape'});
+  assert.deepEqual(reply,{});
+  assert.deepEqual(mouseEvents.slice(-2).map(event=>event.params.type),['keyDown','keyUp']);
+  assert(mouseEvents.slice(-2).every(event=>event.params.key==='Escape' && event.target.tabId===1));
   console.log('Extension download passed: multiple files per run, persisted error report, local import and interruption');
 })().catch(error => { console.error(error); process.exit(1); });

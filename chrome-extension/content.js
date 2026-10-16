@@ -123,22 +123,33 @@ function clickPoint(button) {
  if (!hit || !(button===hit || button.contains(hit))) throw Error('Nút tải PDF bị che hoặc đã đổi vị trí.');
  return {x,y};
 }
-async function closeViewer(cancelled) {
+async function closeViewer(cancelled,mail,file) {
  if (!viewerOpen()) return;
  const close = [...document.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"]')]
   .find(node => visible(node) && /^(đóng|close)(?:\b|$)/i.test(label(node)));
- if (!close) throw Error('Không tìm thấy nút đóng trình xem PDF.');
- close.click();
- if (!await until(() => !viewerOpen(),5000,cancelled)) throw Error('Trình xem PDF chưa đóng.');
+ if (close) {
+  try {
+   await send({type:'trusted-click',...clickPoint(close)});
+   await trace('dong-pdf',mail,file,'Đã bấm nút đóng bằng chuột Chrome');
+   if (await until(() => !viewerOpen(),2000,cancelled)) return;
+  } catch (error) {await trace('dong-pdf-loi',mail,file,error.message);}
+ }
+ if (cancelled()) return;
+ await trace('dong-pdf-esc',mail,file,close?'Nút đóng chưa đóng trình xem':'Không thấy nút đóng');
+ await send({type:'trusted-escape'});
+ if (!await until(() => !viewerOpen(),4000,cancelled)) throw Error('Trình xem PDF chưa đóng sau khi bấm nút Đóng và phím Esc.');
 }
 async function backToList(listURL,cancelled) {
  if (mailRows().some(item=>visible(item.node))) return true;
  const back = [...document.querySelectorAll('[aria-label],[data-tooltip],[title],[role="button"]')]
   .find(node => visible(node) && /quay lại|\bback\b/i.test(label(node)) && !dangerous.test(label(node)));
- if (back) back.click();
- else if (location.href !== listURL) history.back();
- else return false;
- return !!await until(() => mailRows().some(item=>visible(item.node)),10000,cancelled);
+ if (back) {
+  await send({type:'trusted-click',...clickPoint(back)});
+  if (await until(() => mailRows().some(item=>visible(item.node)),4000,cancelled)) return true;
+ }
+ if (location.href === listURL || cancelled()) return false;
+ history.back();
+ return !!await until(() => mailRows().some(item=>visible(item.node)),7000,cancelled);
 }
 async function run(limit,only=[]) {
  stopped=false; const current=++epoch, cancelled=()=>stopped||epoch!==current;
@@ -177,13 +188,18 @@ async function run(limit,only=[]) {
       const point=clickPoint(button);
       await trace('tim-nut-tai',mails,attachment.name,'Nút '+button.tagName.toLowerCase()+' · '+(label(button)||'không có nhãn')+' · x='+Math.round(point.x)+', y='+Math.round(point.y));
       await send({type:'arm-download'});
-      await send({type:'trusted-click',...point});
-      await trace('da-bam-tai',mails,attachment.name,'Chrome đã gửi thao tác chuột thật tại x='+Math.round(point.x)+', y='+Math.round(point.y));
+      let clicked=false;
+      const observe=event=>{if(event.target===button||button.contains(event.target))clicked=true;};
+      document.addEventListener('click',observe,true);
+      try {await send({type:'trusted-click',...point});await pause(100);}
+      finally {document.removeEventListener('click',observe,true);}
+      if (!clicked) throw Error('Chrome đã gửi thao tác chuột nhưng nút tải không nhận sự kiện click.');
+      await trace('da-bam-tai',mails,attachment.name,'Gmail đã nhận click tại x='+Math.round(point.x)+', y='+Math.round(point.y));
       const result=await waitDownload(cancelled);
       files++;await trace('da-luu',mails,attachment.name,result.added===0?'đã có trong sổ':'mới');
-      await progress('Đã lưu '+files+' PDF từ '+mails+' thư. Mới nhất: '+result.filename+(result.added===0?' (đã có trong sổ)':''));
+      await progress('Đã xử lý '+files+' PDF từ '+mails+' thư. Mới nhất: '+result.filename+(result.added===0?' (đã có trong Sổ ghi chép → AI thao tác, không tạo dòng mới)':' (xem tại Sổ ghi chép → AI thao tác)'));
      } catch (error) {errors++;faults.push(attachment.name+': '+error.message);await send({type:'failure',failure:{rowIndex:entry.index,key:entry.key,text:entry.text,fileIndex:attachment.index,name:attachment.name}}).catch(()=>{});await trace('loi',mails,attachment.name,error.message);await progress('Bỏ qua PDF lỗi, tiếp tục file sau: '+attachment.name+' — '+error.message);}
-     await closeViewer(cancelled);
+     await closeViewer(cancelled,mails,attachment.name);
     }
    }
    if (cancelled()) return;

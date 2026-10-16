@@ -3,7 +3,7 @@ chrome.storage.local.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});
 function baseURL(value){const url=new URL(value);if(url.protocol!=='http:'||!['localhost','127.0.0.1'].includes(url.hostname)||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw Error('Chỉ dùng địa chỉ tool localhost trên máy này.');return url.origin;}
 async function api(path,body,override){const config=override||await chrome.storage.local.get(['base','token']);if(!config.token)throw Error('Dán mã ghép nối từ Cài đặt tool trước.');const headers={Authorization:'Bearer '+config.token};if(!(body instanceof FormData))headers['Content-Type']='application/json';const response=await fetch(baseURL(config.base||'http://localhost:8080')+path,{method:'POST',headers,body:body instanceof FormData?body:JSON.stringify(body)});if(!response.headers.get('content-type')?.includes('application/json'))throw Error('Địa chỉ này trả về trang HTML. Kiểm tra đúng cổng tool, tắt hẳn phiên tool cũ và mở bản mới.');let result;try{result=await response.json();}catch{throw Error('Tool trả dữ liệu không hợp lệ. Mở lại tool rồi thử lại.');}if(!response.ok)throw Error(result.error||'Tool từ chối kết nối.');return result;}
 async function upload(blob,name){if(blob.size>20*1024*1024)throw Error('PDF tối đa 20 MB.');const head=new TextDecoder().decode(await blob.slice(0,5).arrayBuffer());if(head!=='%PDF-')throw Error('Không tải được PDF hợp lệ. Hãy chọn PDF đã tải trong tiện ích.');const form=new FormData();form.append('file',blob,name);return api('/extension/pdf',form);}
-function resultMessage(result){return 'Đã lưu: '+(result.filename||'PDF')+'\nNhóm: '+(result.categories?.join(', ')||'Xem trong sổ AI thao tác')+(result.review_reason?'\nCần kiểm tra: '+result.review_reason:'')+(result.folder?'\nThư mục: '+result.folder:'');}
+function resultMessage(result){return (result.added===0?'Đã có trong sổ, không tạo dòng mới: ':'Đã lưu mới: ')+(result.filename||'PDF')+'\nXem tại Sổ ghi chép → chọn nguồn AI thao tác.'+'\nNhóm: '+(result.categories?.join(', ')||'Cần xem lại')+(result.review_reason?'\nCần kiểm tra: '+result.review_reason:'')+(result.folder?'\nThư mục: '+result.folder:'');}
 async function detach(tab){if(tab!==undefined)await chrome.debugger.detach({tabId:tab}).catch(()=>{});}
 async function stop(){const state=await chrome.storage.session.get('run');await chrome.storage.session.remove('run');if(state.run){await chrome.tabs.sendMessage(state.run.tab,{type:'stop'}).catch(()=>{});await detach(state.run.tab);}}
 let reportWrites=Promise.resolve();
@@ -43,6 +43,12 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
    catch(error){await chrome.debugger.sendCommand(target,'Input.dispatchMouseEvent',{type:'mouseReleased',...coords,button:'left',clickCount:1}).catch(()=>{});throw error;}
    return {};
   }
+  if(message.type==='trusted-escape'){
+   const target={tabId:run.tab},key={key:'Escape',code:'Escape',windowsVirtualKeyCode:27,nativeVirtualKeyCode:27};
+   await chrome.debugger.sendCommand(target,'Input.dispatchKeyEvent',{type:'keyDown',...key});
+   await chrome.debugger.sendCommand(target,'Input.dispatchKeyEvent',{type:'keyUp',...key});
+   return {};
+  }
   if(message.type==='finish'){await chrome.storage.session.remove('run');await detach(run.tab);return {}; }
   if(message.type==='arm-download'){await chrome.storage.session.set({run:{...run,pending:{armedAt:Date.now(),downloadId:null,result:null,error:null}}});return {}; }
   if(message.type==='download-state')return run.pending||{};
@@ -62,7 +68,7 @@ async function handleDownload(item){
   const url=new URL(item.url);const ref=new URL(item.referrer||'https://invalid.example/');
   const gmailBlob=item.url.startsWith('blob:https://mail.google.com/');
   if(item.referrer&&ref.hostname!=='mail.google.com'||!gmailBlob&&(url.protocol!=='https:'||!(url.hostname==='mail.google.com'||url.hostname.endsWith('.googleusercontent.com'))))return;
-  if(pending.downloadId===null){pending.downloadId=item.id;await chrome.storage.session.set({run:{...run,pending}});await appendReport({phase:'chrome-bat-dau',detail:'lượt '+item.id+' · '+url.protocol+' · '+url.hostname+' · '+item.state,file:(item.filename||'').split(/[\\/]/).pop()});}
+  if(pending.downloadId===null){pending.downloadId=item.id;await chrome.storage.session.set({run:{...run,pending}});await appendReport({phase:'chrome-bat-dau',detail:'lượt '+item.id+' · sau '+Math.round((Date.now()-pending.armedAt)/1000)+' giây · '+url.protocol+' · '+url.hostname+' · '+item.state,file:(item.filename||'').split(/[\\/]/).pop()});}
   if(item.state==='interrupted'){pending.error='Chrome báo tải PDF thất bại.';await chrome.storage.session.set({run:{...run,pending}});await appendReport({phase:'chrome-loi',detail:'Lượt tải '+item.id+' bị gián đoạn'});return;}
   if(item.state!=='complete')return;
   if(!/\.pdf(?:$|[?#])/i.test(item.filename||'')&&item.mime!=='application/pdf'){pending.error='Chrome đã tải một tệp không phải PDF.';await chrome.storage.session.set({run:{...run,pending}});return;}

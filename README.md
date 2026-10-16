@@ -12,7 +12,7 @@ Xem [cách tải app, cài và giữ dữ liệu](packaging/README.md). Bản Li
 
 ## Tiện ích Chrome — thử trên Gmail đã đăng nhập
 
-Ưu tiên hoàn thiện Linux trước: [quy trình kiểm tra Linux](deploy/linux-test.md). Tiện ích 0.4.2 bấm nút tải PDF bằng thao tác chuột Chrome, xác nhận Chrome bắt đầu tải trong 12 giây, đợi tải xong rồi ưu tiên nhập trực tiếp PDF trong Downloads; báo rõ nhóm và thư mục kết quả.
+Ưu tiên hoàn thiện Linux trước: [quy trình kiểm tra Linux](deploy/linux-test.md). Tiện ích 0.4.3 bấm tải, đóng PDF và quay lại danh sách bằng thao tác chuột Chrome; xác nhận nút nhận click và Chrome bắt đầu tải, rồi ưu tiên nhập trực tiếp PDF trong Downloads. PDF trùng được báo rõ là đã có trong nguồn AI thao tác.
 
 Dùng **Cài đặt → Tiện ích Chrome → Tải tiện ích Chrome** để lấy ZIP. Giải nén, mở `chrome://extensions`, bật Developer mode và Load unpacked thư mục có manifest.json. Tạo mã ghép nối trong Cài đặt tool, dán mã cùng địa chỉ localhost của tool vào popup tiện ích. Mở danh sách thư có PDF trên Gmail bình thường rồi bấm **Xử lý tối đa 20 thư đang hiện**. Không cần Playwright; tiện ích thao tác trên trang Gmail, còn DeepSeek phân loại và tóm tắt PDF sau khi tải. Chi tiết, quyền truy cập và giới hạn bản thử: [chrome-extension/README.md](chrome-extension/README.md). Chưa kiểm chứng Gmail thật khi chưa có phiên người dùng.
 

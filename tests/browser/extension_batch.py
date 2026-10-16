@@ -14,7 +14,16 @@ with sync_playwright() as playwright:
         if(data.type==='failure'){window.failures.push(data.failure);return {};}
         if(data.type==='arm-download'){window.pending={};return {};}
         if(data.type==='trusted-click'){
-          document.elementFromPoint(data.x,data.y)?.click();return {};
+          let target=document.elementFromPoint(data.x,data.y);
+          while(target && !target.onclick)target=target.parentElement;
+          if(window.suppressClick===window.openPdfName && target?.id==='download'){
+            events.push('missed-download-'+window.openPdfName);return {};
+          }
+          if(target){const handler=target.onclick;target.onclick=null;target.dispatchEvent(new MouseEvent('click',{bubbles:true}));target.onclick=handler;handler({isTrusted:true});}
+          return {};
+        }
+        if(data.type==='trusted-escape'){
+          events.push('escape-'+(window.openPdfName||''));document.querySelector('#viewer')?.remove();return {};
         }
         if(data.type==='download-state')return window.pending;
         if(data.type==='finish'){window.finished=true;return {};}
@@ -30,18 +39,20 @@ with sync_playwright() as playwright:
         const names=i===0?['One.pdf','Two.pdf']:[`Mail-${i}.pdf`];
         document.getElementById('app').innerHTML='<button aria-label="Quay lại" style="padding:15px">Trở về</button>'+
           names.map((name,j)=>i===0&&j===0?`<div class="aZo" style="display:inline-block;position:relative"><span class="aV3" data-index="${j}" style="display:inline-block;padding:20px">${name}</span><button id="drive-cover" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:48px;height:32px">Drive</button></div>`:`<span class="aV3" data-index="${j}" style="display:inline-block;padding:20px">${name}</span>`).join('');
-        document.querySelector('button').onclick=showList;
+        document.querySelector('button').onclick=event=>{if(event.isTrusted)showList();};
         document.querySelectorAll('.aV3').forEach((tile,j)=>tile.onclick=()=>showViewer(names[j]));
         document.querySelector('#drive-cover')?.addEventListener('click',event=>{event.stopPropagation();events.push('wrong-drive');});
       };
       window.showViewer=name=>{
-        events.push('open-pdf-'+name);
+        events.push('open-pdf-'+name);window.openPdfName=name;
         const viewer=document.createElement('div');viewer.id='viewer';
         viewer.style='position:fixed;inset:0;background:white;z-index:100';
         viewer.innerHTML='<div aria-label="Đang hiển thị người xem." style="padding:20px">PDF</div><button aria-label="Đóng" style="padding:15px">Đóng</button>'+
           (name==='Two.pdf'?'<button style="position:fixed;right:95px;top:9px;width:40px;height:40px"><svg width="20" height="20"></svg></button><button id="download" style="position:fixed;right:45px;top:9px;width:40px;height:40px">↓</button><button aria-label="Tùy chọn khác" style="position:fixed;right:0;top:9px;width:38px;height:40px">⋮</button>':'<button id="download" aria-label="Tải xuống" style="padding:15px">↓</button>');
         document.body.append(viewer);
-        viewer.querySelector('[aria-label="Đóng"]').onclick=()=>viewer.remove();
+        viewer.querySelector('[aria-label="Đóng"]').onclick=event=>{
+          if(event.isTrusted && window.blockClose!==name)viewer.remove();
+        };
         viewer.querySelector('#download').onclick=()=>{
           if(window.suppressDownload===name){events.push('ignored-download-'+name);return;}
           events.push('download-'+name);pending={result:{filename:name,added:1}};
@@ -94,13 +105,24 @@ with sync_playwright() as playwright:
     assert page.evaluate('status').startswith('Hoàn tất: 1 thư, 1 PDF đã lưu, 0 lỗi.'), page.evaluate('status')
     print('Browser passed: retry processed only the failed PDF')
     page.evaluate('''() => {
-      suppressDownload='One.pdf';events=[];report=[];finished=false;showList();
+      suppressDownload='One.pdf';blockClose='One.pdf';events=[];report=[];finished=false;showList();
       listener({type:'run',limit:1});
     }''')
     page.wait_for_function('finished', timeout=30000)
     assert 'ignored-download-One.pdf' in page.evaluate('events')
     assert 'download-Two.pdf' in page.evaluate('events')
+    assert 'escape-One.pdf' in page.evaluate('events')
     assert page.evaluate('status').startswith('Hoàn tất: 1 thư, 1 PDF đã lưu, 1 lỗi.'), page.evaluate('status')
     assert any(e['phase']=='loi' and 'Chrome chưa bắt đầu tải' in e['detail'] for e in page.evaluate('report'))
-    print('Browser passed: click without Chrome download times out and next PDF continues')
+    print('Browser passed: click without Chrome download and ignored Close fall back to Esc, then next PDF continues')
+    page.evaluate('''() => {
+      suppressDownload=null;blockClose=null;suppressClick='One.pdf';
+      events=[];report=[];finished=false;showList();listener({type:'run',limit:1});
+    }''')
+    page.wait_for_function('finished', timeout=30000)
+    assert 'missed-download-One.pdf' in page.evaluate('events')
+    assert 'download-Two.pdf' in page.evaluate('events')
+    assert page.evaluate('status').startswith('Hoàn tất: 1 thư, 1 PDF đã lưu, 1 lỗi.'), page.evaluate('status')
+    assert any(e['phase']=='loi' and 'không nhận sự kiện click' in e['detail'] for e in page.evaluate('report'))
+    print('Browser passed: missing click is reported immediately and next PDF continues')
     browser.close()
