@@ -39,12 +39,35 @@ function controls(kind,attempted=new Set()){
  const downloads=kind==='pdf'?nodes.filter(item=>/download|tải xuống|tải về/i.test(item.label)&&!/download all|tải xuống tất cả/i.test(item.label)):[];
  return previews.length?previews:downloads.length?downloads:nodes;
 }
+function revealViewerToolbar(){
+ // Gmail hides the viewer toolbar until the pointer enters/moves over it.
+ // Move only; never click an unidentified location or send keyboard shortcuts.
+ const points=[[innerWidth/2,innerHeight/2],[innerWidth/2,24],[innerWidth-50,48]];
+ for(const [x,y] of points){
+  const node=document.elementFromPoint(x,y);if(!node)continue;
+  if(typeof PointerEvent==='function')for(const type of ['pointerover','pointermove'])node.dispatchEvent(new PointerEvent(type,{bubbles:true,view:window,clientX:x,clientY:y,pointerType:'mouse'}));
+  for(const type of ['mouseover','mousemove'])node.dispatchEvent(new MouseEvent(type,{bubbles:true,view:window,clientX:x,clientY:y}));
+ }
+}
+function downloadDiagnostics(){
+ const labels=controls('inspect').slice(0,20).map(item=>item.label).join(' | ');
+ const hidden=[];
+ for(const node of document.querySelectorAll('[aria-label],[data-tooltip],[title]')){
+  const label=[node.getAttribute('aria-label'),node.getAttribute('data-tooltip'),node.getAttribute('title')].filter(Boolean).join(' ');
+  if(!/download|tải xuống|tải về/i.test(label)||driveAction.test(label))continue;
+  const r=node.getBoundingClientRect(),css=getComputedStyle(node);
+  const top=document.elementFromPoint(Math.min(innerWidth-1,Math.max(0,r.left+r.width/2)),Math.min(innerHeight-1,Math.max(0,r.top+r.height/2)));
+  hidden.push(label.slice(0,100)+' ['+(r.width<12||r.height<12?'ẩn/kích thước nhỏ':css.visibility==='hidden'?'đang ẩn':!(top&&(node===top||node.contains(top)))?'bị che':'hiện')+']');
+  if(hidden.length>=6)break;
+ }
+ return 'Các nút đang thấy: '+labels+'. Nút tải trong trang: '+(hidden.join(' | ')||'không có nhãn tải')+'.';
+}
 async function run(){
  stopped=false;const epoch=++activeRun;const cancelled=()=>stopped||activeRun!==epoch;let kind=controls('mail').length?'mail':'pdf';const attempted=new Set();
  try{
   for(let step=0;step<9&&!cancelled();step++){
-   let options=controls(kind,attempted);for(let i=0;i<12&&!options.length&&!cancelled();i++){await pause(500);options=controls(kind,attempted);}
-   if(cancelled())return;if(!options.length)throw Error(kind==='mail'?'Không thấy hàng thư có thể mở.':('Chưa tìm thấy nút tải PDF sau khi mở. Các nút đang thấy: '+controls('inspect').slice(0,8).map(item=>item.label).join(' | ')+'. Hãy gửi nguyên dòng trạng thái này.'));
+   let options=controls(kind,attempted);for(let i=0;i<12&&!options.length&&!cancelled();i++){if(kind==='pdf')revealViewerToolbar();await pause(500);options=controls(kind,attempted);}
+   if(cancelled())return;if(!options.length)throw Error(kind==='mail'?'Không thấy hàng thư có thể mở.':('Chưa tìm thấy nút tải PDF sau khi mở. '+downloadDiagnostics()+' Hãy gửi nguyên dòng trạng thái này.'));
    const result=await send({type:'choose',kind,candidates:options.map((item,index)=>({index,label:item.label,role:item.node.getAttribute('role')||item.node.tagName.toLowerCase()}))});
    if(cancelled())return;if(!result.choice)throw Error((kind==='mail'?'DeepSeek chưa chọn được hàng thư.':'DeepSeek chưa chọn được nút tải/xem PDF.')+' Tiện ích đọc được: '+options.slice(0,4).map(item=>item.label).join(' | ')+'. Hãy gửi dòng trạng thái này để kiểm tra.');
    const target=options[result.choice.index];if(!target||!target.node.isConnected||forbidden.test(target.label))throw Error('Trang đã đổi; dừng để tránh bấm nhầm.');

@@ -75,4 +75,18 @@ with sync_playwright() as p:
     page.wait_for_function('actions.length===1',timeout=15000)
     assert page.evaluate('actions')==['download']
     print('Browser passed: aria-label-only viewer download control')
+    # Viewer hides its top toolbar until pointer movement, while the zoom
+    # and page controls remain visible (the user's reported state).
+    page=browser.new_page()
+    page.set_content('''<div style="position:fixed;inset:0"><div aria-label="Đang hiển thị người xem.">PDF</div><button aria-label="Trang 1 / 1">1</button><button aria-label="Thu nhỏ">−</button><div id="toolbar" style="display:none;position:fixed;top:0;right:0"><button aria-label="Tải xuống" style="padding:20px">↓</button></div></div>''')
+    page.evaluate('''() => {
+      window.actions=[];window.listener=null;
+      window.chrome={runtime:{onMessage:{addListener(fn){window.listener=fn;}},async sendMessage(data){if(data.type==='choose')return {choice:data.candidates[0]};return {};}}};
+      document.addEventListener('mousemove',()=>{document.getElementById('toolbar').style.display='block';});
+      document.querySelector('#toolbar button').onclick=()=>{actions.push('download');listener({type:'stop'});};
+    }''')
+    page.add_script_tag(path=str(Path('chrome-extension/content.js').resolve()));page.evaluate("listener({type:'run'})")
+    page.wait_for_function('actions.length===1',timeout=15000)
+    assert page.evaluate('actions')==['download']
+    print('Browser passed: viewer zoom controls visible; hidden toolbar revealed before Download')
     browser.close()
