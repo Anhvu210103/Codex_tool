@@ -153,4 +153,6 @@ def process(messages, config, source):
             connection.commit()
             added += 1
         render_notes(connection, root / 'notebooks', config.get('timezone', 'Asia/Ho_Chi_Minh'))
+        from .archive import render_archive
+        render_archive(connection, root)
     return added

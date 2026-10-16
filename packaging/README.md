@@ -41,7 +41,7 @@ Thay file executable hoặc `.app` không xóa dữ liệu. Nếu chuyển từ 
 
 Có thể dùng MAILNOTES_DATA_DIR để chọn thư mục dữ liệu riêng khi triển khai có quản lý. Không gửi data/token/key qua chat. Nhật ký khởi động nằm ở `admin/desktop.log` trong thư mục dữ liệu; chỉ chia sẻ lỗi đã loại bỏ thông tin riêng.
 
-DeepSeek nhận phần chữ trích từ PDF. OCR scan là tính năng tùy chọn cần Poppler + Tesseract với vie+eng trên máy; bản app không cài công cụ hệ thống bằng quyền admin. PDF có chữ, phân loại và ghi sổ đã được tích hợp. Chứng chỉ CA công khai được đóng gói, giữ TLS verification; SSL_CERT_FILE do người dùng cấu hình được tôn trọng.
+DeepSeek nhận chữ từ Markdown đã chuyển từ PDF. Bản scan vào Cần xem lại; luồng này không chạy OCR và không cần cài Tesseract hay Poppler. PDF có chữ, phân loại và ghi sổ đã được tích hợp. Chứng chỉ CA công khai được đóng gói, giữ TLS verification; SSL_CERT_FILE do người dùng cấu hình được tôn trọng.
 
 ## Build cho người phát triển
 
@@ -55,4 +55,4 @@ python3 -m venv .venv
 .venv/bin/python packaging/smoke_app.py
 ```
 
-Linux tạo `dist/SoGhiChep`; macOS tạo `dist/SoGhiChep.app`. Không cross-build Mac từ Linux. CI dùng Ubuntu 22.04 để có nền glibc cũ hơn; bản Linux build tại môi trường cloud hiện tại chỉ được kiểm chứng trên chính môi trường đó, không cam kết chạy mọi distro/CPU. PDF scan tiếng Việt, OAuth Gmail thật, DeepSeek thật và bản macOS vẫn cần kiểm thử trên máy đích có credentials hợp lệ.
+Linux tạo `dist/SoGhiChep`; macOS tạo `dist/SoGhiChep.app`. Không cross-build Mac từ Linux. CI dùng Ubuntu 22.04 để có nền glibc cũ hơn; bản Linux build tại môi trường cloud hiện tại chỉ được kiểm chứng trên chính môi trường đó, không cam kết chạy mọi distro/CPU. OAuth Gmail thật, DeepSeek thật và bản macOS vẫn cần kiểm thử trên máy đích có credentials hợp lệ.

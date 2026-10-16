@@ -365,10 +365,32 @@ def create_app(base=None, data_root=None, public_url=None):
             row = connection.execute('SELECT file_hash FROM notes WHERE id=?', (request.args.get('id'),)).fetchone()
         if not row or not row[0] or not re.fullmatch(r'[a-f0-9]{64}', row[0]):
             return jsonify(error='Không tìm thấy PDF.'), 404
-        path = database.parent / 'files' / (row[0] + '.pdf')
+        markdown = request.args.get('format') == 'markdown'
+        path = database.parent / ('Markdown' if markdown else 'files') / (row[0] + ('.md' if markdown else '.pdf'))
         if not path.exists():
             return jsonify(error='File PDF đã bị xóa trên máy chủ.'), 404
-        return send_file(path, mimetype='application/pdf', as_attachment=True, download_name='tai-lieu.pdf')
+        return send_file(path, mimetype='text/markdown; charset=utf-8' if markdown else 'application/pdf', as_attachment=True, download_name='tai-lieu.md' if markdown else 'tai-lieu.pdf')
+
+    @app.route('/api/archive', methods=['GET', 'POST'])
+    def archive_folder():
+        import subprocess
+        import sys
+        source = request.args.get('source')
+        if source not in ('gmail', 'pdf', 'ai'):
+            raise ValueError('Chọn nguồn Gmail, PDF tải lên hoặc AI thao tác.')
+        root = admin.root / source
+        local = parsed.hostname in ('localhost', '127.0.0.1') and request.remote_addr in ('127.0.0.1', '::1')
+        can_open = local and sys.platform in ('linux', 'darwin')
+        if request.method == 'POST':
+            if not can_open:
+                raise ValueError('Chỉ mở thư mục trực tiếp khi tool chạy trên cùng máy.')
+            root.mkdir(parents=True, exist_ok=True)
+            try:
+                subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', str(root)],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except OSError:
+                raise ValueError('Chưa mở được trình quản lý file. Hãy sao chép đường dẫn bên dưới để mở thủ công.') from None
+        return jsonify(path=str(root), can_open=can_open)
 
     @app.post('/api/gmail/client')
     def gmail_client():

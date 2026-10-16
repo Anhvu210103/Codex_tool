@@ -54,26 +54,13 @@ Service restart không giữ phiên xử lý đang chạy, nhưng các email đ�
 
 Bật Đọc PDF đính kèm Gmail trong Cài đặt: email có PDF tạo một ghi chép cho mỗi PDF (không tạo thêm ghi chép riêng cho thân email); email không có PDF vẫn xử lý nội dung thư. PDF upload trực tiếp lưu riêng tại `.local/pdf/`, PDF đính kèm tại `.local/gmail/files/`. Các file gốc có tên theo SHA-256, quyền 0600. UI cho phép tải lại bản gốc qua phiên đăng nhập. Sửa nhóm bằng tay không gọi AI; xem cảnh báo gốc để biết giới hạn tóm tắt.
 
-PDF tối đa 20 MB; đọc lớp văn bản tối đa 100 trang/100.000 ký tự. Giới hạn đầu vào AI được khách chỉnh; phần vượt giới hạn không được gửi và ghi chép có cảnh báo Cần xem lại. PDF lỗi, có mật khẩu hoặc scan chưa OCR được đưa vào Cần xem lại, không gửi nội dung rỗng cho AI. File Word/Excel và website chưa được hỗ trợ.
+PDF tối đa 20 MB; đọc lớp văn bản tối đa 100 trang/100.000 ký tự. Giới hạn đầu vào AI được khách chỉnh; phần vượt giới hạn không được gửi và ghi chép có cảnh báo Cần xem lại. PDF lỗi, có mật khẩu hoặc scan không có lớp chữ đưa vào Cần xem lại, không gửi nội dung rỗng cho AI. File Word/Excel và website chưa được hỗ trợ.
 
-Một request AI trả JSON nhóm + tóm tắt. Nhóm ngoài danh sách, confidence dưới 0.65 (do mô hình tự báo, không phải độ chính xác đã đo), hoặc needs_review sẽ vào Cần xem lại. Cache SQLite gắn với nhà cung cấp, mô hình, prompt, nội dung gửi và mô tả nhóm; tránh gọi lại kết quả giống nhau trong cùng nguồn. Cache không dùng chung giữa Gmail/PDF upload. Khi PDF đã lưu, upload lại không gọi AI. Chọn Xử lý lại PDF đã có nếu cần áp dụng cấu hình/OCR mới; thao tác này thay nhóm/tóm tắt đã sửa bằng tay và có thể phát sinh phí. Nếu prompt/input không đổi, cache vẫn được dùng.
+Một request AI trả JSON nhóm + tóm tắt. Nhóm ngoài danh sách, confidence dưới 0.65 (do mô hình tự báo, không phải độ chính xác đã đo), hoặc needs_review sẽ vào Cần xem lại. Cache SQLite gắn với nhà cung cấp, mô hình, prompt, nội dung gửi và mô tả nhóm; tránh gọi lại kết quả giống nhau trong cùng nguồn. Cache không dùng chung giữa Gmail/PDF upload. Khi PDF đã lưu, upload lại không gọi AI. Chọn Xử lý lại PDF đã có nếu cần áp dụng cấu hình phân nhóm mới; thao tác này thay nhóm/tóm tắt đã sửa bằng tay và có thể phát sinh phí. Nếu prompt/input không đổi, cache vẫn được dùng.
 
 DeepSeek dùng endpoint cố định `https://api.deepseek.com/chat/completions`, model mặc định `deepseek-chat`; không cho nhập endpoint tùy ý. Cho phép domain `api.deepseek.com` trong mạng máy chủ. Key nhập qua web hoặc `DEEPSEEK_API_KEY`. Không có key thật trong repo. Giá và quota phụ thuộc tài khoản nhà cung cấp; chưa xác nhận chi phí hay độ chính xác trên tài liệu khách.
 
-OCR là tùy chọn chạy cục bộ, tối đa 20 trang với ngân sách thời gian khoảng 180 giây cho các lệnh OCR. Để cài trên Ubuntu/Debian:
-
-```bash
-sudo apt install poppler-utils tesseract-ocr tesseract-ocr-vie
-```
-
-Trên Mac có Homebrew:
-
-```bash
-brew install poppler tesseract tesseract-lang
-```
-
-Kiểm tra `tesseract --list-langs` có `vie` và `eng`, rồi bật OCR trên web. Kết quả OCR vẫn đánh dấu Cần xem lại để đối chiếu bản gốc. Môi trường phát triển hiện thiếu ngôn ngữ `vie`, nên chưa kiểm chứng OCR tiếng Việt thật; PDF có chữ và cơ chế chuyển scan sang review đã được kiểm chứng.
-
+Luồng hiện tại chỉ chuyển PDF có lớp chữ thành Markdown bằng pypdf. Không cài Tesseract/Poppler và không chạy OCR. Bản scan vào Cần xem lại, không gửi chữ rỗng đến DeepSeek. Sao lưu các thư mục files/, Markdown/, Theo-nhom/, Can-xem-lai/, exports/ cùng SQLite. Sửa nhóm trong sổ sẽ đồng bộ các bản Markdown theo nhóm.
 
 ## Usage và đơn giá
 

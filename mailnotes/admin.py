@@ -103,7 +103,7 @@ def validate_settings(value):
     if not isinstance(enabled, bool):
         raise ValueError('Trạng thái lịch chạy không hợp lệ.')
     return {'source': source, 'schedule_enabled': enabled, 'classification_mode': classification,
-            'gmail_pdf': value.get('gmail_pdf', True) is True or (gmail_filter['period'] != 'advanced' and gmail_filter['pdf_only']), 'pdf_ocr': value.get('pdf_ocr', False) is True,
+            'gmail_pdf': value.get('gmail_pdf', True) is True or (gmail_filter['period'] != 'advanced' and gmail_filter['pdf_only']), 'pdf_ocr': False,
             'gmail_query': text('Bộ lọc Gmail', value.get('gmail_query', ''), 1000, empty=gmail_filter['period'] != 'advanced'),
             'gmail_filter': gmail_filter,
             'interval_seconds': integer('Chu kỳ (giây)', value.get('interval_seconds'), 60, 604800),
@@ -372,6 +372,8 @@ class Admin:
                     raise ValueError('Không tìm thấy ghi chép.')
                 connection.commit()
                 render_notes(connection, database.parent / 'notebooks', self.config()['timezone'])
+                from .archive import render_archive
+                render_archive(connection, database.parent)
 
     def start_run(self, source=None):
         if not self.run_lock.acquire(blocking=False):

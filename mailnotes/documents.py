@@ -20,14 +20,21 @@ def pdf_text(data, ocr=False):
         if reader.is_encrypted and not reader.decrypt(''):
             return '', 'PDF có mật khẩu; cần mở khóa trước.'
         pages = len(reader.pages)
-        text = '\n\n'.join((page.extract_text() or '') for page in reader.pages[:100])
+        chunks = [(page.extract_text() or '') for page in reader.pages[:100]]
+        text = '\n\n'.join(chunks)
     except Exception:
         return '', 'Không đọc được PDF; kiểm tra file hỏng hoặc mật khẩu.'
     warning = 'PDF vượt 100 trang; chỉ đọc 100 trang đầu.' if pages > 100 else ''
-    if len(text.strip()) >= 40:
-        return text[:100000], warning or ('Nội dung vượt 100.000 ký tự; đã giới hạn phần đọc.' if len(text) > 100000 else '')
+    if text.strip():
+        warnings = [warning] if warning else []
+        missing = sum(not chunk.strip() for chunk in chunks)
+        if missing:
+            warnings.append(f'{missing} trang không có lớp chữ; phần scan hoặc trang trắng chưa được đọc.')
+        if len(text) > 100000:
+            warnings.append('Nội dung vượt 100.000 ký tự; đã giới hạn phần đọc.')
+        return text[:100000], ' '.join(warnings)
     if not ocr:
-        return '', 'PDF có thể là bản scan. Bật OCR hoặc dùng PDF có lớp văn bản.'
+        return '', 'PDF không có lớp chữ, có thể là bản scan. Cần xem lại; luồng này không chạy OCR.'
     if not shutil.which('pdftoppm') or not shutil.which('tesseract'):
         return '', 'OCR chưa được cài trên máy chủ (cần Poppler, Tesseract và dữ liệu tiếng Việt).'
     try:
@@ -66,6 +73,8 @@ def save_pdf(data, root):
 def pdf_message(data, filename, config, **metadata):
     if len(data) > MAX_PDF_BYTES or not data.startswith(b'%PDF-'):
         raise ValueError('Chọn file PDF hợp lệ, tối đa 20 MB.')
-    text, warning = pdf_text(data, config.get('pdf_ocr', False))
+    text, warning = pdf_text(data, False)
     digest = save_pdf(data, config['data_dir'])
-    return {**metadata, 'subject': filename[:250], 'body': text, 'review_reason': warning, 'file_hash': digest}
+    from .archive import save_markdown
+    markdown = save_markdown(config['data_dir'], digest, text)
+    return {**metadata, 'subject': filename[:250], 'body': markdown.read_text(encoding='utf-8'), 'review_reason': warning, 'file_hash': digest}

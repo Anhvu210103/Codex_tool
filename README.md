@@ -20,6 +20,14 @@ Trước khi chạy, trong Cài đặt bật DeepSeek AI, lưu key và đồng �
 
 Đây là phép thử điều khiển trình duyệt trên Gmail, chưa phải bằng chứng hoạt động trên website cơ quan nhà nước. Đã kiểm thử lựa chọn AI, chặn nút nguy hiểm và nhận diện hàng email/nút PDF trên trang mô phỏng; chưa thử Gmail thật vì môi trường phát triển không có phiên đăng nhập của người dùng. Bản macOS đóng gói hiện chưa kèm Playwright; cần kiểm chứng bản thử trên Linux trước khi quyết định cách tích hợp cho iMac.
 
+## PDF → Markdown → nhóm trên máy
+
+PDF có lớp chữ được chuyển bằng pypdf thành Markdown trước khi gửi chữ cho DeepSeek. Không chạy OCR, không yêu cầu Tesseract trên Linux/Mac. Bản scan không có chữ được giữ nguyên PDF và tạo ghi chú Cần xem lại, không gọi AI để đoán nội dung. PDF vừa có chữ vừa có trang scan/trắng sẽ có cảnh báo phần chưa đọc. Chuyển Markdown là trích chữ, không cam kết giữ đúng bảng, cột và bố cục của PDF.
+
+Mỗi nguồn Gmail, PDF tải lên và AI thao tác có kho riêng trong thư mục dữ liệu. `files/` giữ PDF gốc, `Markdown/` giữ bản chữ, `Theo-nhom/<tên nhóm>/` chứa bản Markdown gồm tóm tắt và toàn bộ chữ trích được, `Can-xem-lai/` giữ ghi chú cần kiểm tra. Một tài liệu có nhiều nhóm có nhiều bản Markdown, dùng chung PDF gốc. Tên file/thư mục có mã ngắn để tránh trùng hoặc thoát đường dẫn. Khi sửa nhóm trong sổ, bản Markdown theo nhóm được cập nhật mà không gọi AI.
+
+Trong Sổ ghi chép chọn nguồn rồi bấm **Mở thư mục tài liệu**, hoặc **Tải Markdown** ở từng dòng. Đường dẫn hiển thị là trên máy chạy tool. Với bản Mac đóng gói, dữ liệu mặc định trong `~/Library/Application Support/SoGhiChep/`; với mã nguồn là `.local/` trong repo. Ghi chú cũ chưa có Markdown cần bấm Đọc lại PDF một lần. Mỗi lượt lấy chữ/AI có giới hạn trang/ký tự đã cấu hình; cảnh báo chỉ rõ phần bị giới hạn. Đổi sang Markdown không làm token chữ miễn phí; cache giúp tránh gọi lại nếu nội dung và cấu hình không đổi.
+
 ## Nhóm mẫu cho cơ quan nhà nước
 
 Bản cài mới có 14 nhóm mẫu: văn bản pháp luật, công việc cần xử lý, công văn chỉ đạo, thủ tục hành chính, kinh tế và đầu tư, tài chính và ngân sách, thuế/phí, đấu thầu, doanh nghiệp, đất đai/xây dựng, lao động/an sinh, báo cáo/thống kê, nhân sự nội bộ và thanh tra/kiểm tra. Mỗi nhóm có mô tả để DeepSeek chọn khi đọc tài liệu và từ khóa để thử chế độ miễn phí. Một tài liệu có thể vào nhiều nhóm.
@@ -34,7 +42,7 @@ Bản đã cài giữ nguyên nhóm người dùng đã lưu. Muốn bổ sung n
 4. Vào **Sổ ghi chép**, chọn PDF và bấm **Đọc & ghi vào sổ**; hoặc bật **Đọc PDF đính kèm Gmail** rồi chạy nguồn Gmail. Một tài liệu có thể thuộc nhiều nhóm.
 5. Bấm **Sửa nhóm** tại dòng ghi chép khi cần điều chỉnh. Không gọi AI lại khi sửa nhóm. Có nút tải PDF gốc.
 
-AI được gọi một lần để trả cả nhóm và tóm tắt, có cache và chống xử lý trùng. Không chắc chắn/nhóm lạ sẽ vào **Cần xem lại**. PDF scan cần OCR cục bộ; xem hướng dẫn cài OCR trong deploy/README.md. PDF quá dài bị giới hạn và có cảnh báo; không coi trích đoạn hoặc tóm tắt phần đầu là đã đọc toàn bộ tài liệu. Lần tải lại PDF đã có mặc định xử lý lại theo cấu hình mới; có thể tốn phí và thay nội dung/nhóm đã chỉnh tay. Có thể bỏ dấu chọn nếu muốn giữ bản đã xử lý.
+AI được gọi một lần để trả cả nhóm và tóm tắt, có cache và chống xử lý trùng. Không chắc chắn/nhóm lạ sẽ vào **Cần xem lại**. PDF scan được giữ trong Cần xem lại; luồng hiện tại không chạy OCR và không cần cài Tesseract. PDF quá dài bị giới hạn và có cảnh báo; không coi trích đoạn hoặc tóm tắt phần đầu là đã đọc toàn bộ tài liệu. Lần tải lại PDF đã có mặc định xử lý lại theo cấu hình mới; có thể tốn phí và thay nội dung/nhóm đã chỉnh tay. Có thể bỏ dấu chọn nếu muốn giữ bản đã xử lý.
 
 Đã kiểm chứng với PDF có chữ thật, AI giả lập và trình duyệt thật. DeepSeek thật chưa được gọi vì chưa có API key; chất lượng phân nhóm/tóm tắt cần đối chiếu tài liệu của khách. Chế độ mẫu luôn dùng rules và trích đoạn miễn phí, không giả vờ là kết quả AI.
 
@@ -66,9 +74,9 @@ Giao diện hiển thị câu mô tả dễ đọc thay cho cú pháp tìm kiế
 
 ## PDF đính kèm Gmail — không cần tải lên thủ công
 
-Trong Cài đặt, chọn nguồn **Gmail — email và PDF đính kèm**, bật **Tự tải và ĐỌC PDF đính kèm Gmail**, chọn thời gian/người gửi phù hợp rồi lưu và Chạy ngay/bật lịch. Tool tự lấy file qua Gmail API, đọc chữ hoặc OCR và phân nhóm/tóm tắt nội dung bên trong. Mỗi PDF là một ghi chép. Email không có PDF vẫn xử lý thân thư. Email có PDF không tạo ghi chép riêng cho thân thư.
+Trong Cài đặt, chọn nguồn **Gmail — email và PDF đính kèm**, bật **Tự tải và ĐỌC PDF đính kèm Gmail**, chọn thời gian/người gửi phù hợp rồi lưu và Chạy ngay/bật lịch. Tool tự lấy file qua Gmail API, chuyển phần chữ sang Markdown và phân nhóm/tóm tắt nội dung bên trong. Mỗi PDF là một ghi chép. Email không có PDF vẫn xử lý thân thư. Email có PDF không tạo ghi chép riêng cho thân thư.
 
-Trong sổ chọn nguồn Gmail, xem tên PDF, nội dung ngắn và nhóm; có link email gốc, Tải PDF và **Đọc lại PDF**. Nút đọc lại dùng cấu hình hiện tại, có thể tốn phí và thay nội dung/nhóm đã sửa tay; cache được dùng lại nếu input/prompt không đổi. Scan chưa OCR được đánh dấu Cần xem lại, không được giả vờ đã đọc.
+Trong sổ chọn nguồn Gmail, xem tên PDF, nội dung ngắn và nhóm; có link email gốc, Tải PDF và **Đọc lại PDF**. Nút đọc lại dùng cấu hình hiện tại, có thể tốn phí và thay nội dung/nhóm đã sửa tay; cache được dùng lại nếu input/prompt không đổi. Scan không có lớp chữ được đánh dấu Cần xem lại, không được giả vờ đã đọc.
 
 ## Trang quản trị web
 
@@ -162,4 +170,4 @@ Module Gmail trả các trường `id`, `sender`, `subject`, `received_at`, `bod
 
 ## Tình trạng kiểm chứng
 
-Đã chạy demo và kiểm thử tự động cho phân loại, MIME/HTML, chống xử lý trùng, chia ngày theo múi giờ, link Gmail và khả năng thử lại khi tóm tắt lỗi. Đã kiểm thử API quản trị và OAuth giả lập, lưu cấu hình/lịch chạy; đã thử trình duyệt thật cho đăng nhập, demo, tìm kiếm, tải file, thêm/xóa rules và lưu cài đặt trên desktop/mobile. Đã bổ sung kiểm thử AI JSON/cache/review, PDF có chữ, PDF scan vào review, Gmail PDF qua API giả lập, nâng cấp database và sửa nhóm. Chưa kiểm chứng OAuth với Google, Gmail thật, DeepSeek thật hoặc OCR tiếng Việt thật vì chưa có credentials. Không coi demo là bằng chứng kết nối tài khoản đã hoạt động.
+Đã chạy demo và kiểm thử tự động cho phân loại, MIME/HTML, chống xử lý trùng, chia ngày theo múi giờ, link Gmail và khả năng thử lại khi tóm tắt lỗi. Đã kiểm thử API quản trị và OAuth giả lập, lưu cấu hình/lịch chạy; đã thử trình duyệt thật cho đăng nhập, demo, tìm kiếm, tải file, thêm/xóa rules và lưu cài đặt trên desktop/mobile. Đã bổ sung kiểm thử AI JSON/cache/review, PDF có chữ, PDF scan vào review, Gmail PDF qua API giả lập, nâng cấp database và sửa nhóm. Chưa kiểm chứng OAuth với Google, Gmail thật, DeepSeek thật vì chưa có credentials. Không coi demo là bằng chứng kết nối tài khoản đã hoạt động.

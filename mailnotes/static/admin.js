@@ -130,7 +130,7 @@ async function refreshStatus() {
   $('ai-key-state').textContent=status.ai_key_configured?'Đã có key. Giá trị không hiển thị lại.':'Chưa có API key';
   $('connect-gmail').disabled=!status.gmail_client_configured || status.running;
   $('dashboard-pdf-state').textContent=config.gmail_pdf?'Tự tải và đọc nội dung':'Chưa bật';
-  if($('pdf-processing-description'))$('pdf-processing-description').textContent='PDF có chữ được đọc trực tiếp. Bản scan cần OCR trên máy trước khi gửi chữ cho DeepSeek.';
+  if($('pdf-processing-description'))$('pdf-processing-description').textContent='PDF có chữ được chuyển sang Markdown rồi gửi chữ cho DeepSeek. PDF scan được giữ trong Cần xem lại; không chạy OCR.';
   if (activeTab==='overview') await loadOverview();
   if (activeTab==='notebook') await loadNotes();
   if (activeTab==='usage') await loadUsage();
@@ -143,9 +143,11 @@ function updateOptions(select,values,placeholder) {
 let notesSequence=0;
 async function loadNotes() {
   const sequence=++notesSequence;
-  const params=new URLSearchParams({source:$('notes-source').value,day:$('notes-day').value,category:$('notes-category').value,q:$('notes-search').value});
-  const data=await api('/api/notes?'+params);
+  const source=$('notes-source').value;
+  const params=new URLSearchParams({source,day:$('notes-day').value,category:$('notes-category').value,q:$('notes-search').value});
+  const [data,info]=await Promise.all([api('/api/notes?'+params),source==='demo'?Promise.resolve(null):api('/api/archive?'+new URLSearchParams({source}))]);
   if(sequence!==notesSequence) return;
+  if($('archive-card')){$('archive-card').hidden=!info;if(info){$('archive-path').textContent=info.path;$('open-archive').hidden=!info.can_open;}}
   currentNotes=data;
   updateOptions($('notes-day'),data.days,'Tất cả ngày'); updateOptions($('notes-category'),data.categories,'Tất cả nhóm');
   $('notes-body').replaceChildren(); $('notes-empty').hidden=data.notes.length>0;
@@ -159,7 +161,7 @@ async function loadNotes() {
     const content=document.createElement('td');const summary=document.createElement('div');summary.className='summary-text';summary.textContent=note.summary;content.append(summary);if(note.review_reason){const warning=document.createElement('div');warning.className='review-note';warning.textContent=note.review_reason;content.append(warning);}
     const source=document.createElement('td');
     if(note.source==='gmail') {const link=document.createElement('a');link.textContent='Mở email';link.href='https://mail.google.com/mail/u/0/#all/'+encodeURIComponent(note.origin_id || note.id.split(':').slice(1).join(':'));link.target='_blank';link.rel='noopener noreferrer';source.append(link);} else source.textContent=note.source==='ai'?'AI thao tác':note.source==='pdf'?'PDF tải lên':'Dữ liệu mẫu';
-    if(note.file_hash){const pdf=document.createElement('a');pdf.textContent='Tải PDF';pdf.href='/api/document?'+new URLSearchParams({source:note.source,id:note.id});source.append(document.createElement('br'),pdf);const again=document.createElement('button');again.className='secondary edit-button';again.textContent='Đọc lại PDF';again.addEventListener('click',async()=>{if(!confirm('Đọc lại PDF theo cấu hình hiện tại? Có thể tốn phí AI và thay nhóm/tóm tắt đã chỉnh tay.'))return;again.disabled=true;try{await post('/api/notes/reprocess',{source:note.source,id:note.id});notice('Đã đọc lại PDF và cập nhật sổ.');await loadNotes();}catch(error){notice(error.message,true);}finally{again.disabled=false;}});source.append(document.createElement('br'),again);}
+    if(note.file_hash){const pdf=document.createElement('a');pdf.textContent='Tải PDF';pdf.href='/api/document?'+new URLSearchParams({source:note.source,id:note.id});source.append(document.createElement('br'),pdf);const md=document.createElement('a');md.textContent='Tải Markdown';md.href='/api/document?'+new URLSearchParams({source:note.source,id:note.id,format:'markdown'});source.append(document.createElement('br'),md);const again=document.createElement('button');again.className='secondary edit-button';again.textContent='Đọc lại PDF';again.addEventListener('click',async()=>{if(!confirm('Đọc lại PDF theo cấu hình hiện tại? Có thể tốn phí AI và thay nhóm/tóm tắt đã chỉnh tay.'))return;again.disabled=true;try{await post('/api/notes/reprocess',{source:note.source,id:note.id});notice('Đã đọc lại PDF và cập nhật sổ.');await loadNotes();}catch(error){notice(error.message,true);}finally{again.disabled=false;}});source.append(document.createElement('br'),again);}
     row.append(time,title,categories,content,source);$('notes-body').append(row);
   }
   $('notes-count').textContent=(data.total>500?'Hiển thị 500 / ':'')+data.total+' ghi chép';
@@ -199,6 +201,7 @@ document.querySelectorAll('[data-go]').forEach(node=>node.addEventListener('clic
 action('stop-app',async()=>{if(!confirm('Tắt tool và dừng lịch tự động trên máy này?'))return;await post('/api/desktop/stop');if(polling)clearInterval(polling);notice('Đã yêu cầu tắt tool. Bạn có thể đóng trang. Bấm biểu tượng Sổ ghi chép để mở lại.');});
 action('logout',async()=>{await post('/api/logout');await boot();});
 action('run-now',()=>run());action('demo-run',()=>run('demo'));
+action('open-archive',async()=>{await post('/api/archive?'+new URLSearchParams({source:$('notes-source').value}));notice('Đã yêu cầu mở thư mục tài liệu trên máy chạy tool.');});
 action('save-settings',()=>saveSettings());action('save-rules',()=>saveSettings(true));
 action('pair-extension',async()=>{const data=await post('/api/extension/pair');$('extension-token').value=data.token;notice('Đã tạo mã ghép nối mới. Dán mã vào tiện ích Chrome; mã cũ đã hết hiệu lực. Không gửi mã vào chat.');});
 action('add-preset-groups',async()=>{
@@ -312,10 +315,10 @@ $('edit-groups-form').addEventListener('submit',async event=>{
   catch(error){$('edit-error').textContent=error.message;}finally{button.disabled=false;}
 });
 function updateProviderUI(){
- if($('local-ocr-label'))$('local-ocr-label').hidden=false;$('pdf-ocr').disabled=false;
- if($('pdf-reader-help'))$('pdf-reader-help').textContent='PDF scan cần Poppler và Tesseract vie+eng trên máy để lấy chữ trước khi DeepSeek phân nhóm.';
+ if($('local-ocr-label'))$('local-ocr-label').hidden=true;$('pdf-ocr').disabled=true;$('pdf-ocr').checked=false;
+ if($('pdf-reader-help'))$('pdf-reader-help').textContent='PDF có chữ → Markdown → DeepSeek → thư mục nhóm. PDF scan vào Cần xem lại, không chạy OCR.';
 }
-action('setup-deepseek',()=>{setTab('settings');$('summary-mode').value='openai';$('ai-options').hidden=false;updateProviderUI();notice('Nhập DeepSeek API key, bấm Lưu key riêng, xác nhận đồng ý gửi chữ tài liệu rồi Lưu cài đặt. PDF scan cần OCR trên máy.');$('ai-key').scrollIntoView({behavior:'smooth',block:'center'});$('ai-key').focus();});
+action('setup-deepseek',()=>{setTab('settings');$('summary-mode').value='openai';$('ai-options').hidden=false;updateProviderUI();notice('Nhập DeepSeek API key, bấm Lưu key riêng, xác nhận đồng ý gửi chữ tài liệu rồi Lưu cài đặt. PDF scan sẽ vào Cần xem lại.');$('ai-key').scrollIntoView({behavior:'smooth',block:'center'});$('ai-key').focus();});
 action('upload-pdf',async()=>{
   const file=$('pdf-file').files[0];if(!file)throw new Error('Chọn file PDF trước.');
   if(file.size>20*1024*1024)throw new Error('PDF tối đa 20 MB.');
