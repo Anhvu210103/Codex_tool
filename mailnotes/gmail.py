@@ -10,6 +10,8 @@ import urllib.request
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+
+from .database import connect
 import webbrowser
 
 from .core import html_to_text, request_json
@@ -129,7 +131,7 @@ def messages(config, credentials, token_path):
     known = set()
     database = Path(config['data_dir']) / 'notes.sqlite3'
     if database.exists():
-        with sqlite3.connect(database) as connection:
+        with connect(database) as connection:
             known = {row[0] for row in connection.execute('SELECT id FROM notes')}
     from .gmail_filters import build_query, date_bounds
     filter_time = datetime.now(timezone.utc)

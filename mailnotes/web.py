@@ -14,6 +14,8 @@ import urllib.parse
 from datetime import timedelta
 from pathlib import Path
 
+from .database import connect
+
 from flask import Flask, jsonify, redirect, render_template, request, send_file, session
 
 from .admin import Admin, error_message, password_record, private_json, read_json, verify_password
@@ -242,7 +244,7 @@ def create_app(base=None, data_root=None, public_url=None):
             raise ValueError('Chưa lưu DeepSeek key trong tool.')
         root = Path(config['data_dir']);root.mkdir(parents=True, exist_ok=True)
         try:
-            with sqlite3.connect(root / 'notes.sqlite3') as connection:
+            with connect(root / 'notes.sqlite3') as connection:
                 choice = select_with_ai(None, candidates, kind, key, config['summary']['model'], connection, config['summary']['pricing'])
         except Exception as error:
             return jsonify(error=error_message(error)), 400
@@ -359,7 +361,7 @@ def create_app(base=None, data_root=None, public_url=None):
         if not database.exists():
             return jsonify(error='Không tìm thấy PDF.'), 404
         import sqlite3
-        with sqlite3.connect(database) as connection:
+        with connect(database) as connection:
             row = connection.execute('SELECT file_hash FROM notes WHERE id=?', (request.args.get('id'),)).fetchone()
         if not row or not row[0] or not re.fullmatch(r'[a-f0-9]{64}', row[0]):
             return jsonify(error='Không tìm thấy PDF.'), 404

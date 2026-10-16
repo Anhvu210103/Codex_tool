@@ -14,6 +14,8 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+from .database import connect
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -227,7 +229,7 @@ class Admin:
             database = self.root / source / 'notes.sqlite3'
             if not database.exists():
                 continue
-            with sqlite3.connect(f'{database.as_uri()}?mode=ro', uri=True) as connection:
+            with connect(f'{database.as_uri()}?mode=ro', uri=True) as connection:
                 connection.row_factory = sqlite3.Row
                 if not connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ai_usage'").fetchone():
                     continue
@@ -272,7 +274,7 @@ class Admin:
         groups = {}
         database = self.root / source / 'notes.sqlite3'
         if database.exists():
-            with sqlite3.connect(f'{database.as_uri()}?mode=ro', uri=True) as connection:
+            with connect(f'{database.as_uri()}?mode=ro', uri=True) as connection:
                 for categories, received in connection.execute('SELECT categories,received_at FROM notes'):
                     categories = json.loads(categories)
                     count_today += datetime.fromisoformat(received).astimezone(zone).date() == today
@@ -314,7 +316,7 @@ class Admin:
             identifier = source + ':' + sha256(data).hexdigest()
             database = Path(config['data_dir']) / 'notes.sqlite3'
             if not reprocess and database.exists():
-                with sqlite3.connect(database) as connection:
+                with connect(database) as connection:
                     if connection.execute('SELECT 1 FROM notes WHERE id=?', (identifier,)).fetchone():
                         return 0
             if reprocess:
@@ -334,7 +336,7 @@ class Admin:
             database = self.root / source / 'notes.sqlite3'
             if not database.exists():
                 raise ValueError('Không tìm thấy ghi chép.')
-            with sqlite3.connect(database) as connection:
+            with connect(database) as connection:
                 connection.row_factory = sqlite3.Row
                 row = connection.execute('SELECT * FROM notes WHERE id=?', (identifier,)).fetchone()
             if not row or not row['file_hash']:
@@ -363,7 +365,7 @@ class Admin:
             database = self.root / source / 'notes.sqlite3'
             if not database.exists():
                 raise ValueError('Không tìm thấy ghi chép.')
-            with sqlite3.connect(database) as connection:
+            with connect(database) as connection:
                 ensure_schema(connection)
                 cursor = connection.execute('UPDATE notes SET categories=? WHERE id=?', (json.dumps(list(dict.fromkeys(categories)), ensure_ascii=False), identifier))
                 if not cursor.rowcount:
@@ -437,9 +439,9 @@ class Admin:
         database = self.root / source / 'notes.sqlite3'
         if not database.exists():
             return {'notes': [], 'total': 0, 'categories': [], 'days': []}
-        with sqlite3.connect(database) as migration:
+        with connect(database) as migration:
             ensure_schema(migration)
-        with sqlite3.connect(f'{database.as_uri()}?mode=ro', uri=True) as connection:
+        with connect(f'{database.as_uri()}?mode=ro', uri=True) as connection:
             connection.row_factory = sqlite3.Row
             rows = [dict(row) for row in connection.execute('SELECT id,sender,subject,categories,summary,received_at,day,source,origin_id,review_reason,file_hash FROM notes ORDER BY received_at DESC,id')]
         for row in rows:

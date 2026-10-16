@@ -7,6 +7,8 @@ import sqlite3
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+
+from .database import connect
 from zoneinfo import ZoneInfo
 
 
@@ -122,7 +124,7 @@ def render_notes(connection, directory, timezone='Asia/Ho_Chi_Minh'):
 def process(messages, config, source):
     root = Path(config['data_dir'])
     root.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(root / 'notes.sqlite3') as connection:
+    with connect(root / 'notes.sqlite3') as connection:
         ensure_schema(connection)
         added = 0
         for message in messages:

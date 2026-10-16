@@ -9,6 +9,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+
+from .database import connect
 import re
 import shutil
 import sqlite3
@@ -139,7 +141,7 @@ def run(data_root=None, limit=MAX_MAILS):
     results_url = GMAIL + 'mail/u/0/#search/' + quote(query.strip(), safe='')
     count = 0
     seen = set()
-    with sqlite3.connect(root / 'ai' / 'notes.sqlite3') as usage_db:
+    with connect(root / 'ai' / 'notes.sqlite3') as usage_db:
         with sync_playwright() as playwright:
             context = playwright.chromium.launch_persistent_context(
                 str(profile), executable_path=executable, headless=False,
