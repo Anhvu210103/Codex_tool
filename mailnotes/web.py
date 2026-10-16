@@ -8,6 +8,8 @@ import json
 import os
 import re
 import secrets
+import subprocess
+import sys
 import threading
 import time
 import urllib.parse
@@ -306,6 +308,31 @@ def create_app(base=None, data_root=None, public_url=None):
     @app.get('/api/usage')
     def usage():
         return jsonify(admin.usage())
+
+    @app.post('/api/desktop/update')
+    def desktop_update():
+        if request.remote_addr not in ('127.0.0.1', '::1') or parsed.hostname not in ('localhost', '127.0.0.1', '::1'):
+            return jsonify(error='Chỉ cập nhật từ máy đang chạy tool.'), 403
+        if getattr(sys, 'frozen', False) or not sys.platform.startswith('linux'):
+            return jsonify(error='Cập nhật một nút hiện hỗ trợ bản mã nguồn Linux.'), 400
+        if 'desktop_shutdown' not in app.extensions:
+            return jsonify(error='Tắt lệnh đang chạy bằng Ctrl+C, rồi mở Mo-So-Ghi-Chep.sh để dùng cập nhật một nút.'), 400
+        if admin.run_lock.locked():
+            return jsonify(error='Chờ xử lý tài liệu hoàn tất rồi cập nhật.'), 409
+        updater = base / 'Cap-Nhat-Tool.py'
+        if not updater.is_file():
+            return jsonify(error='Bản này chưa có trình cập nhật.'), 400
+        log = admin.private / 'update.log'
+        descriptor = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, 'w') as output:
+            subprocess.Popen([sys.executable, str(updater)], cwd=base, stdout=output,
+                             stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
+        return jsonify(ok=True)
+
+    @app.get('/api/desktop/update-log')
+    def desktop_update_log():
+        log = admin.private / 'update.log'
+        return jsonify(message=log.read_text(errors='replace')[-6000:] if log.exists() else '')
 
     @app.post('/api/desktop/stop')
     def desktop_stop():

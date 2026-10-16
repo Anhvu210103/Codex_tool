@@ -330,3 +330,17 @@ action('upload-pdf',async()=>{
   notice(data.added?'Đã ghi/cập nhật PDF vào sổ.':'PDF này đã xử lý, không gọi AI lại.');await loadNotes();
 });
 boot().catch(()=>{if($('auth'))$('auth').hidden=true;if($('app'))$('app').hidden=true;showStartupError();});
+
+action('update-tool',async()=>{
+ if(!confirm('Cập nhật bản mới và tự mở lại tool? Dữ liệu, key và cài đặt được giữ nguyên.'))return;
+ await post('/api/desktop/update');
+ const panel=$('update-progress');panel.hidden=false;panel.textContent='Đang tải bản mới. Tool sẽ tự mở lại. Nếu có lỗi, mở Cap-Nhat-So-Ghi-Chep.sh để xem thông báo.';
+ $('update-tool').disabled=true;
+ let attempts=0;
+ const timer=setInterval(async()=>{
+  try{const result=await api('/api/desktop/update-log');panel.textContent=result.message||panel.textContent;
+   if(result.message.includes('Cập nhật chưa hoàn tất:')||result.message.includes('Đã cập nhật.')){clearInterval(timer);$('update-tool').disabled=false;}
+  }catch{/* The server is restarting; its launcher opens the new page. */}
+  if(++attempts>=180){clearInterval(timer);$('update-tool').disabled=false;}
+ },3000);
+});

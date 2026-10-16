@@ -175,3 +175,11 @@ Module Gmail trả các trường `id`, `sender`, `subject`, `received_at`, `bod
 ## Tình trạng kiểm chứng
 
 Đã chạy demo và kiểm thử tự động cho phân loại, MIME/HTML, chống xử lý trùng, chia ngày theo múi giờ, link Gmail và khả năng thử lại khi tóm tắt lỗi. Đã kiểm thử API quản trị và OAuth giả lập, lưu cấu hình/lịch chạy; đã thử trình duyệt thật cho đăng nhập, demo, tìm kiếm, tải file, thêm/xóa rules và lưu cài đặt trên desktop/mobile. Đã bổ sung kiểm thử AI JSON/cache/review, PDF có chữ, PDF scan vào review, Gmail PDF qua API giả lập, nâng cấp database và sửa nhóm. Chưa kiểm chứng OAuth với Google, Gmail thật, DeepSeek thật vì chưa có credentials. Không coi demo là bằng chứng kết nối tài khoản đã hoạt động.
+
+### Cập nhật dễ hơn trên Linux (bản mã nguồn)
+
+Mở bằng `Mo-So-Ghi-Chep.sh`, vào **Cài đặt → Cập nhật tool**. Tool tải nhánh `codex/admin-web`, kiểm tra gói tải về, chờ phiên cũ tắt, sao lưu mã rồi mở lại. Không thay `.local`, `.venv`, `.env` hoặc file đăng nhập. Mã cũ nằm trong `.local/updates/backup-*`. Nếu kiểm tra nhập module hoặc cài phụ thuộc thất bại, mã được phục hồi; thay đổi phụ thuộc đã cài vào `.venv` không được tự hoàn tác. Bản cập nhật không tự xóa các file cũ không còn trong nhánh.
+
+Có thể chạy `Cap-Nhat-So-Ghi-Chep.sh` bằng **Run as a Program / Run in Terminal**. Nếu đang chạy bằng lệnh `python -m mailnotes.web`, nhấn Ctrl+C ở cửa sổ đó trước lần cập nhật đầu tiên. Không cập nhật khi tài liệu đang xử lý. Nếu cập nhật lỗi trước khi dừng app, app cũ tiếp tục chạy; xem thông báo trong Cài đặt hoặc `.local/admin/update.log`.
+
+Để Chrome chỉ cần bấm **Reload** tại `chrome://extensions` sau mỗi lần cập nhật, nạp tiện ích một lần từ thư mục `chrome-extension` **bên trong thư mục tool đang dùng**, thay cho bản giải nén ở thư mục Downloads khác. Khi đổi thư mục tiện ích, có thể cần nhập lại địa chỉ tool và mã ghép nối. Bản đóng gói và macOS chưa dùng trình cập nhật này.
