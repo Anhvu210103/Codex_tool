@@ -4,10 +4,14 @@ import sqlite3
 import unittest
 from unittest.mock import MagicMock, patch
 
-from mailnotes.gmail_browser_pilot import select_with_ai, click_control
+from mailnotes.gmail_browser_pilot import select_with_ai, click_control, browser_binary
 
 
 class BrowserPilotTests(unittest.TestCase):
+    def test_linux_finds_chromium_outside_path(self):
+        with patch('mailnotes.gmail_browser_pilot.shutil.which',return_value=None),patch('sys.platform','linux'),patch('os.path.isfile',side_effect=lambda path:path=='/snap/bin/chromium'),patch('os.access',return_value=True):
+            self.assertEqual(browser_binary(),'/snap/bin/chromium')
+
     def test_ai_selects_only_a_visible_control_and_records_token_usage(self):
         page = MagicMock()
         candidates = [{'index':2,'label':'Office — document.pdf','role':'row'}]

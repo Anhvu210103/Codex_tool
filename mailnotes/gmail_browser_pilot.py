@@ -29,10 +29,14 @@ MAX_STEPS = 8
 
 
 def browser_binary():
-    for name in ('google-chrome', 'chromium', 'chromium-browser', 'chrome'):
+    for name in ('google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser', 'chrome'):
         path = shutil.which(name)
         if path:
             return path
+    if sys.platform == 'linux':
+        for candidate in ('/snap/bin/chromium', '/opt/google/chrome/chrome'):
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                return candidate
     if sys.platform == 'darwin':
         path = Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
         if path.is_file():
@@ -127,6 +131,7 @@ def run(data_root=None, limit=MAX_MAILS):
     model = config['summary']['model']
     if not re.fullmatch(r'[A-Za-z0-9._-]{1,100}',model):
         raise RuntimeError('Model DeepSeek không hợp lệ.')
+    executable = browser_binary()
     profile = root / 'browser-gmail' / 'profile'
     profile.mkdir(parents=True, exist_ok=True, mode=0o700)
     (root / 'pdf').mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -137,7 +142,7 @@ def run(data_root=None, limit=MAX_MAILS):
     with sqlite3.connect(root / 'pdf' / 'notes.sqlite3') as usage_db:
         with sync_playwright() as playwright:
             context = playwright.chromium.launch_persistent_context(
-                str(profile), executable_path=browser_binary(), headless=False,
+                str(profile), executable_path=executable, headless=False,
                 accept_downloads=True, viewport={'width':1280,'height':850})
             try:
                 page = context.pages[0] if context.pages else context.new_page()
