@@ -6,8 +6,8 @@
   "summary": {
     "mode": "extractive",
     "max_chars": 1200,
-    "provider": "gemini",
-    "model": "gemini-flash-latest"
+    "provider": "deepseek",
+    "model": "deepseek-chat"
   },
   "rules": [
     {

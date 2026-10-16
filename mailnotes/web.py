@@ -190,7 +190,7 @@ def create_app(base=None, data_root=None, public_url=None):
     def status():
         status = admin.status()
         requested = request.args.get('provider')
-        if requested in ('deepseek', 'openai', 'gemini'):
+        if requested == 'deepseek':
             status['ai_key_configured'] = admin.has_key(requested)
         status['desktop_mode'] = 'desktop_shutdown' in app.extensions
         return jsonify(status)
@@ -361,23 +361,11 @@ def create_app(base=None, data_root=None, public_url=None):
         session.pop('oauth', None)
         return jsonify(ok=True)
 
-    @app.post('/api/gemini/check')
-    def check_gemini():
-        from .gemini import models
-        key = read_json(admin.key_path('gemini'), {}).get('key') or os.environ.get('GEMINI_API_KEY')
-        if not key:
-            raise ValueError('Lưu Gemini API key trước khi kiểm tra.')
-        try:
-            available = models(key)
-        except Exception as error:
-            return jsonify(error=error_message(error)), 400
-        return jsonify(models=available)
-
     @app.post('/api/ai-key')
     def ai_key():
         data = payload()
         provider = data.get('provider', admin.config()['summary']['provider'])
-        if provider not in ('deepseek', 'openai', 'gemini'):
+        if provider != 'deepseek':
             raise ValueError('Nhà cung cấp AI không hợp lệ.')
         key = data.get('key')
         if not isinstance(key, str) or len(key) > 1000:

@@ -54,11 +54,11 @@ def summarize(message, config):
         return body[:limit] + ('…' if len(body) > limit else '')
     if settings['mode'] != 'openai':
         raise ValueError('summary.mode must be extractive or openai')
-    key = config.get('_api_key') or os.environ.get('OPENAI_API_KEY')
+    key = config.get('_api_key') or os.environ.get('DEEPSEEK_API_KEY')
     if not key:
-        raise RuntimeError('OPENAI_API_KEY is required for openai mode')
-    result = request_json('https://api.openai.com/v1/chat/completions', data={
-        'model': settings.get('model', 'gpt-4o-mini'),
+        raise RuntimeError('DEEPSEEK_API_KEY is required for AI mode')
+    result = request_json('https://api.deepseek.com/chat/completions', data={
+        'model': settings.get('model', 'deepseek-chat'),
         'temperature': 0,
         'max_tokens': 500,
         'messages': [

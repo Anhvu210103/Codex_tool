@@ -12,31 +12,15 @@ Xem [cách tải app, cài và giữ dữ liệu](packaging/README.md). Bản Li
 
 Trên máy Linux đang chạy bản mã nguồn, dùng **Mo-AI-Gmail.sh** để mở bản thử riêng. Lần đầu launcher cài `requirements-browser.txt` vào `.venv` hiện có; cần Chrome hoặc Chromium cài trên máy. Bản thử dùng hồ sơ trình duyệt riêng tại `.local/browser-gmail/profile`; người dùng đăng nhập Gmail ngay trong cửa sổ đó. Không gửi mật khẩu cho tool hay cho người hỗ trợ. Nếu Google từ chối đăng nhập bằng trình duyệt tự động, dừng bản thử và tiếp tục dùng kết nối Gmail API đã có.
 
-Trước khi chạy, trong Cài đặt bật Gemini AI, lưu key và đồng ý xử lý dữ liệu. AI nhận **ảnh chụp giao diện Gmail**, danh sách nút/hàng đang thấy và chọn email hoặc nút PDF; mỗi lượt chọn có thể dùng token. Bản thử áp dụng bộ lọc Gmail đã lưu cộng điều kiện có PDF, thử tối đa 3 thư, tải PDF qua giao diện và ghi vào nguồn **PDF tải lên** trong sổ. Tải lại cùng file sẽ xử lý lại; cache AI có thể tránh một lượt phân loại trùng. Chỉ cho phép mở thư và chọn PDF; lựa chọn gửi/xóa/lưu trữ bị chặn. Mở thư có thể khiến Gmail đánh dấu đã đọc. Bản thử không chạy theo lịch và chưa thay thế bộ kết nối Gmail API.
+Trước khi chạy, trong Cài đặt bật DeepSeek AI, lưu key và đồng ý xử lý dữ liệu. DeepSeek nhận **chữ và nhãn nút/hàng đang thấy trên Gmail**, không nhận ảnh chụp màn hình và chọn email hoặc nút PDF; mỗi lượt chọn có thể dùng token. Bản thử áp dụng bộ lọc Gmail đã lưu cộng điều kiện có PDF, thử tối đa 3 thư, tải PDF qua giao diện và ghi vào nguồn **PDF tải lên** trong sổ. Tải lại cùng file sẽ xử lý lại; cache AI có thể tránh một lượt phân loại trùng. Chỉ cho phép mở thư và chọn PDF; lựa chọn gửi/xóa/lưu trữ bị chặn. Mở thư có thể khiến Gmail đánh dấu đã đọc. Bản thử không chạy theo lịch và chưa thay thế bộ kết nối Gmail API.
 
 Đây là phép thử điều khiển trình duyệt trên Gmail, chưa phải bằng chứng hoạt động trên website cơ quan nhà nước. Đã kiểm thử lựa chọn AI, chặn nút nguy hiểm và nhận diện hàng email/nút PDF trên trang mô phỏng; chưa thử Gmail thật vì môi trường phát triển không có phiên đăng nhập của người dùng. Bản macOS đóng gói hiện chưa kèm Playwright; cần kiểm chứng bản thử trên Linux trước khi quyết định cách tích hợp cho iMac.
 
 ## Nhóm mẫu cho cơ quan nhà nước
 
-Bản cài mới có 14 nhóm mẫu: văn bản pháp luật, công việc cần xử lý, công văn chỉ đạo, thủ tục hành chính, kinh tế và đầu tư, tài chính và ngân sách, thuế/phí, đấu thầu, doanh nghiệp, đất đai/xây dựng, lao động/an sinh, báo cáo/thống kê, nhân sự nội bộ và thanh tra/kiểm tra. Mỗi nhóm có mô tả để Gemini chọn khi đọc tài liệu và từ khóa để thử chế độ miễn phí. Một tài liệu có thể vào nhiều nhóm.
+Bản cài mới có 14 nhóm mẫu: văn bản pháp luật, công việc cần xử lý, công văn chỉ đạo, thủ tục hành chính, kinh tế và đầu tư, tài chính và ngân sách, thuế/phí, đấu thầu, doanh nghiệp, đất đai/xây dựng, lao động/an sinh, báo cáo/thống kê, nhân sự nội bộ và thanh tra/kiểm tra. Mỗi nhóm có mô tả để DeepSeek chọn khi đọc tài liệu và từ khóa để thử chế độ miễn phí. Một tài liệu có thể vào nhiều nhóm.
 
 Bản đã cài giữ nguyên nhóm người dùng đã lưu. Muốn bổ sung nhóm mẫu, vào **Nhóm tài liệu → Thêm nhóm mẫu cơ quan nhà nước**, xem lại mô tả rồi bấm **Lưu quy tắc**. Nút chỉ thêm nhóm còn thiếu theo tên, không xóa hoặc ghi đè nhóm riêng. Nhóm mới áp dụng cho tài liệu xử lý tiếp theo; PDF cũ có thể đọc lại nếu muốn phân loại theo nhóm mới.
-
-## Gemini: đọc PDF trên cloud, không OCR trên máy
-
-1. Cập nhật code và mở lại tool. Vào Sổ ghi chép → **Cài Gemini để đọc PDF trên cloud**, hoặc Cài đặt → chọn AI phân nhóm + tóm tắt và nhà cung cấp Gemini.
-2. Tạo Gemini API key tại [Google AI Studio](https://aistudio.google.com/apikey). Đây là key riêng, không phải file OAuth Gmail. Nhập vào Cài đặt và bấm **Lưu key riêng**; không gửi key qua chat.
-3. Bấm **Kiểm tra key & model** để xem model tài khoản truy cập được. Mặc định `gemini-flash-latest` theo ví dụ SDK chính thức; đây là bí danh có thể đổi phiên bản. Chọn model cố định được tài khoản hỗ trợ PDF/JSON nếu muốn theo dõi đơn giá ổn định. Kiểm tra danh sách model chưa chứng minh đọc PDF thành công.
-4. Đọc thông báo gửi nguyên PDF tới Google, xác nhận đồng ý, rồi **Lưu cài đặt**. Sau đó upload PDF hoặc chạy Gmail với Đọc PDF đính kèm được bật.
-5. Tài liệu scan đã lưu trước đây: bấm **Đọc lại PDF**. Bản cũ được cập nhật, không tạo dòng trùng. Thao tác có thể phát sinh phí AI và thay nhóm/tóm tắt chỉnh tay.
-
-Chế độ Gemini AI gửi nguyên PDF (cả scan), không gọi pypdf để trích chữ, Poppler hoặc Tesseract. File gốc vẫn được lưu trên đĩa để mở lại; đọc hiểu diễn ra trên API Google. Tối đa 20 MB theo giới hạn upload của tool. File tối đa 8 MB được gửi inline; file lớn hơn dùng Files API, chờ xử lý và yêu cầu xóa file tạm sau lượt gọi, kể cả khi generation lỗi. Nếu chưa xác nhận xóa được, ghi chép có cảnh báo. Việc xóa file tạm không có nghĩa Google không lưu dữ liệu theo chính sách dịch vụ của họ.
-
-Phân nhóm và tóm tắt dùng một lượt generateContent. Có cache theo hash PDF, model, nhóm và prompt. Token đọc PDF do API báo, không ước lượng từ ký tự; token đầu ra cộng cả thoughtsTokenCount nếu có. Giá Gemini nhập riêng trong Cài đặt theo model, không tự lấy giá của DeepSeek. Đơn giá chưa cấu hình sẽ hiển thị chưa đủ dữ liệu. Giới hạn ký tự chỉ áp dụng nội dung văn bản, không cắt PDF gửi Gemini.
-
-Chế độ thử miễn phí vẫn dùng rules/trích đoạn và không gọi Gemini. DeepSeek/OpenAI vẫn được giữ; các chế độ đó đọc chữ/OCR cục bộ như trước. Chỉ khi chọn Gemini + bật AI và lưu, PDF mới được gửi lên cloud. Key được lưu tại `.local/admin/gemini-key.json` quyền 0600 hoặc dùng biến `GEMINI_API_KEY`. API chỉ trả trạng thái có key, không trả lại giá trị. Backend dùng domain `generativelanguage.googleapis.com`; TLS được xác minh và không chuyển tiếp API key qua redirect.
-
-Đã kiểm chứng PDF scan đi qua adapter API, Gmail PDF, upload, đọc lại bản cũ, token/cache và giao diện bằng Gemini giả lập. Chưa có key trong môi trường phát triển để gọi Gemini thật hoặc xác nhận độ chính xác, quota, chi phí thực tế. Tham khảo [SDK chính thức](https://github.com/googleapis/python-genai) và [tài liệu PDF](https://ai.google.dev/gemini-api/docs/document-processing). File có mật khẩu, model không phù hợp, quota/billing hoặc file vượt giới hạn Google có thể bị API từ chối; tool báo lỗi thay vì giả vờ đã đọc.
 
 ## Phân loại + tóm tắt bằng DeepSeek
 
@@ -158,13 +142,13 @@ Rules mới áp dụng cho email chưa xử lý; MVP chưa hỗ trợ phân lo�
 
 Mặc định `summary.mode = "extractive"`: bỏ một số chữ ký và trích dẫn phổ biến rồi lấy tối đa `max_chars` ký tự đầu. **Đây là trích đoạn, không phải tóm tắt ngữ nghĩa**; có thể bỏ sót thời hạn nằm cuối thư. Loại chữ ký/trích dẫn là heuristic, cần xem bản gốc khi ra quyết định.
 
-Để bật AI qua CLI, cấu hình `classification_mode: "ai"`, `summary.mode: "openai"` (tên legacy của chế độ AI), `summary.provider: "deepseek"`, `summary.model: "deepseek-chat"`, `summary.ai_consent: true` và đặt `DEEPSEEK_API_KEY` bằng cơ chế secrets. CLI chưa có lệnh upload PDF; dùng trang web cho upload. OpenAI tùy chọn dùng `provider: "openai"`, `model: "gpt-4o-mini"` và `OPENAI_API_KEY`. Không đặt key trong config.json.
+Để bật AI qua CLI, cấu hình `classification_mode: "ai"`, `summary.mode: "openai"` (tên legacy của chế độ AI), `summary.provider: "deepseek"`, `summary.model: "deepseek-chat"`, `summary.ai_consent: true` và đặt `DEEPSEEK_API_KEY` bằng cơ chế secrets. CLI chưa có lệnh upload PDF; dùng trang web cho upload. Không đặt key trong config.json.
 
 ## Mạng cần thiết
 
 - Gmail: `gmail.googleapis.com`
 - OAuth: `accounts.google.com`, `oauth2.googleapis.com`
-- AI tùy chọn: `generativelanguage.googleapis.com`, `api.deepseek.com`, `api.openai.com`
+- AI tùy chọn: `api.deepseek.com`
 
 TLS được xác minh mặc định. Không cần API key để chạy demo/extractive. Việc có domain trong cấu hình không đồng nghĩa OAuth/API đã hoạt động.
 
@@ -174,4 +158,4 @@ Module Gmail trả các trường `id`, `sender`, `subject`, `received_at`, `bod
 
 ## Tình trạng kiểm chứng
 
-Đã chạy demo và kiểm thử tự động cho phân loại, MIME/HTML, chống xử lý trùng, chia ngày theo múi giờ, link Gmail và khả năng thử lại khi tóm tắt lỗi. Đã kiểm thử API quản trị và OAuth giả lập, lưu cấu hình/lịch chạy; đã thử trình duyệt thật cho đăng nhập, demo, tìm kiếm, tải file, thêm/xóa rules và lưu cài đặt trên desktop/mobile. Đã bổ sung kiểm thử AI JSON/cache/review, PDF có chữ, PDF scan vào review, Gmail PDF qua API giả lập, nâng cấp database và sửa nhóm. Chưa kiểm chứng OAuth với Google, Gmail thật, DeepSeek/OpenAI thật hoặc OCR tiếng Việt thật vì chưa có credentials. Không coi demo là bằng chứng kết nối tài khoản đã hoạt động.
+Đã chạy demo và kiểm thử tự động cho phân loại, MIME/HTML, chống xử lý trùng, chia ngày theo múi giờ, link Gmail và khả năng thử lại khi tóm tắt lỗi. Đã kiểm thử API quản trị và OAuth giả lập, lưu cấu hình/lịch chạy; đã thử trình duyệt thật cho đăng nhập, demo, tìm kiếm, tải file, thêm/xóa rules và lưu cài đặt trên desktop/mobile. Đã bổ sung kiểm thử AI JSON/cache/review, PDF có chữ, PDF scan vào review, Gmail PDF qua API giả lập, nâng cấp database và sửa nhóm. Chưa kiểm chứng OAuth với Google, Gmail thật, DeepSeek thật hoặc OCR tiếng Việt thật vì chưa có credentials. Không coi demo là bằng chứng kết nối tài khoản đã hoạt động.

@@ -17,5 +17,5 @@ if ! .venv/bin/python -c 'import playwright' >/dev/null 2>&1; then
     echo 'Đang cài Playwright một lần cho bản thử AI trên Gmail...'
     .venv/bin/python -m pip install -r requirements-browser.txt
 fi
-echo 'AI sẽ nhìn ảnh chụp Gmail và chỉ thử mở thư, tải PDF. Đăng nhập bằng cửa sổ Chrome khi được hỏi.'
+echo 'DeepSeek sẽ chọn thư và nút PDF từ chữ trên trang Gmail. Đăng nhập bằng cửa sổ Chrome khi được hỏi.'
 .venv/bin/python -m mailnotes.gmail_browser_pilot

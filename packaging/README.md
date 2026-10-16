@@ -41,7 +41,7 @@ Thay file executable hoặc `.app` không xóa dữ liệu. Nếu chuyển từ 
 
 Có thể dùng MAILNOTES_DATA_DIR để chọn thư mục dữ liệu riêng khi triển khai có quản lý. Không gửi data/token/key qua chat. Nhật ký khởi động nằm ở `admin/desktop.log` trong thư mục dữ liệu; chỉ chia sẻ lỗi đã loại bỏ thông tin riêng.
 
-Với Gemini AI, PDF scan gửi lên API và không cần OCR trên máy. Với DeepSeek/OpenAI/trích đoạn, OCR scan vẫn là tính năng tùy chọn cần Poppler + Tesseract với vie+eng trên máy; bản app không cài công cụ hệ thống bằng quyền admin. PDF có chữ, phân loại và ghi sổ đã được tích hợp. Chứng chỉ CA công khai được đóng gói, giữ TLS verification; SSL_CERT_FILE do người dùng cấu hình được tôn trọng.
+DeepSeek nhận phần chữ trích từ PDF. OCR scan là tính năng tùy chọn cần Poppler + Tesseract với vie+eng trên máy; bản app không cài công cụ hệ thống bằng quyền admin. PDF có chữ, phân loại và ghi sổ đã được tích hợp. Chứng chỉ CA công khai được đóng gói, giữ TLS verification; SSL_CERT_FILE do người dùng cấu hình được tôn trọng.
 
 ## Build cho người phát triển
 

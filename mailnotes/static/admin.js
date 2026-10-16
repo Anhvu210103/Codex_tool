@@ -128,9 +128,8 @@ async function refreshStatus() {
   $('client-state').textContent=status.gmail_client_configured?'Đã lưu cấu hình Google. File bí mật không hiển thị lại.':'Chưa có file cấu hình';
   $('ai-key-state').textContent=status.ai_key_configured?'Đã có key. Giá trị không hiển thị lại.':'Chưa có API key';
   $('connect-gmail').disabled=!status.gmail_client_configured || status.running;
-  const cloud=config.summary.provider==='gemini' && config.summary.mode==='openai';
-  $('dashboard-pdf-state').textContent=config.gmail_pdf?(cloud?'Gemini đọc PDF trên cloud':'Tự tải và đọc nội dung'):'Chưa bật';
-  if($('pdf-processing-description'))$('pdf-processing-description').textContent=cloud?'PDF và bản scan được gửi nguyên file lên Gemini để phân nhóm/tóm tắt. Máy bạn không chạy OCR.':'Đang dùng chế độ đọc chữ/OCR trên máy. Chọn Gemini để đọc PDF trên cloud, không cần cài OCR.';
+  $('dashboard-pdf-state').textContent=config.gmail_pdf?'Tự tải và đọc nội dung':'Chưa bật';
+  if($('pdf-processing-description'))$('pdf-processing-description').textContent='PDF có chữ được đọc trực tiếp. Bản scan cần OCR trên máy trước khi gửi chữ cho DeepSeek.';
   if (activeTab==='overview') await loadOverview();
   if (activeTab==='notebook') await loadNotes();
   if (activeTab==='usage') await loadUsage();
@@ -310,21 +309,16 @@ $('edit-groups-form').addEventListener('submit',async event=>{
   try{const categories=[...$('edit-group-options').querySelectorAll('input:checked')].map(input=>input.value);await post('/api/notes/categories',{source:editingNote.source,id:editingNote.id,categories});$('edit-groups').close();notice('Đã sửa nhóm và cập nhật sổ. Không gọi AI lại.');if(activeTab==='overview')await loadOverview();else await loadNotes();}
   catch(error){$('edit-error').textContent=error.message;}finally{button.disabled=false;}
 });
-$('provider').addEventListener('change',()=>{$('model').value=({gemini:'gemini-flash-latest',deepseek:'deepseek-chat',openai:'gpt-4o-mini'})[$('provider').value];$('ai-key').value='';$('ai-consent').checked=false;clearPrices();updateProviderUI();refreshStatus().catch(error=>notice(error.message,true));});
 function updateProviderUI(){
- const gemini=$('provider').value==='gemini';const cloud=gemini && $('summary-mode').value==='openai';
- if($('check-gemini'))$('check-gemini').hidden=!gemini;if($('gemini-key-help'))$('gemini-key-help').hidden=!gemini;
- if($('local-ocr-label'))$('local-ocr-label').hidden=cloud;$('pdf-ocr').disabled=cloud;
- if($('ai-data-notice'))$('ai-data-notice').textContent=gemini?'Gemini nhận nguyên file PDF (kể cả ảnh scan) để đọc, phân nhóm và tóm tắt trên cloud. File nhỏ gửi trực tiếp; file lớn được tải tạm qua Files API rồi yêu cầu xóa. Chỉ bật khi bạn được phép gửi toàn bộ tài liệu cho Google.':'AI nhận tiêu đề và phần văn bản đã đọc được. PDF scan vẫn cần OCR trên máy trong chế độ này.';
- if($('pdf-reader-help'))$('pdf-reader-help').textContent=cloud?'Gemini đọc PDF trên cloud. Không cần cài Poppler hay Tesseract; máy chỉ lưu và chuyển file.':'OCR cục bộ cần Poppler + Tesseract vie+eng. Nếu muốn gửi PDF trực tiếp lên API, chọn Gemini và bật chế độ AI.';
+ if($('local-ocr-label'))$('local-ocr-label').hidden=false;$('pdf-ocr').disabled=false;
+ if($('pdf-reader-help'))$('pdf-reader-help').textContent='PDF scan cần Poppler và Tesseract vie+eng trên máy để lấy chữ trước khi DeepSeek phân nhóm.';
 }
-action('setup-gemini',()=>{setTab('settings');$('summary-mode').value='openai';$('ai-options').hidden=false;$('provider').value='gemini';$('provider').dispatchEvent(new Event('change'));notice('Nhập Gemini API key, bấm Lưu key riêng, xác nhận đồng ý gửi PDF rồi Lưu cài đặt. Cấu hình đang chạy chưa thay đổi.');$('ai-key').scrollIntoView({behavior:'smooth',block:'center'});$('ai-key').focus();});
-action('check-gemini',async()=>{const data=await post('/api/gemini/check');$('gemini-models').replaceChildren();data.models.forEach(name=>$('gemini-models').append(new Option(name,name)));notice('Key Gemini đã truy cập được '+data.models.length+' model. Chọn model hỗ trợ PDF/JSON rồi thử một file; kiểm tra này chưa xác nhận đọc PDF thành công.');});
+action('setup-deepseek',()=>{setTab('settings');$('summary-mode').value='openai';$('ai-options').hidden=false;updateProviderUI();notice('Nhập DeepSeek API key, bấm Lưu key riêng, xác nhận đồng ý gửi chữ tài liệu rồi Lưu cài đặt. PDF scan cần OCR trên máy.');$('ai-key').scrollIntoView({behavior:'smooth',block:'center'});$('ai-key').focus();});
 action('upload-pdf',async()=>{
   const file=$('pdf-file').files[0];if(!file)throw new Error('Chọn file PDF trước.');
   if(file.size>20*1024*1024)throw new Error('PDF tối đa 20 MB.');
   const form=new FormData();form.append('file',file);form.append('reprocess',$('pdf-reprocess').checked?'true':'false');
-  notice(config.summary.provider==='gemini' && config.summary.mode==='openai'?'Đang gửi PDF lên Gemini để đọc, phân nhóm và tóm tắt. Không chạy OCR trên máy. Vui lòng chờ…':'Đang đọc PDF và xử lý theo cấu hình đã lưu. Vui lòng chờ…');
+  notice('Đang đọc PDF và xử lý theo cấu hình đã lưu. Vui lòng chờ…');
   const response=await fetch('/api/pdf',{method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':csrf},body:form});
   const data=await response.json();if(!response.ok)throw new Error(data.error || 'Không xử lý được PDF.');
   $('pdf-file').value='';$('notes-source').value='pdf';$('notes-day').value='';$('notes-category').value='';

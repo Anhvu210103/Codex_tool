@@ -21,7 +21,7 @@ Bản này phục vụ **một quản trị viên / một Gmail / một máy ch�
    MAILNOTES_ADMIN_PASSWORD=<mật khẩu riêng ít nhất 12 ký tự>
    ```
 
-   Thay URL và mật khẩu bằng giá trị thật. Biến mật khẩu chỉ dùng khởi tạo khi chưa có file `.local/admin/password.json`; sau đó mật khẩu được quản lý bằng hash PBKDF2, có thể đổi trên web. Không cần đặt `OPENAI_API_KEY` để dùng trích đoạn. API key có thể nhập sau trên web (lưu file riêng quyền 0600).
+   Thay URL và mật khẩu bằng giá trị thật. Biến mật khẩu chỉ dùng khởi tạo khi chưa có file `.local/admin/password.json`; sau đó mật khẩu được quản lý bằng hash PBKDF2, có thể đổi trên web. Không cần đặt `DEEPSEEK_API_KEY` để dùng trích đoạn. API key có thể nhập sau trên web (lưu file riêng quyền 0600).
 
 4. Dùng mẫu `mailnotes.service` cho systemd, điều chỉnh tài khoản và đường dẫn nếu khác. Reverse proxy HTTPS tới `127.0.0.1:8080` theo `nginx.conf.example`. Chỉ mở cổng HTTPS cho khách, giữ cổng backend nội bộ. Không ghi query string của `/oauth/callback` vào access log.
 5. Quản trị viên kỹ thuật cài và bật service bằng systemd. Kiểm tra truy cập trang đăng nhập qua domain HTTPS. Backend dùng Waitress, không dùng Flask debug server. Giới hạn đăng nhập sai tính theo IP backend; nếu tất cả truy cập qua một proxy, giới hạn 5 lần/5 phút sẽ dùng chung. Có thể thêm rate limit phù hợp ở proxy.
@@ -32,7 +32,7 @@ Bản này phục vụ **một quản trị viên / một Gmail / một máy ch�
 
 - Đổi nguồn mẫu/Gmail, bộ lọc Gmail, chu kỳ, múi giờ; bật/tắt lịch.
 - Thêm/xóa nhóm, từ khóa và điều kiện người gửi. Quy tắc mới áp dụng email chưa xử lý.
-- Chọn rules + trích đoạn miễn phí hoặc AI phân nhóm/tóm tắt chung. Chọn DeepSeek/OpenAI, xác nhận đồng ý gửi nội dung, lưu/xóa key riêng cho từng nhà cung cấp và đặt giới hạn đầu vào.
+- Chọn rules + trích đoạn miễn phí hoặc AI phân nhóm/tóm tắt chung. Chọn DeepSeek, xác nhận đồng ý gửi nội dung, lưu/xóa key riêng cho từng nhà cung cấp và đặt giới hạn đầu vào.
 - Bấm Chạy ngay, theo dõi trạng thái/lỗi gần nhất.
 - Tìm ghi chép, lọc ngày/nhóm/nguồn và tải toàn bộ sổ Markdown của một ngày. File tải gồm toàn bộ ngày, không chỉ các hàng đang lọc bằng từ khóa.
 - Kết nối lại Gmail khi quyền hết hạn, ngắt kết nối và đổi mật khẩu quản trị.
@@ -58,7 +58,7 @@ PDF tối đa 20 MB; đọc lớp văn bản tối đa 100 trang/100.000 ký t�
 
 Một request AI trả JSON nhóm + tóm tắt. Nhóm ngoài danh sách, confidence dưới 0.65 (do mô hình tự báo, không phải độ chính xác đã đo), hoặc needs_review sẽ vào Cần xem lại. Cache SQLite gắn với nhà cung cấp, mô hình, prompt, nội dung gửi và mô tả nhóm; tránh gọi lại kết quả giống nhau trong cùng nguồn. Cache không dùng chung giữa Gmail/PDF upload. Khi PDF đã lưu, upload lại không gọi AI. Chọn Xử lý lại PDF đã có nếu cần áp dụng cấu hình/OCR mới; thao tác này thay nhóm/tóm tắt đã sửa bằng tay và có thể phát sinh phí. Nếu prompt/input không đổi, cache vẫn được dùng.
 
-DeepSeek dùng endpoint cố định `https://api.deepseek.com/chat/completions`, model mặc định `deepseek-chat`; không cho nhập endpoint tùy ý. Cho phép domain `api.deepseek.com` trong mạng máy chủ. Key nhập qua web hoặc `DEEPSEEK_API_KEY`; OpenAI vẫn dùng key riêng. Không có key thật trong repo. Giá và quota phụ thuộc tài khoản nhà cung cấp; chưa xác nhận chi phí hay độ chính xác trên tài liệu khách.
+DeepSeek dùng endpoint cố định `https://api.deepseek.com/chat/completions`, model mặc định `deepseek-chat`; không cho nhập endpoint tùy ý. Cho phép domain `api.deepseek.com` trong mạng máy chủ. Key nhập qua web hoặc `DEEPSEEK_API_KEY`. Không có key thật trong repo. Giá và quota phụ thuộc tài khoản nhà cung cấp; chưa xác nhận chi phí hay độ chính xác trên tài liệu khách.
 
 OCR là tùy chọn chạy cục bộ, tối đa 20 trang với ngân sách thời gian khoảng 180 giây cho các lệnh OCR. Để cài trên Ubuntu/Debian:
 
@@ -85,12 +85,3 @@ Nút Đọc lại PDF hỗ trợ cả Gmail và upload, giữ một dòng ghi ch
 ## Bộ chọn Gmail đơn giản
 
 Cấu hình mới có gmail_filter mặc định Hôm nay. Thiết lập cũ thiếu trường này được giữ như bộ lọc nâng cao, không tự mở rộng phạm vi đọc. Khi người dùng chọn Hôm nay/7 ngày/khoảng ngày, server tính ranh giới ngày theo timezone từng lượt và kiểm tra internalDate của email để không lấy nhầm thư ở ngày bên cạnh; dùng số giây timestamp cho Gmail, không phụ thuộc cách Gmail diễn giải múi giờ của chuỗi ngày. “7 ngày” là 7 ngày lịch tính cả hôm nay. Bộ lọc người gửi và nhãn được kiểm tra trước khi tạo query; cú pháp thô chỉ hoạt động ở chế độ nâng cao.
-
-
-## Gemini cloud PDF
-
-Không cần cài OCR khi chọn provider Gemini và bật AI. Gốc PDF lưu trong files/ như trước, nguyên file được gửi Google để đọc/phân nhóm/tóm tắt. Lưu key qua UI hoặc GEMINI_API_KEY, yêu cầu mạng tới generativelanguage.googleapis.com. Bí danh model mặc định gemini-flash-latest có thể đổi theo Google, nên chọn model cụ thể và cập nhật đơn giá khi vận hành có kiểm soát chi phí. Model list check dùng quyền key hiện tại; cần thử file thực tế để xác nhận PDF/JSON hoạt động.
-
-PDF ≤8 MB gửi inline; lớn hơn dùng resumable Files API, poll trạng thái trong ngân sách chờ, rồi generateContent và yêu cầu xóa file tạm. Không dùng endpoint do khách nhập, không gửi key qua URL/query hoặc redirect. Giới hạn upload của tool vẫn 20 MB. Cloud PDF không bị cắt theo giới hạn ký tự; giới hạn trang/dung lượng/chính sách của model do Google áp dụng. File scan cũ có bản gốc trong files/ được xử lý lại bằng nút Đọc lại PDF. Nếu bản gốc đã bị xóa thì cần tải lại file.
-
-Token Gemini chuẩn hóa từ usageMetadata: promptTokenCount, cachedContentTokenCount, candidatesTokenCount + thoughtsTokenCount, totalTokenCount. Files upload/poll/delete không được đếm thành lượt generation; không gọi đồng bộ hóa đơn/số dư. Chưa kiểm chứng API thật khi thiếu key. Giá nhập tay là ước tính, không giả định free tier áp dụng cho mọi tài khoản. Dữ liệu test dùng transport giả lập, không gửi tài liệu khách.
