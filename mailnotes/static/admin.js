@@ -162,7 +162,10 @@ async function loadNotes() {
     const source=document.createElement('td');
     if(note.source==='gmail') {const link=document.createElement('a');link.textContent='Mở email';link.href='https://mail.google.com/mail/u/0/#all/'+encodeURIComponent(note.origin_id || note.id.split(':').slice(1).join(':'));link.target='_blank';link.rel='noopener noreferrer';source.append(link);} else source.textContent=note.source==='ai'?'AI thao tác':note.source==='pdf'?'PDF tải lên':'Dữ liệu mẫu';
     if(note.file_hash){const pdf=document.createElement('a');pdf.textContent='Tải PDF';pdf.href='/api/document?'+new URLSearchParams({source:note.source,id:note.id});source.append(document.createElement('br'),pdf);const md=document.createElement('a');md.textContent='Tải Markdown';md.href='/api/document?'+new URLSearchParams({source:note.source,id:note.id,format:'markdown'});source.append(document.createElement('br'),md);const again=document.createElement('button');again.className='secondary edit-button';again.textContent='Đọc lại PDF';again.addEventListener('click',async()=>{if(!confirm('Đọc lại PDF theo cấu hình hiện tại? Có thể tốn phí AI và thay nhóm/tóm tắt đã chỉnh tay.'))return;again.disabled=true;try{await post('/api/notes/reprocess',{source:note.source,id:note.id});notice('Đã đọc lại PDF và cập nhật sổ.');await loadNotes();}catch(error){notice(error.message,true);}finally{again.disabled=false;}});source.append(document.createElement('br'),again);}
-    row.append(time,title,categories,content,source);$('notes-body').append(row);
+    const files=document.createElement('td');
+    for(const item of note.local_pdf_paths||[]){const entry=document.createElement('div');entry.className='local-file';const group=document.createElement('small');group.textContent=item.category;const path=document.createElement('code');path.textContent=item.path;entry.append(group,path);files.append(entry);}
+    if(!files.childNodes.length && note.original_pdf_path){const group=document.createElement('small');group.textContent='PDF gốc';const path=document.createElement('code');path.textContent=note.original_pdf_path;files.append(group,path);}
+    row.append(time,title,categories,content,source,files);$('notes-body').append(row);
   }
   $('notes-count').textContent=(data.total>500?'Hiển thị 500 / ':'')+data.total+' ghi chép';
   $('export').disabled=!$('notes-day').value;

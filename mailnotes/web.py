@@ -273,12 +273,15 @@ def create_app(base=None, data_root=None, public_url=None):
     def store_ai_document(data, filename):
         added = admin.process_pdf(data, filename, reprocess=False, source='ai')
         identifier = 'ai:' + hashlib.sha256(data).hexdigest()
+        from .archive import classified_pdf_paths
         with connect(admin.root / 'ai' / 'notes.sqlite3') as connection:
             row = connection.execute('SELECT subject,categories,review_reason FROM notes WHERE id=?', (identifier,)).fetchone()
         if row is None:
             raise ValueError('Tài liệu chưa được lưu: không khớp nhóm nào. Bật nhóm mặc định hoặc cấu hình lại nhóm.')
+        categories = json.loads(row[1])
+        local_paths = [str(path) for path in classified_pdf_paths(admin.root / 'ai', identifier, row[0], categories, hashlib.sha256(data).hexdigest()) if path.is_file()]
         return {'added':added, 'source':'ai', 'filename':row[0],
-                'categories':json.loads(row[1]), 'review_reason':row[2],
+                'categories':categories, 'review_reason':row[2], 'local_pdf_paths':local_paths,
                 'folder':str(admin.root / 'ai')}
 
     @app.post('/extension/import-local')

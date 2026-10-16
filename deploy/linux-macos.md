@@ -8,9 +8,9 @@ Linux, Mac Intel và Mac Apple Silicon dùng cùng mã xử lý, giao diện, ti
 | Cài AI | Lưu DeepSeek API key, đồng ý gửi chữ tài liệu, chọn model và nhóm. |
 | Dùng tiện ích | Tải cùng ZIP tiện ích trong Cài đặt, cài vào Chrome, ghép nối bằng địa chỉ tool và mã trên chính máy đó. |
 | Chạy AI thao tác | Mở Gmail đã đăng nhập bình thường trong Chrome, tìm thư có PDF, bấm Xử lý tối đa 20 thư đang hiện. Có nút Dừng. |
-| Xử lý tài liệu | PDF có chữ → Markdown trên máy → DeepSeek phân nhóm và tóm tắt → ghi sổ và thư mục nhóm. |
+| Xử lý tài liệu | PDF có chữ → Markdown trên máy → DeepSeek phân nhóm và tóm tắt → ghi sổ; mỗi thư mục nhóm giữ PDF và ghi chú Markdown. |
 | PDF scan | Giữ bản gốc, tạo ghi chú Cần xem lại, không chạy OCR và không yêu cầu Tesseract/Poppler. |
-| Xem kết quả | Sổ ghi chép → AI thao tác → Mở thư mục tài liệu hoặc Tải Markdown. |
+| Xem kết quả | Sổ ghi chép → AI thao tác → xem đường dẫn PDF theo nhóm, Mở thư mục tài liệu hoặc Tải Markdown. |
 | Sửa nhóm | Sửa trong sổ, bản Markdown theo nhóm cập nhật theo, không gọi AI lại. |
 | Tắt | Bấm Tắt tool. Đóng tab không tắt dịch vụ; máy ngủ hoặc tắt thì việc xử lý ngừng. |
 

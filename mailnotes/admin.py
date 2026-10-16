@@ -444,11 +444,34 @@ class Admin:
             return {'notes': [], 'total': 0, 'categories': [], 'days': []}
         with connect(database) as migration:
             ensure_schema(migration)
+            if source != 'demo':
+                from .archive import classified_pdf_paths, render_archive
+                old_rows = migration.execute('SELECT id,subject,categories,file_hash FROM notes WHERE file_hash IS NOT NULL AND file_hash != ""').fetchall()
+                missing = any((database.parent / 'files' / (digest + '.pdf')).is_file()
+                              and (database.parent / 'Markdown' / (digest + '.md')).is_file()
+                              and any(not path.is_file() for path in classified_pdf_paths(database.parent, identifier, title, json.loads(groups), digest))
+                              for identifier, title, groups, digest in old_rows)
+                if missing and self.run_lock.acquire(blocking=False):
+                    try:
+                        render_archive(migration, database.parent)
+                        render_notes(migration, database.parent / 'notebooks', self.config()['timezone'])
+                    finally:
+                        self.run_lock.release()
         with connect(f'{database.as_uri()}?mode=ro', uri=True) as connection:
             connection.row_factory = sqlite3.Row
             rows = [dict(row) for row in connection.execute('SELECT id,sender,subject,categories,summary,received_at,day,source,origin_id,review_reason,file_hash FROM notes ORDER BY received_at DESC,id')]
         for row in rows:
             row['categories'] = json.loads(row['categories'])
+            row['local_pdf_paths'] = []
+            row['original_pdf_path'] = ''
+            if row['file_hash']:
+                from .archive import classified_pdf_paths
+                original = database.parent / 'files' / (row['file_hash'] + '.pdf')
+                if original.is_file():
+                    row['original_pdf_path'] = str(original)
+                paths = classified_pdf_paths(database.parent, row['id'], row['subject'], row['categories'], row['file_hash'])
+                row['local_pdf_paths'] = [{'category': group, 'path': str(path)}
+                                          for group, path in zip(row['categories'], paths) if path.is_file()]
         categories = sorted({item for row in rows for item in row['categories']})
         days = sorted({row['day'] for row in rows}, reverse=True)
         filtered = [row for row in rows if (not day or row['day'] == day)

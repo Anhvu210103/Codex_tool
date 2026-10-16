@@ -12,7 +12,7 @@ Xem [cách tải app, cài và giữ dữ liệu](packaging/README.md). Bản Li
 
 ## Tiện ích Chrome — thử trên Gmail đã đăng nhập
 
-Ưu tiên hoàn thiện Linux trước: [quy trình kiểm tra Linux](deploy/linux-test.md). Tiện ích 0.4.3 bấm tải, đóng PDF và quay lại danh sách bằng thao tác chuột Chrome; xác nhận nút nhận click và Chrome bắt đầu tải, rồi ưu tiên nhập trực tiếp PDF trong Downloads. PDF trùng được báo rõ là đã có trong nguồn AI thao tác.
+Ưu tiên hoàn thiện Linux trước: [quy trình kiểm tra Linux](deploy/linux-test.md). Tiện ích 0.4.4 bấm tải, đóng PDF và quay lại danh sách bằng thao tác chuột Chrome; nhận sự kiện tải PDF từ Gmail kể cả khi Chrome đổi tab đang chọn. Một thư có nhiều PDF được xử lý lần lượt; PDF trùng được báo rõ là đã có trong nguồn AI thao tác.
 
 Dùng **Cài đặt → Tiện ích Chrome → Tải tiện ích Chrome** để lấy ZIP. Giải nén, mở `chrome://extensions`, bật Developer mode và Load unpacked thư mục có manifest.json. Tạo mã ghép nối trong Cài đặt tool, dán mã cùng địa chỉ localhost của tool vào popup tiện ích. Mở danh sách thư có PDF trên Gmail bình thường rồi bấm **Xử lý tối đa 20 thư đang hiện**. Không cần Playwright; tiện ích thao tác trên trang Gmail, còn DeepSeek phân loại và tóm tắt PDF sau khi tải. Chi tiết, quyền truy cập và giới hạn bản thử: [chrome-extension/README.md](chrome-extension/README.md). Chưa kiểm chứng Gmail thật khi chưa có phiên người dùng.
 
@@ -26,7 +26,7 @@ Trước khi chạy, trong Cài đặt bật DeepSeek AI, lưu key và đồng �
 
 ## PDF → Markdown → nhóm trên máy
 
-PDF có lớp chữ được chuyển bằng pypdf thành Markdown trước khi gửi chữ cho DeepSeek. Không chạy OCR, không yêu cầu Tesseract trên Linux/Mac. Bản scan không có chữ được giữ nguyên PDF và tạo ghi chú Cần xem lại, không gọi AI để đoán nội dung. PDF vừa có chữ vừa có trang scan/trắng sẽ có cảnh báo phần chưa đọc. Chuyển Markdown là trích chữ, không cam kết giữ đúng bảng, cột và bố cục của PDF.
+PDF có lớp chữ được chuyển bằng pypdf thành Markdown trước khi gửi chữ cho DeepSeek. Không chạy OCR, không yêu cầu Tesseract trên Linux/Mac. Bản scan không có chữ được giữ nguyên PDF và tạo ghi chú Cần xem lại, không gọi AI để đoán nội dung. PDF vừa có chữ vừa có trang scan/trắng sẽ có cảnh báo phần chưa đọc. Chuyển Markdown là trích chữ, không cam kết giữ đúng bảng, cột và bố cục của PDF. PDF gốc giữ trong `files/`; mỗi nhóm có bản PDF và ghi chú Markdown riêng trong `Theo-nhom/<nhóm>/` hoặc `Can-xem-lai/`. Sổ ghi chép web và Markdown theo ngày hiển thị đường dẫn PDF trên máy.
 
 Mỗi nguồn Gmail, PDF tải lên và AI thao tác có kho riêng trong thư mục dữ liệu. `files/` giữ PDF gốc, `Markdown/` giữ bản chữ, `Theo-nhom/<tên nhóm>/` chứa bản Markdown gồm tóm tắt và toàn bộ chữ trích được, `Can-xem-lai/` giữ ghi chú cần kiểm tra. Một tài liệu có nhiều nhóm có nhiều bản Markdown, dùng chung PDF gốc. Tên file/thư mục có mã ngắn để tránh trùng hoặc thoát đường dẫn. Khi sửa nhóm trong sổ, bản Markdown theo nhóm được cập nhật mà không gọi AI.
 

@@ -55,8 +55,10 @@ function begin(id, capabilities = []) {
   assert(session.run.pending.result);
 
   begin(8, ['linux-local-pdf']);
+  activeTab = 2; // Gmail viewer can move focus before Chrome reports the download.
   item.filename = '/Downloads/report.pdf'; item.state = 'complete';
   await listeners.created({...item});
+  assert.equal(session.run.pending.downloadId, 8, 'Gmail download must not be dropped when another tab is active');
   assert.equal(requests.length, 1);
   assert(requests[0].endsWith('/extension/import-local'));
   assert(local.status.includes('/data/ai'));
@@ -76,11 +78,18 @@ function begin(id, capabilities = []) {
   await listeners.created({...item});
   assert.equal(session.run.pending.result.filename, 'report.pdf');
   session.run.pending = {armedAt: Date.now(), downloadId: null, result: null, error: null};
+  activeTab = 2;
   item = {id: 12, url: 'https://mail.google.com/mail/u/0/?view=att', referrer: '', filename: '/Downloads/second.pdf', mime: 'application/pdf', state: 'complete'};
   await listeners.created({...item});
   assert.equal(session.run.pending.downloadId, 12);
   assert(session.run.pending.result);
   assert(session.run, 'Processing one PDF must keep the run alive for the next PDF');
+  begin(13);
+  activeTab = 2;
+  item.url = 'https://example.org/unrelated.pdf'; item.filename = '/Downloads/unrelated.pdf'; item.state = 'complete';
+  await listeners.created({...item});
+  assert.equal(session.run.pending.downloadId, null, 'Unrelated downloads must not be imported');
+  assert(local.report.some(entry=>entry.phase==='chrome-bo-qua' && entry.detail.includes('nguồn tải không thuộc Gmail')));
   const fromTab = data => new Promise(resolve => listeners.message(data,{tab:{id:1}},resolve));
   let reply=await fromTab({type:'trace',event:{phase:'loi',mail:1,file:'blocked.pdf',detail:'Ô PDF bị che'}});
   assert.deepEqual(reply,{});
