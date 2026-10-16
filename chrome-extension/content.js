@@ -5,6 +5,7 @@ let stopped=true,activeRun=0;
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const driveAction=/add.{0,50}drive|save.{0,50}drive|thêm.{0,50}drive|lưu.{0,50}drive/i;
 const forbidden=/compose|soạn thư|send|gửi|delete|xóa|archive|lưu trữ|spam|reply|trả lời|forward|chuyển tiếp|settings|cài đặt/i;
+const cleanText=value=>String(value||'').normalize('NFC').trim().replace(/\s+/g,' ');
 async function send(data){const result=await chrome.runtime.sendMessage(data);if(result.error)throw Error(result.error);return result;}
 function controls(kind,attempted=new Set()){
  const nodes=[];const selector=kind==='mail'?'[role="row"],.zA':'[role="button"],button,a,[role="link"],[data-tooltip],[aria-label],[title],.aQH .aZo,.aQH [tabindex="0"],.aV3';
@@ -12,16 +13,16 @@ function controls(kind,attempted=new Set()){
   const rect=node.getBoundingClientRect();if(rect.width<12||rect.height<12||rect.bottom<0||rect.top>innerHeight||getComputedStyle(node).visibility==='hidden')continue;
   const x=Math.min(innerWidth-1,Math.max(0,rect.left+rect.width/2)),y=Math.min(innerHeight-1,Math.max(0,rect.top+rect.height/2));
   const top=document.elementFromPoint(x,y);if(!top||!(node===top||node.contains(top)))continue;
-  const raw=(node.getAttribute('aria-label')||node.getAttribute('title')||node.getAttribute('data-tooltip')||node.innerText||'').trim().replace(/\s+/g,' ');
+  const raw=cleanText(node.getAttribute('aria-label')||node.getAttribute('title')||node.getAttribute('data-tooltip')||node.innerText);
   if(kind==='pdf'&&driveAction.test(raw))continue;
   const attachment=node.closest('.aZo');
   const filenameNode=node.matches('.aV3')&&/\.pdf\b/i.test(node.textContent||'');
-  const filename=attachment?.querySelector('.aV3')?.textContent?.trim()||'';
+  const filename=cleanText(attachment?.querySelector('.aV3')?.textContent);
   const isDownload=/download|tải xuống|tải về/i.test(raw);
   // Gmail may put only 'Preview attachment' on the clickable tile and the
   // filename on a child. Keep the PDF filename visible to the AI.
   const previewTile=attachment&&(node===attachment||/preview|xem trước/i.test(raw));
-  const label=(kind==='pdf'&&filenameNode?'Mở PDF đính kèm: '+node.textContent.trim():kind==='pdf'&&!isDownload&&previewTile&&/\.pdf\b/i.test(filename)?'Mở PDF đính kèm: '+filename:raw).slice(0,240);
+  const label=(kind==='pdf'&&filenameNode?'Mở PDF đính kèm: '+cleanText(node.textContent):kind==='pdf'&&!isDownload&&previewTile&&/\.pdf\b/i.test(filename)?'Mở PDF đính kèm: '+filename:raw).slice(0,240);
   if(!label||forbidden.test(label)||attempted.has(label))continue;
   if(kind==='mail'&&(label.length<8||node.closest('[role="row"]')&&node.closest('[role="row"]')!==node))continue;
   if(kind==='pdf'&&!/\.pdf\b|download|tải xuống|tải về|preview|xem trước/i.test(label))continue;
@@ -53,7 +54,7 @@ function downloadDiagnostics(){
  const labels=controls('inspect').slice(0,20).map(item=>item.label).join(' | ');
  const hidden=[];
  for(const node of document.querySelectorAll('[aria-label],[data-tooltip],[title]')){
-  const label=[node.getAttribute('aria-label'),node.getAttribute('data-tooltip'),node.getAttribute('title')].filter(Boolean).join(' ');
+  const label=cleanText([node.getAttribute('aria-label'),node.getAttribute('data-tooltip'),node.getAttribute('title')].filter(Boolean).join(' '));
   if(!/download|tải xuống|tải về/i.test(label)||driveAction.test(label))continue;
   const r=node.getBoundingClientRect(),css=getComputedStyle(node);
   const top=document.elementFromPoint(Math.min(innerWidth-1,Math.max(0,r.left+r.width/2)),Math.min(innerHeight-1,Math.max(0,r.top+r.height/2)));

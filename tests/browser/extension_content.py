@@ -89,4 +89,18 @@ with sync_playwright() as p:
     page.wait_for_function('actions.length===1',timeout=15000)
     assert page.evaluate('actions')==['download']
     print('Browser passed: viewer zoom controls visible; hidden toolbar revealed before Download')
+    # Vietnamese Gmail labels can be canonically equivalent NFD text:
+    # Ta\u0309i xuo\u0302\u0301ng looks like Tải xuống but fails literal regexes.
+    page=browser.new_page()
+    page.set_content('<div aria-label="Đang hiển thị người xem.">PDF</div><button id="nfd-download" style="padding:20px">↓</button>')
+    page.evaluate('''() => {
+      window.actions=[];window.listener=null;
+      document.querySelector('button').setAttribute('aria-label','Tải xuống'.normalize('NFD'));
+      window.chrome={runtime:{onMessage:{addListener(fn){window.listener=fn;}},async sendMessage(data){if(data.type==='choose')return {choice:data.candidates[0]};return {};}}};
+      document.querySelector('button').onclick=()=>{actions.push('download');listener({type:'stop'});};
+    }''')
+    page.add_script_tag(path=str(Path('chrome-extension/content.js').resolve()));page.evaluate("listener({type:'run'})")
+    page.wait_for_function('actions.length===1',timeout=10000)
+    assert page.evaluate('actions')==['download']
+    print('Browser passed: decomposed Vietnamese Tải xuống is recognized')
     browser.close()
