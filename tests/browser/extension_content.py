@@ -63,4 +63,16 @@ with sync_playwright() as p:
     assert 'Mở PDF đính kèm:' in page.evaluate('selections[0][0].label')
     assert 'Drive' not in page.evaluate('JSON.stringify(selections)')
     print('Browser passed: reported Vietnamese Drive control excluded; filename opens PDF')
+    # Some viewer toolbars label a clickable div without role/data-tooltip.
+    page=browser.new_page()
+    page.set_content('<div aria-label="Tải về" style="width:120px;height:60px">↓</div>')
+    page.evaluate('''() => {
+      window.actions=[];window.listener=null;
+      window.chrome={runtime:{onMessage:{addListener(fn){window.listener=fn;}},async sendMessage(data){if(data.type==='choose')return {choice:data.candidates[0]};return {};}}};
+      document.querySelector('div').onclick=()=>{actions.push('download');listener({type:'stop'});};
+    }''')
+    page.add_script_tag(path=str(Path('chrome-extension/content.js').resolve()));page.evaluate("listener({type:'run'})")
+    page.wait_for_function('actions.length===1',timeout=15000)
+    assert page.evaluate('actions')==['download']
+    print('Browser passed: aria-label-only viewer download control')
     browser.close()
