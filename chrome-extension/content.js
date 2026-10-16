@@ -27,6 +27,35 @@ function pdfTiles() {
  const nodes = [...document.querySelectorAll('.aV3')];
  return nodes.filter(node => {const r=node.getBoundingClientRect(),css=getComputedStyle(node);return /\.pdf\b/i.test(clean(node.textContent)) && r.width>=10 && r.height>=10 && css.visibility!=='hidden' && css.display!=='none' && !/drive/i.test(label(node.closest('[role="button"],button')));}).map((node,index) => ({node, name:clean(node.textContent), index}));
 }
+function tileReady(node) {
+ if (!node?.isConnected || viewerOpen()) return {ok:false, reason:'PDF không còn trong thư hoặc đang mở trình xem'};
+ const r=node.getBoundingClientRect(),css=getComputedStyle(node);
+ if (r.width<10||r.height<10||css.visibility==='hidden'||css.display==='none') return {ok:false,reason:'Ô PDF đang ẩn hoặc chưa nạp'};
+ if (r.bottom<=0||r.top>=innerHeight||r.right<=0||r.left>=innerWidth) return {ok:false,reason:'Ô PDF nằm ngoài vùng nhìn thấy sau khi cuộn'};
+ const tile=node.closest('.aZo,.aQH');
+ const points=[[.5,.5],[.2,.5],[.8,.5],[.5,.2],[.5,.8]];
+ let blocking='không xác định';
+ for(const [fx,fy] of points){
+  const x=Math.min(innerWidth-1,Math.max(0,r.left+r.width*fx)),y=Math.min(innerHeight-1,Math.max(0,r.top+r.height*fy));
+  const hit=document.elementFromPoint(x,y);
+  if(hit&&(node===hit||node.contains(hit)||tile?.contains(hit)))return {ok:true};
+  if(hit)blocking=hit.tagName.toLowerCase()+'.'+String(hit.className?.baseVal||hit.className||'').split(/\s+/).slice(0,2).join('.').slice(0,70);
+ }
+ return {ok:false,reason:'Ô PDF bị phần tử '+blocking+' che ở mọi điểm kiểm tra'};
+}
+async function openTile(node,cancelled) {
+ let check;
+ for(let i=0;i<5&&!cancelled();i++){
+  node.scrollIntoView({block:'center'});
+  await pause(250);
+  check=tileReady(node);
+  if(check.ok){node.click();return;}
+ }
+ throw Error(check?.reason||'Không xác định được ô PDF.');
+}
+async function trace(phase,mail,file,detail='') {
+ await send({type:'trace',event:{phase,mail,file:clean(file).slice(0,180),detail:clean(detail).slice(0,180)}}).catch(()=>{});
+}
 async function until(get, ms, cancelled) {
  const deadline = Date.now() + ms;
  while (!cancelled()) { const value = get(); if (value) return value; if (Date.now() >= deadline) break; await pause(300); }
@@ -74,8 +103,10 @@ function downloadControl() {
  return null;
 }
 async function waitDownload(cancelled) {
- const deadline = Date.now()+120000;
+ const started=Date.now(), deadline=started+120000;let reported=-1;
  while (!cancelled() && Date.now()<deadline) {
+  const elapsed=Math.floor((Date.now()-started)/5000);
+  if(elapsed!==reported){reported=elapsed;await progress('Đang chờ Chrome tải PDF và tool lưu vào sổ... '+(elapsed*5)+' giây');}
   const state = await send({type:'download-state'});
   if (state.error) throw Error(state.error);
   if (state.result) return state.result;
@@ -100,13 +131,14 @@ async function backToList(listURL,cancelled) {
  else return false;
  return !!await until(() => mailRows().some(item=>visible(item.node)),10000,cancelled);
 }
-async function run(limit) {
+async function run(limit,only=[]) {
  stopped=false; const current=++epoch, cancelled=()=>stopped||epoch!==current;
  let mails=0, files=0, errors=0; const faults=[];
  try {
   const rows = await until(() => mailRows().length ? mailRows() : null,10000,cancelled);
   if (!rows) throw Error('Mở danh sách thư Gmail trước khi chạy.');
-  const listURL=location.href, queue=rows.slice(0, limit).map(row=>({key:row.key,text:row.text,index:row.index}));
+  const listURL=location.href, queue=rows.slice(0, limit).map(row=>({key:row.key,text:row.text,index:row.index})).filter(row=>!only.length||only.some(item=>item.key?item.key===row.key:item.rowIndex===row.index&&item.text===row.text));
+  if(!queue.length)throw Error('Không thấy các thư lỗi trên trang Gmail hiện tại. Mở lại danh sách cũ rồi thử lại.');
   await progress('Đã thấy '+queue.length+' thư trên trang. Đang xử lý lần lượt...');
   for (const entry of queue) {
    if (cancelled()) return;
@@ -115,39 +147,41 @@ async function run(limit) {
    if (!row) { errors++; faults.push('Không tìm lại được thư '+(entry.index+1)); continue; }
    row.node.scrollIntoView({block:'center'});
    if (!visible(row.node)) {errors++;faults.push('Thư '+(entry.index+1)+': không hiển thị sau khi cuộn');continue;}
-   row.node.click(); mails++;
+   row.node.click(); mails++;await trace('mo-thu',mails,'');
    const tiles=await until(() => pdfTiles().length ? pdfTiles() : null,10000,cancelled);
    if (!tiles) {errors++;faults.push('Thư '+mails+': không thấy PDF');}
    else {
-    const attachments=tiles.map(item=>({name:item.name,index:item.index}));
+    const attachments=tiles.map(item=>({name:item.name,index:item.index})).filter(item=>!only.length||only.some(failed=>(failed.key?failed.key===entry.key:failed.rowIndex===entry.index&&failed.text===entry.text)&&failed.fileIndex===item.index&&failed.name===item.name));
+    if(!attachments.length&&only.length){errors++;faults.push('Thư '+mails+': PDF lỗi trước đó không còn trong thư');}
     for (const attachment of attachments) {
      if (cancelled()) return;
      try {
       const tile=pdfTiles().find(item=>item.index===attachment.index && item.name===attachment.name);
       if (!tile) throw Error('Không tìm lại được ô PDF.');
       await progress('Thư '+mails+'/'+queue.length+' · PDF '+(files+1)+' · Mở '+attachment.name);
-      tile.node.scrollIntoView({block:'center'});
-      if (!visible(tile.node)) throw Error('Ô PDF bị che hoặc chưa hiển thị.');
-      tile.node.click();
+      await trace('mo-pdf',mails,attachment.name);
+      await openTile(tile.node,cancelled);
       if (!await until(viewerOpen,10000,cancelled)) throw Error('PDF chưa mở trong Gmail.');
       let button=null;
       for (let i=0;i<20 && !cancelled();i++) {revealToolbar();button=downloadControl();if(button)break;await pause(300);}
       if (!button) throw Error('Không thấy nút tải trong trình xem PDF.');
+      await trace('bam-tai',mails,attachment.name);
       await send({type:'arm-download'});
       button.click();
       const result=await waitDownload(cancelled);
-      files++;
+      files++;await trace('da-luu',mails,attachment.name,result.added===0?'đã có trong sổ':'mới');
       await progress('Đã lưu '+files+' PDF từ '+mails+' thư. Mới nhất: '+result.filename+(result.added===0?' (đã có trong sổ)':''));
-     } catch (error) {errors++;faults.push(attachment.name+': '+error.message);await progress('Lỗi '+attachment.name+': '+error.message);}
+     } catch (error) {errors++;faults.push(attachment.name+': '+error.message);await send({type:'failure',failure:{rowIndex:entry.index,key:entry.key,text:entry.text,fileIndex:attachment.index,name:attachment.name}}).catch(()=>{});await trace('loi',mails,attachment.name,error.message);await progress('Bỏ qua PDF lỗi, tiếp tục file sau: '+attachment.name+' — '+error.message);}
      await closeViewer(cancelled);
     }
    }
    if (cancelled()) return;
    if (!await backToList(listURL,cancelled)) throw Error('Không trở lại được danh sách thư. Đã lưu '+files+' PDF.');
   }
-  await progress('Hoàn tất: '+mails+' thư, '+files+' PDF đã lưu, '+errors+' lỗi.'+(faults.length?'\n'+faults.slice(0,4).join('\n'):''));
- } catch (error) {await progress('Đã lưu '+files+' PDF từ '+mails+' thư. Dừng: '+error.message).catch(()=>{});}
+  await trace('hoan-tat',mails,'',files+' PDF đã lưu, '+errors+' lỗi');
+  await progress('Hoàn tất: '+mails+' thư, '+files+' PDF đã lưu, '+errors+' lỗi.'+(faults.length?'\nXem Báo cáo lần chạy trong tiện ích để biết từng file lỗi.':''));
+ } catch (error) {await trace('dung',mails,'',error.message);await progress('Đã lưu '+files+' PDF từ '+mails+' thư. Dừng: '+error.message+'\nMở Báo cáo lần chạy trong tiện ích.').catch(()=>{});}
  finally {if(epoch===current){stopped=true;await send({type:'finish'}).catch(()=>{});}}
 }
-chrome.runtime.onMessage.addListener(message=>{if(message.type==='run')run(message.limit===1?1:20);if(message.type==='stop'){stopped=true;epoch++;}});
+chrome.runtime.onMessage.addListener(message=>{if(message.type==='run')run(message.limit===1?1:20,message.only||[]);if(message.type==='stop'){stopped=true;epoch++;}});
 }

@@ -78,5 +78,12 @@ function begin(id, capabilities = []) {
   assert.equal(session.run.pending.downloadId, 12);
   assert(session.run.pending.result);
   assert(session.run, 'Processing one PDF must keep the run alive for the next PDF');
-  console.log('Extension download passed: multiple files per run, completion, local import, URL fallback and interruption');
+  const fromTab = data => new Promise(resolve => listeners.message(data,{tab:{id:1}},resolve));
+  let reply=await fromTab({type:'trace',event:{phase:'loi',mail:1,file:'blocked.pdf',detail:'Ô PDF bị che'}});
+  assert.deepEqual(reply,{});
+  assert.equal(local.report[0].file,'blocked.pdf');
+  reply=await fromTab({type:'failure',failure:{rowIndex:0,key:'mail-0',text:'Công văn số 1',fileIndex:1,name:'blocked.pdf'}});
+  assert.deepEqual(reply,{});
+  assert.equal(local.failures[0].name,'blocked.pdf');
+  console.log('Extension download passed: multiple files per run, persisted error report, local import and interruption');
 })().catch(error => { console.error(error); process.exit(1); });

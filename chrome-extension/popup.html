@@ -2,7 +2,7 @@
 <h1>AI thao tác Gmail</h1><p>Mở danh sách thư có PDF trong Gmail trước. Tiện ích tự mở từng thư và từng PDF trên trang Gmail. DeepSeek phân loại tài liệu sau khi tải. Mở thư có thể đánh dấu đã đọc.</p>
 <label>Địa chỉ tool<input id="base" value="http://localhost:8080"></label>
 <label>Mã ghép nối từ Cài đặt tool<input id="token" type="password"></label>
-<button id="save">Lưu kết nối</button><button id="start">Xử lý tối đa 20 thư đang hiện</button><button id="start-one">Thử 1 thư</button><button id="stop">Dừng</button>
-<p id="status" role="status">Chưa chạy.</p>
+<button id="save">Lưu kết nối</button><button id="start">Xử lý tối đa 20 thư đang hiện</button><button id="start-one">Thử 1 thư</button><button id="retry">Thử lại file lỗi</button><button id="stop">Dừng</button>
+<p id="status" role="status">Chưa chạy.</p><details><summary>Báo cáo lần chạy</summary><p>Ghi lại từng bước và lỗi. Không chứa nội dung PDF hoặc API key.</p><button id="copy-report">Sao chép báo cáo</button><pre id="report" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto">Chưa có báo cáo.</pre></details>
 <details><summary>Nếu PDF chưa tự về sổ</summary><p>Chọn PDF vừa tải để chuyển vào sổ.</p><input id="file" type="file" accept=".pdf,application/pdf"><button id="upload">Ghi PDF vào sổ</button></details>
 <script src="popup.js"></script></body></html>
