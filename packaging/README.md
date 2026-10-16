@@ -1,5 +1,7 @@
 # Ứng dụng bấm mở — Linux và macOS
 
+Hai hệ điều hành dùng cùng quy trình nghiệp vụ và cấu trúc tài liệu: [chi tiết Linux/macOS](../deploy/linux-macos.md). Bản mã nguồn trên Mac có launcher `Mo-So-Ghi-Chep.command`, dùng lại cùng `.venv` và `.local` như Linux.
+
 Ứng dụng có sẵn Python và thư viện, tự chạy dịch vụ nội bộ rồi mở trình duyệt mặc định. Không cần nhập lệnh mỗi lần dùng. Giao diện vẫn là trang quản trị trong trình duyệt, không phải cửa sổ webview riêng.
 
 ## Tải bản đóng gói trên GitHub
@@ -14,7 +16,7 @@ Mac: giải nén ZIP artifact rồi ZIP chứa app, kéo `SoGhiChep.app` vào Ap
 
 GitHub yêu cầu đăng nhập và quyền đọc repository để tải artifact. Có thể cần bật Actions cho repository nếu đang bị tắt. Quy trình build tự chạy khi nhánh codex/admin-web thay đổi các file app, hoặc chủ repository chọn Run workflow. Artifact chỉ có sau khi job tương ứng thành công; chưa coi bản Mac đã chạy được nếu chưa test trên Mac thật.
 
-CI chạy kiểm thử ứng dụng, đóng gói trên từng hệ điều hành, rồi khởi động bản vừa đóng gói và kiểm tra trang web cùng API phiên làm việc trước khi tải artifact lên. Đây là phép thử tự động trên máy Mac của GitHub; vẫn cần thử trên iMac của khách để xác nhận phiên bản macOS, chip và quyền mở ứng dụng.
+CI chạy kiểm thử ứng dụng, đóng gói trên từng hệ điều hành, rồi khởi động bản vừa đóng gói và kiểm tra đăng nhập, PDF chữ → Markdown/nhóm, PDF scan → Cần xem lại và tải ZIP tiện ích trước khi tải artifact lên. Đây là phép thử tự động trên máy Mac của GitHub; vẫn cần thử trên iMac của khách để xác nhận phiên bản macOS, chip và quyền mở ứng dụng.
 
 ## Dùng bản mã nguồn đã cài trên máy bạn
 

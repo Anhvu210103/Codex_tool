@@ -4,6 +4,8 @@ MVP đọc nội dung Gmail, PDF đính kèm và PDF tải lên, phân loại th
 
 ## Mở bằng app, không gõ lệnh mỗi lần
 
+Linux và macOS dùng cùng luồng PDF → Markdown → DeepSeek → thư mục nhóm. Xem [quy trình chung và khác biệt đường dẫn Linux/macOS](deploy/linux-macos.md). Mỗi máy giữ dữ liệu riêng, chưa có đồng bộ tài liệu giữa các máy.
+
 Có launcher **Mo-So-Ghi-Chep.sh** cho bản mã nguồn Linux đã cài và gói app tự chứa Python/thư viện cho Linux/macOS. Bấm app để tự chạy nền và mở trang quản trị. Lần bấm tiếp theo mở lại phiên đang chạy. Đăng nhập rồi dùng nút **Tắt tool** để dừng hẳn; đóng tab chỉ đóng giao diện.
 
 Xem [cách tải app, cài và giữ dữ liệu](packaging/README.md). Bản Linux đã build và kiểm chứng chạy độc lập tại môi trường phát triển; bản Mac có quy trình build GitHub Actions riêng cho Apple Silicon/Intel, chưa khẳng định hoạt động trên máy khách trước khi có kết quả build và kiểm thử. App Mac thử nghiệm chưa ký/notarize. Dữ liệu riêng được giữ ngoài app để không mất khi cập nhật.

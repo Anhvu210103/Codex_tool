@@ -88,7 +88,8 @@ class MarkdownArchiveTests(unittest.TestCase):
         response=client.get('/api/document',query_string={'source':'ai','id':note['id'],'format':'markdown'})
         self.assertEqual(response.status_code,200);self.assertIn('Text available',response.get_data(as_text=True));response.close()
         self.assertEqual(client.get('/api/archive?source=../../outside').status_code,400)
-        with patch('subprocess.Popen') as opened:
-            response=client.post('/api/archive?source=ai',json={},headers={'X-CSRF-Token':csrf})
-            self.assertEqual(response.status_code,200)
-            self.assertEqual(opened.call_args.args[0][-1],str(self.root/'ai'))
+        for platform, command in (('linux','xdg-open'),('darwin','open')):
+            with self.subTest(platform=platform),patch('sys.platform',platform),patch('subprocess.Popen') as opened:
+                response=client.post('/api/archive?source=ai',json={},headers={'X-CSRF-Token':csrf})
+                self.assertEqual(response.status_code,200)
+                self.assertEqual(opened.call_args.args[0],[command,str(self.root/'ai')])

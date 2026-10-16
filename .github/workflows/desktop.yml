@@ -7,6 +7,9 @@ on:
       - 'mailnotes/**'
       - 'chrome-extension/**'
       - 'packaging/**'
+      - 'tests/**'
+      - 'config.json'
+      - 'examples/**'
       - 'requirements*.txt'
       - '.github/workflows/desktop.yml'
     tags: ['desktop-v*']

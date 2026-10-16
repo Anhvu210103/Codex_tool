@@ -37,6 +37,8 @@ class DesktopTests(unittest.TestCase):
         with patch.dict(os.environ,{'MAILNOTES_DATA_DIR':str(self.root)}):self.assertEqual(data_directory(),self.root)
         with patch.dict(os.environ,{},clear=True),patch('sys.frozen',True,create=True),patch('sys.platform','darwin'),patch('pathlib.Path.home',return_value=self.root):
             self.assertEqual(data_directory(),self.root/'Library/Application Support/SoGhiChep')
+        with patch.dict(os.environ,{},clear=True),patch('sys.frozen',True,create=True),patch('sys.platform','linux'),patch('pathlib.Path.home',return_value=self.root):
+            self.assertEqual(data_directory(),self.root/'.local/share/so-ghi-chep')
 
     def test_menu_has_no_terminal_and_quotes_spaces(self):
         with patch.dict(os.environ,{'XDG_DATA_HOME':str(self.root)}),patch('sys.platform','linux'),patch('mailnotes.desktop.command',return_value=['/tmp/app with spaces/SoGhiChep']):

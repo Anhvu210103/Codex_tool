@@ -7,6 +7,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parent.parent
 name = 'SoGhiChep'
 args = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--name', name,
+        '--exclude-module', 'playwright',
         '--onefile', '--windowed', '--collect-data', 'certifi', '--paths', str(root), '--collect-all', 'pypdf', '--collect-all', 'waitress',
         '--add-data', str(root/'config.json') + ':.' ,
         '--add-data', str(root/'examples') + ':examples',
