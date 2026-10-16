@@ -223,7 +223,7 @@ class Admin:
 
     def usage(self, now=None):
         rows = []
-        for source in ('gmail', 'pdf', 'demo'):
+        for source in ('gmail', 'pdf', 'ai', 'demo'):
             database = self.root / source / 'notes.sqlite3'
             if not database.exists():
                 continue
@@ -302,29 +302,31 @@ class Admin:
             config['summary']['mode'] = 'extractive'
         return config
 
-    def process_pdf(self, data, filename, reprocess=False):
+    def process_pdf(self, data, filename, reprocess=False, source='pdf'):
+        if source not in ('pdf', 'ai'):
+            raise ValueError('Nguồn PDF không hợp lệ.')
         from .documents import pdf_message
         if not self.run_lock.acquire(blocking=False):
             raise ValueError('Đang có lượt xử lý. Chờ hoàn tất rồi tải PDF.')
         try:
-            config = self.runtime_config('pdf')
+            config = self.runtime_config(source)
             from hashlib import sha256
-            identifier = 'pdf:' + sha256(data).hexdigest()
+            identifier = source + ':' + sha256(data).hexdigest()
             database = Path(config['data_dir']) / 'notes.sqlite3'
             if not reprocess and database.exists():
                 with sqlite3.connect(database) as connection:
                     if connection.execute('SELECT 1 FROM notes WHERE id=?', (identifier,)).fetchone():
                         return 0
             if reprocess:
-                config['_reprocess_id'] = 'pdf:' + sha256(data).hexdigest()
-            document = pdf_message(data, filename, config, id=sha256(data).hexdigest(), sender='PDF tải lên', received_at=datetime.now(timezone.utc).isoformat())
-            return process([document], config, 'pdf')
+                config['_reprocess_id'] = identifier
+            document = pdf_message(data, filename, config, id=sha256(data).hexdigest(), sender='AI thao tác' if source == 'ai' else 'PDF tải lên', received_at=datetime.now(timezone.utc).isoformat())
+            return process([document], config, source)
         finally:
             self.run_lock.release()
 
     def reprocess_note(self, source, identifier):
         from .documents import pdf_message
-        if source not in ('gmail', 'pdf'):
+        if source not in ('gmail', 'pdf', 'ai'):
             raise ValueError('Chỉ xử lý lại ghi chép có PDF gốc.')
         if not self.run_lock.acquire(blocking=False):
             raise ValueError('Đang có lượt xử lý. Vui lòng chờ.')
@@ -350,7 +352,7 @@ class Admin:
             self.run_lock.release()
 
     def edit_categories(self, source, identifier, categories):
-        if source not in ('demo', 'gmail', 'pdf') or not isinstance(categories, list) or not categories:
+        if source not in ('demo', 'gmail', 'pdf', 'ai') or not isinstance(categories, list) or not categories:
             raise ValueError('Chọn ít nhất một nhóm hợp lệ.')
         allowed = {rule['category'] for rule in self.config()['rules']} | {'Cần xem lại'}
         if self.config().get('unmatched_category'):
@@ -430,7 +432,7 @@ class Admin:
         self.scheduler.start()
 
     def notes(self, source, day='', search='', category=''):
-        if source not in ('demo', 'gmail', 'pdf'):
+        if source not in ('demo', 'gmail', 'pdf', 'ai'):
             raise ValueError('Nguồn không hợp lệ.')
         database = self.root / source / 'notes.sqlite3'
         if not database.exists():

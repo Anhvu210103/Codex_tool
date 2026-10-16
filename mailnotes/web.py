@@ -234,7 +234,7 @@ def create_app(base=None, data_root=None, public_url=None):
         for item in candidates:
             if not isinstance(item, dict) or type(item.get('index')) is not int or not isinstance(item.get('label'), str) or len(item['label']) > 240:
                 raise ValueError('Điều khiển không hợp lệ.')
-        config = admin.runtime_config('pdf')
+        config = admin.runtime_config('ai')
         if config['summary']['mode'] != 'openai' or not config['summary']['ai_consent']:
             raise ValueError('Bật DeepSeek AI và đồng ý gửi chữ tài liệu trong Cài đặt trước.')
         key = config.get('_api_key') or os.environ.get('DEEPSEEK_API_KEY')
@@ -259,7 +259,7 @@ def create_app(base=None, data_root=None, public_url=None):
         if not file:
             raise ValueError('Chọn PDF.')
         try:
-            added = admin.process_pdf(file.stream.read(MAX_PDF_BYTES + 1), Path(file.filename or 'Gmail.pdf').name, reprocess=True)
+            added = admin.process_pdf(file.stream.read(MAX_PDF_BYTES + 1), Path(file.filename or 'Gmail.pdf').name, reprocess=True, source='ai')
         except Exception as error:
             return jsonify(error=error_message(error)), 400
         return jsonify(added=added)
@@ -309,7 +309,7 @@ def create_app(base=None, data_root=None, public_url=None):
     @app.get('/api/export')
     def export():
         source, day = request.args.get('source', 'demo'), request.args.get('day', '')
-        if source not in ('demo', 'gmail', 'pdf') or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
+        if source not in ('demo', 'gmail', 'pdf', 'ai') or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
             raise ValueError('Chọn nguồn và ngày hợp lệ để tải sổ.')
         path = admin.root / source / 'notebooks' / (day + '.md')
         if not path.exists():
@@ -353,7 +353,7 @@ def create_app(base=None, data_root=None, public_url=None):
     @app.get('/api/document')
     def document():
         source = request.args.get('source')
-        if source not in ('gmail', 'pdf'):
+        if source not in ('gmail', 'pdf', 'ai'):
             raise ValueError('Nguồn không hợp lệ.')
         database = admin.root / source / 'notes.sqlite3'
         if not database.exists():

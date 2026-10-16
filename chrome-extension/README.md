@@ -8,6 +8,6 @@
 
 Bản thử mở một hàng thư và chọn các nút PDF; tối đa 9 bước, hết hạn 3 phút. Chỉ các điều khiển đang thấy được đưa cho DeepSeek chọn. Không nhận ảnh chụp màn hình hoặc mật khẩu. Mở thư có thể đánh dấu đã đọc. Có nút Dừng; request AI đã gửi vẫn có thể tính phí. Chỉ tải một PDF mỗi lượt. Token các lượt chọn được ghi trong tool. Bộ lọc là danh sách Gmail bạn đang mở, không tự áp dụng bộ lọc Gmail API trong Cài đặt.
 
-Tiện ích cố gắng đọc lại URL tải PDF và chuyển về tool. Nếu Google không cho đọc lại hoặc không xác định được tải xuống, dùng ô Chọn PDF trong tiện ích để ghi file đã tải vào sổ. Kiểm tra kết quả tại Sổ ghi chép → PDF tải lên. PDF scan vẫn cần OCR trên máy trước khi DeepSeek đọc.
+Tiện ích cố gắng đọc lại URL tải PDF và chuyển về tool. Nếu Google không cho đọc lại hoặc không xác định được tải xuống, dùng ô Chọn PDF trong tiện ích để ghi file đã tải vào sổ. Kiểm tra kết quả tại Sổ ghi chép → AI thao tác. PDF scan vẫn cần OCR trên máy trước khi DeepSeek đọc.
 
 Mã ghép nối được lưu trong bộ nhớ cục bộ của tiện ích, API key ở tool. Đổi mã trong tool để thu hồi quyền cũ. Bridge chỉ chấp nhận kết nối loopback từ extension có mã, không mở quyền cho website thông thường. Tiện ích cần quyền đọc Gmail, URL tệp đính kèm Google, tải xuống và kết nối localhost. Dùng thử trên một thư mẫu trước; chưa xác nhận Gmail thật hoặc iMac hoạt động cho tới khi thử trên máy người dùng. Không cần Playwright cho cách này.

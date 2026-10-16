@@ -37,14 +37,32 @@ class ExtensionTests(unittest.TestCase):
         self.client.post('/api/settings',json=config,headers={'X-CSRF-Token':self.csrf})
         self.client.post('/api/ai-key',json={'provider':'deepseek','key':'test-private-key'},headers={'X-CSRF-Token':self.csrf})
         choice={'index':0,'label':'document.pdf','role':'button'}
-        with patch('mailnotes.gmail_browser_pilot.select_with_ai',return_value=choice):
+        upstream={'choices':[{'message':{'content':'{"index":0}'}}],
+                  'usage':{'prompt_tokens':10,'completion_tokens':2,'total_tokens':12,'prompt_cache_hit_tokens':0}}
+        with patch('mailnotes.gmail_browser_pilot.request_json',return_value=upstream):
             response=self.client.post('/extension/choose',json={'kind':'pdf','candidates':[choice]},headers=self.headers)
         self.assertEqual(response.status_code,200);self.assertEqual(response.get_json()['choice'],choice)
         self.assertNotIn('test-private-key',response.get_data(as_text=True))
+        self.assertEqual(self.client.get('/api/usage').get_json()['recent'][0]['source'],'ai')
         writer=PdfWriter();writer.add_blank_page(width=600,height=800);pdf=io.BytesIO();writer.write(pdf);pdf.seek(0)
         result=self.client.post('/extension/pdf',data={'file':(pdf,'scan.pdf')},headers=self.headers)
         self.assertEqual(result.status_code,200)
-        self.assertEqual(self.client.get('/api/notes?source=pdf').get_json()['total'],1)
+        self.assertEqual(self.client.get('/api/notes?source=ai').get_json()['total'],1)
+        self.assertEqual(self.client.get('/api/notes?source=pdf').get_json()['total'],0)
+        note=self.client.get('/api/notes?source=ai').get_json()['notes'][0]
+        self.assertEqual(note['source'],'ai')
+        self.assertTrue(note['id'].startswith('ai:'))
+        document=self.client.get('/api/document',query_string={'source':'ai','id':note['id']})
+        self.assertEqual(document.status_code,200);document.close()
+        exported=self.client.get('/api/export',query_string={'source':'ai','day':note['day']})
+        self.assertEqual(exported.status_code,200)
+        self.assertIn('AI thao tác',exported.get_data(as_text=True))
+        edited=self.client.post('/api/notes/categories',json={'source':'ai','id':note['id'],'categories':[config['rules'][0]['category']]},headers={'X-CSRF-Token':self.csrf})
+        self.assertEqual(edited.status_code,200)
+        self.assertEqual(self.client.get('/api/dashboard?source=ai').get_json()['total_notes'],1)
+        reread=self.client.post('/api/notes/reprocess',json={'source':'ai','id':note['id']},headers={'X-CSRF-Token':self.csrf})
+        self.assertEqual(reread.status_code,200)
+        self.assertEqual(self.client.get('/api/notes?source=ai').get_json()['total'],1)
 
     def test_zip_contains_loadable_manifest(self):
         result=self.client.get('/api/extension/download');self.assertEqual(result.status_code,200)

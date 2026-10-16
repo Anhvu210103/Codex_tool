@@ -20,16 +20,21 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
   throw Error('Yêu cầu không hợp lệ.');
  })().then(reply).catch(error=>reply({error:error.message}));return true;
 });
-chrome.downloads.onCreated.addListener(async item=>{
- const {run}=await chrome.storage.session.get('run');if(!run||!run.armedAt||Date.now()-run.armedAt>10000)return;
+const claimedDownloads=new Set();
+async function handleDownload(item){
+ const {run}=await chrome.storage.session.get('run');if(!run||!run.armedAt||Date.now()-run.started>180000||run.downloadId&&run.downloadId!==item.id||!run.downloadId&&Date.now()-run.armedAt>10000)return;
  const [active]=await chrome.tabs.query({active:true,lastFocusedWindow:true});if(active?.id!==run.tab)return;
  try{
   const url=new URL(item.url);const ref=new URL(item.referrer||'https://invalid.example/');
-  if(ref.hostname!=='mail.google.com'||url.protocol!=='https:'||!(url.hostname==='mail.google.com'||url.hostname.endsWith('.googleusercontent.com')))return;
+  if(item.referrer&&ref.hostname!=='mail.google.com'||url.protocol!=='https:'||!(url.hostname==='mail.google.com'||url.hostname.endsWith('.googleusercontent.com')))return;
+  if(!run.downloadId)await chrome.storage.session.set({run:{...run,downloadId:item.id}});
   if(!/\.pdf(?:$|[?#])/i.test(item.filename||'')&&item.mime!=='application/pdf')return;
+  if(claimedDownloads.has(item.id))return;claimedDownloads.add(item.id);if(claimedDownloads.size>100)claimedDownloads.delete(claimedDownloads.values().next().value);
   await stop();await chrome.storage.local.set({status:'Đang chuyển PDF về tool...'});
   const response=await fetch(url.href,{credentials:'include'});if(!response.ok)throw Error('Không đọc lại được file tải xuống. Chọn PDF bằng tay trong tiện ích.');
   const length=Number(response.headers.get('content-length'));if(length>20*1024*1024)throw Error('PDF vượt 20 MB.');
-  await upload(await response.blob(),(item.filename||'Gmail.pdf').split(/[\\/]/).pop());await chrome.storage.local.set({status:'Đã ghi PDF vào sổ, nguồn PDF tải lên.'});
+  await upload(await response.blob(),(item.filename||'Gmail.pdf').split(/[\\/]/).pop());await chrome.storage.local.set({status:'Đã ghi PDF vào sổ, nguồn AI thao tác.'});
  }catch(e){await chrome.storage.local.set({status:e.message});}
-});
+}
+chrome.downloads.onCreated.addListener(item=>handleDownload(item));
+chrome.downloads.onChanged.addListener(async change=>{if(!change.filename&&!change.mime&&!change.state)return;const {run}=await chrome.storage.session.get('run');if(run?.downloadId!==change.id)return;const [item]=await chrome.downloads.search({id:change.id});if(item)await handleDownload(item);});

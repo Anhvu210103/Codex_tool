@@ -125,7 +125,7 @@ def run(data_root=None, limit=MAX_MAILS):
     config = admin.config()
     if config['summary']['provider'] != 'deepseek' or config['summary']['mode'] != 'openai' or not config['summary']['ai_consent']:
         raise RuntimeError('Trong Cài đặt, hãy bật DeepSeek AI và đồng ý gửi dữ liệu trước khi thử Gmail bằng AI.')
-    key = admin.runtime_config('pdf').get('_api_key') or os.environ.get('DEEPSEEK_API_KEY')
+    key = admin.runtime_config('ai').get('_api_key') or os.environ.get('DEEPSEEK_API_KEY')
     if not key:
         raise RuntimeError('Chưa lưu DeepSeek API key trong Cài đặt.')
     model = config['summary']['model']
@@ -134,12 +134,12 @@ def run(data_root=None, limit=MAX_MAILS):
     executable = browser_binary()
     profile = root / 'browser-gmail' / 'profile'
     profile.mkdir(parents=True, exist_ok=True, mode=0o700)
-    (root / 'pdf').mkdir(parents=True, exist_ok=True, mode=0o700)
+    (root / 'ai').mkdir(parents=True, exist_ok=True, mode=0o700)
     query = build_query(config, datetime.now(timezone.utc)) + ' has:attachment filename:pdf'
     results_url = GMAIL + 'mail/u/0/#search/' + quote(query.strip(), safe='')
     count = 0
     seen = set()
-    with sqlite3.connect(root / 'pdf' / 'notes.sqlite3') as usage_db:
+    with sqlite3.connect(root / 'ai' / 'notes.sqlite3') as usage_db:
         with sync_playwright() as playwright:
             context = playwright.chromium.launch_persistent_context(
                 str(profile), executable_path=executable, headless=False,
@@ -188,7 +188,7 @@ def run(data_root=None, limit=MAX_MAILS):
                             data = path.read_bytes()
                         if not name.lower().endswith('.pdf') or not data.startswith(b'%PDF-'):
                             raise RuntimeError('File tải xuống không phải PDF hợp lệ; đã dừng.')
-                        added = admin.process_pdf(data,name,reprocess=True)
+                        added = admin.process_pdf(data,name,reprocess=True,source='ai')
                         count += added
                         downloaded = True
                         print(f'Đã ghi PDF vào sổ: {name}')
@@ -196,7 +196,7 @@ def run(data_root=None, limit=MAX_MAILS):
                     if not downloaded:
                         print('Chưa tải được PDF từ thư này; tiếp tục thư khác.')
                     page.goto(results_url, wait_until='domcontentloaded', timeout=60000)
-                print(f'Hoàn tất bản thử: {count} PDF ghi vào sổ PDF tải lên. Token thao tác cũng nằm trong Token & chi phí.')
+                print(f'Hoàn tất bản thử: {count} PDF ghi vào sổ AI thao tác. Token thao tác cũng nằm trong Token & chi phí.')
                 return count
             finally:
                 context.close()

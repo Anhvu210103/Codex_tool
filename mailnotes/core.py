@@ -107,8 +107,8 @@ def render_notes(connection, directory, timezone='Asia/Ho_Chi_Minh'):
             if source == 'gmail':
                 email_id = origin_id or identifier.split(':', 1)[1]
                 link = f'[Mở email](https://mail.google.com/mail/u/0/#all/{email_id})'
-            elif source == 'pdf':
-                link = 'PDF tải lên'
+            elif source in ('pdf', 'ai'):
+                link = 'AI thao tác' if source == 'ai' else 'PDF tải lên'
             else:
                 link = 'Dữ liệu mẫu'
             cells = [local_time, subject, sender, ', '.join(json.loads(categories)), summary + ('\nLưu ý: ' + review_reason if review_reason else '')]
