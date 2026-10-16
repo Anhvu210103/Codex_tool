@@ -19,7 +19,8 @@ applyTextSize(savedTextSize);
 $('text-size')?.addEventListener('change',()=>applyTextSize($('text-size').value));
 async function api(path, options = {}) {
   const response = await fetch(path, {credentials:'same-origin', ...options, headers:{'Content-Type':'application/json','X-CSRF-Token':csrf,...options.headers}});
-  const data = await response.json();
+  if(!response.headers.get('content-type')?.includes('application/json'))throw new Error(response.status===404?'Tool đang chạy bản cũ hoặc sai địa chỉ/cổng. Tắt hẳn phiên tool cũ rồi mở bản mới trong đúng thư mục.':'Tool trả về trang HTML thay vì dữ liệu. Kiểm tra địa chỉ, tắt phiên cũ và mở lại tool.');
+  let data;try{data=await response.json();}catch{throw new Error('Phản hồi từ tool không hợp lệ. Tắt phiên cũ và mở lại tool.');}
   if (!response.ok) {
     if (response.status === 401 && path !== '/api/login') await boot();
     throw new Error(data.error || 'Không thực hiện được yêu cầu.');

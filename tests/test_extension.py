@@ -21,6 +21,9 @@ class ExtensionTests(unittest.TestCase):
     def tearDown(self):self.temp.cleanup()
 
     def test_bridge_requires_pair_token_and_extension_origin(self):
+        ping=self.client.post('/extension/ping',json={},headers=self.headers)
+        self.assertEqual(ping.status_code,200)
+        self.assertEqual(ping.get_json(),{'app':'mailnotes-extension','protocol':1})
         self.assertEqual(self.client.post('/extension/choose',json={}).status_code,403)
         self.assertEqual(self.client.post('/extension/choose',json={},headers={'Origin':self.headers['Origin']}).status_code,401)
         preflight=self.client.options('/extension/choose',headers={'Origin':self.headers['Origin']})

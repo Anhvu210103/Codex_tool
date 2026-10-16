@@ -248,6 +248,10 @@ def create_app(base=None, data_root=None, public_url=None):
             return jsonify(error=error_message(error)), 400
         return jsonify(choice=choice)
 
+    @app.post('/extension/ping')
+    def extension_ping():
+        return jsonify(app='mailnotes-extension', protocol=1)
+
     @app.post('/extension/pdf')
     def extension_pdf():
         from .documents import MAX_PDF_BYTES
