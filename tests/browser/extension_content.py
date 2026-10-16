@@ -41,4 +41,26 @@ with sync_playwright() as p:
     assert page.evaluate('actions')==['preview','download']
     assert page.evaluate('selections[0][0].label')=='Mở PDF đính kèm: Quyet-dinh.pdf'
     print('Browser passed: Gmail attachment tile -> overlay -> Download; inline icon skipped')
+    # Reported layout: only the Drive button had a recognized role. The
+    # filename's preview wrapper has neither the old class nor an ARIA role.
+    page=browser.new_page()
+    page.set_content('''<div style="padding:30px"><span id="open-pdf" style="display:inline-block;padding:20px"><span class="aV3">01.Thư ngỏ ChaTask.pdf</span></span><button aria-label="Thêm tệp đính kèm vào Drive 01.Thư ngỏ ChaTask.pdf">Drive</button></div>''')
+    page.evaluate('''() => {
+      window.actions=[];window.listener=null;window.selections=[];
+      window.chrome={runtime:{onMessage:{addListener(fn){window.listener=fn;}},async sendMessage(data){
+        if(data.type==='choose'){selections.push(data.candidates);return {choice:data.candidates[0]};}return {};
+      }}};
+      document.querySelector('button').onclick=()=>actions.push('WRONG-DRIVE');
+      document.getElementById('open-pdf').onclick=()=>{
+        actions.push('preview');document.body.innerHTML='<button data-tooltip="Tải xuống" style="padding:30px">↓</button>';
+        document.querySelector('button').onclick=()=>{actions.push('download');listener({type:'stop'});};
+      };
+    }''')
+    page.add_script_tag(path=str(Path('chrome-extension/content.js').resolve()));page.evaluate("listener({type:'run'})")
+    page.wait_for_function('actions.length>=2',timeout=15000)
+    assert page.evaluate('actions')==['preview','download']
+    assert page.evaluate('selections[0].length')==1
+    assert 'Mở PDF đính kèm:' in page.evaluate('selections[0][0].label')
+    assert 'Drive' not in page.evaluate('JSON.stringify(selections)')
+    print('Browser passed: reported Vietnamese Drive control excluded; filename opens PDF')
     browser.close()
