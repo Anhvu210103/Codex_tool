@@ -110,9 +110,18 @@ async function waitDownload(cancelled) {
   const state = await send({type:'download-state'});
   if (state.error) throw Error(state.error);
   if (state.result) return state.result;
+  if (!state.downloadId && Date.now()-started>=12000) throw Error('Chrome chưa bắt đầu tải PDF sau 12 giây. Mở Báo cáo lần chạy để xem nút đã bấm và phản hồi của Chrome.');
   await pause(500);
  }
  throw Error('Chưa nhận được PDF từ Chrome trong 2 phút.');
+}
+function clickPoint(button) {
+ const r=button.getBoundingClientRect();
+ const x=Math.min(innerWidth-1,Math.max(0,r.left+r.width/2));
+ const y=Math.min(innerHeight-1,Math.max(0,r.top+r.height/2));
+ const hit=document.elementFromPoint(x,y);
+ if (!hit || !(button===hit || button.contains(hit))) throw Error('Nút tải PDF bị che hoặc đã đổi vị trí.');
+ return {x,y};
 }
 async function closeViewer(cancelled) {
  if (!viewerOpen()) return;
@@ -165,9 +174,11 @@ async function run(limit,only=[]) {
       let button=null;
       for (let i=0;i<20 && !cancelled();i++) {revealToolbar();button=downloadControl();if(button)break;await pause(300);}
       if (!button) throw Error('Không thấy nút tải trong trình xem PDF.');
-      await trace('bam-tai',mails,attachment.name);
+      const point=clickPoint(button);
+      await trace('tim-nut-tai',mails,attachment.name,'Nút '+button.tagName.toLowerCase()+' · '+(label(button)||'không có nhãn')+' · x='+Math.round(point.x)+', y='+Math.round(point.y));
       await send({type:'arm-download'});
-      button.click();
+      await send({type:'trusted-click',...point});
+      await trace('da-bam-tai',mails,attachment.name,'Chrome đã gửi thao tác chuột thật tại x='+Math.round(point.x)+', y='+Math.round(point.y));
       const result=await waitDownload(cancelled);
       files++;await trace('da-luu',mails,attachment.name,result.added===0?'đã có trong sổ':'mới');
       await progress('Đã lưu '+files+' PDF từ '+mails+' thư. Mới nhất: '+result.filename+(result.added===0?' (đã có trong sổ)':''));

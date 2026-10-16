@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const local = {base: 'http://localhost:8081', token: 'test-token'};
 const session = {}, listeners = {};
 let activeTab = 1, item, requests = [], localAvailable = true;
+const mouseEvents = [];
 const storage = obj => ({
   async get(key) { return Array.isArray(key) ? Object.fromEntries(key.map(k => [k, obj[k]])) : {[key]: obj[key]}; },
   async set(data) { Object.assign(obj, data); },
@@ -13,6 +14,7 @@ const storage = obj => ({
 global.chrome = {
   storage: {local: storage(local), session: storage(session)},
   runtime: {onMessage: {addListener(fn) { listeners.message = fn; }}},
+  debugger: {onDetach: {addListener(fn) { listeners.detached = fn; }}, async sendCommand(target, method, params) { mouseEvents.push({target, method, params}); }, async detach() {}},
   tabs: {async query() { return [{id: activeTab}]; }, async sendMessage() {}},
   downloads: {
     onCreated: {addListener(fn) { listeners.created = fn; }},
@@ -42,6 +44,7 @@ function begin(id, capabilities = []) {
   begin(7);
   await listeners.created({...item});
   assert.equal(session.run.pending.downloadId, 7);
+  assert(local.report.some(entry=>entry.phase==='chrome-bat-dau' && entry.detail.includes('lượt 7')));
   item.filename = '/Downloads/report.pdf';
   await listeners.changed({id: 7, filename: {current: item.filename}});
   assert.equal(requests.length, 0, 'Must wait for the file to finish downloading');
@@ -81,9 +84,13 @@ function begin(id, capabilities = []) {
   const fromTab = data => new Promise(resolve => listeners.message(data,{tab:{id:1}},resolve));
   let reply=await fromTab({type:'trace',event:{phase:'loi',mail:1,file:'blocked.pdf',detail:'Ô PDF bị che'}});
   assert.deepEqual(reply,{});
-  assert.equal(local.report[0].file,'blocked.pdf');
+  assert(local.report.some(entry=>entry.file==='blocked.pdf' && entry.phase==='loi'));
   reply=await fromTab({type:'failure',failure:{rowIndex:0,key:'mail-0',text:'Công văn số 1',fileIndex:1,name:'blocked.pdf'}});
   assert.deepEqual(reply,{});
   assert.equal(local.failures[0].name,'blocked.pdf');
+  reply=await fromTab({type:'trusted-click',x:150,y:30});
+  assert.deepEqual(reply,{});
+  assert.deepEqual(mouseEvents.map(event=>event.params.type),['mouseMoved','mousePressed','mouseReleased']);
+  assert(mouseEvents.every(event=>event.target.tabId===1 && event.params.x===150 && event.params.y===30));
   console.log('Extension download passed: multiple files per run, persisted error report, local import and interruption');
 })().catch(error => { console.error(error); process.exit(1); });

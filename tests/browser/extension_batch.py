@@ -13,6 +13,9 @@ with sync_playwright() as playwright:
         if(data.type==='trace'){window.report.push(data.event);return {};}
         if(data.type==='failure'){window.failures.push(data.failure);return {};}
         if(data.type==='arm-download'){window.pending={};return {};}
+        if(data.type==='trusted-click'){
+          document.elementFromPoint(data.x,data.y)?.click();return {};
+        }
         if(data.type==='download-state')return window.pending;
         if(data.type==='finish'){window.finished=true;return {};}
         return {};
@@ -40,6 +43,7 @@ with sync_playwright() as playwright:
         document.body.append(viewer);
         viewer.querySelector('[aria-label="Đóng"]').onclick=()=>viewer.remove();
         viewer.querySelector('#download').onclick=()=>{
+          if(window.suppressDownload===name){events.push('ignored-download-'+name);return;}
           events.push('download-'+name);pending={result:{filename:name,added:1}};
         };
       };
@@ -89,4 +93,14 @@ with sync_playwright() as playwright:
     assert 'download-Two.pdf' not in page.evaluate('events')
     assert page.evaluate('status').startswith('Hoàn tất: 1 thư, 1 PDF đã lưu, 0 lỗi.'), page.evaluate('status')
     print('Browser passed: retry processed only the failed PDF')
+    page.evaluate('''() => {
+      suppressDownload='One.pdf';events=[];report=[];finished=false;showList();
+      listener({type:'run',limit:1});
+    }''')
+    page.wait_for_function('finished', timeout=30000)
+    assert 'ignored-download-One.pdf' in page.evaluate('events')
+    assert 'download-Two.pdf' in page.evaluate('events')
+    assert page.evaluate('status').startswith('Hoàn tất: 1 thư, 1 PDF đã lưu, 1 lỗi.'), page.evaluate('status')
+    assert any(e['phase']=='loi' and 'Chrome chưa bắt đầu tải' in e['detail'] for e in page.evaluate('report'))
+    print('Browser passed: click without Chrome download times out and next PDF continues')
     browser.close()
