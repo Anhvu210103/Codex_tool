@@ -10,12 +10,14 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
   if(message.type==='save'){if(sender.tab)throw Error('Thao tác chỉ từ tiện ích.');const config={base:baseURL(message.base),token:message.token.trim()};const check=await api('/extension/ping',{},config);if(check.app!=='mailnotes-extension'||check.protocol!==1)throw Error('Phiên bản tool chưa hỗ trợ tiện ích.');await chrome.storage.local.set({...config,capabilities:check.capabilities||[]});return {};}
   if(message.type==='start'){
    if(sender.tab)throw Error('Thao tác chỉ từ tiện ích.');const check=await api('/extension/ping',{});await chrome.storage.local.set({capabilities:check.capabilities||[]});await stop();const [tab]=await chrome.tabs.query({active:true,currentWindow:true});if(!tab?.url?.startsWith('https://mail.google.com/'))throw Error('Mở tab Gmail rồi bấm lại.');
-   await chrome.storage.session.set({run:{tab:tab.id,started:Date.now()}});await chrome.storage.local.set({status:'Đang tìm thư có PDF...'});await chrome.scripting.executeScript({target:{tabId:tab.id},files:['content.js']});await chrome.tabs.sendMessage(tab.id,{type:'run'});return {};
+   await chrome.storage.session.set({run:{tab:tab.id,started:Date.now(),limit:message.limit===1?1:20}});await chrome.storage.local.set({status:'Đang tìm thư có PDF...'});await chrome.scripting.executeScript({target:{tabId:tab.id},files:['content.js']});await chrome.tabs.sendMessage(tab.id,{type:'run',limit:message.limit===1?1:20});return {};
   }
   if(message.type==='stop'){await stop();return {};}
   if(message.type==='upload'){if(sender.tab)throw Error('Thao tác chỉ từ tiện ích.');const result=await upload(new Blob([new Uint8Array(message.bytes)],{type:'application/pdf'}),message.name);const status=resultMessage(result);await chrome.storage.local.set({status});return {...result,status};}
-  const {run}=await chrome.storage.session.get('run');if(!run||sender.tab?.id!==run.tab||Date.now()-run.started>180000)throw Error('Lượt thử đã dừng/hết hạn.');
-  if(message.type==='arm-download'){await chrome.storage.session.set({run:{...run,armedAt:Date.now()}});return {};}
+  const {run}=await chrome.storage.session.get('run');if(!run||sender.tab?.id!==run.tab||Date.now()-run.started>3600000)throw Error('Lượt thử đã dừng/hết hạn.');
+  if(message.type==='finish'){await chrome.storage.session.remove('run');return {}; }
+  if(message.type==='arm-download'){await chrome.storage.session.set({run:{...run,pending:{armedAt:Date.now(),downloadId:null,result:null,error:null}}});return {}; }
+  if(message.type==='download-state')return run.pending||{};
   if(message.type==='choose')return api('/extension/choose',{kind:message.kind,candidates:message.candidates});
   if(message.type==='progress'){await chrome.storage.local.set({status:message.text});return {};}
   throw Error('Yêu cầu không hợp lệ.');
@@ -23,23 +25,35 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
 });
 const claimedDownloads=new Set();
 async function handleDownload(item){
- const {run}=await chrome.storage.session.get('run');if(!run||!run.armedAt||Date.now()-run.started>180000||run.downloadId&&run.downloadId!==item.id||!run.downloadId&&Date.now()-run.armedAt>10000)return;
- if(!run.downloadId){const [active]=await chrome.tabs.query({active:true,lastFocusedWindow:true});if(active?.id!==run.tab)return;}
+ const {run}=await chrome.storage.session.get('run');const pending=run?.pending;
+ if(!pending||pending.result||pending.error||Date.now()-run.started>3600000)return;
+ if(pending.downloadId!==null&&pending.downloadId!==item.id)return;
+ if(pending.downloadId===null&&Date.now()-pending.armedAt>15000)return;
+ if(pending.downloadId===null){const [active]=await chrome.tabs.query({active:true,lastFocusedWindow:true});if(active?.id!==run.tab)return;}
  try{
   const url=new URL(item.url);const ref=new URL(item.referrer||'https://invalid.example/');
-  if(item.referrer&&ref.hostname!=='mail.google.com'||url.protocol!=='https:'||!(url.hostname==='mail.google.com'||url.hostname.endsWith('.googleusercontent.com')))return;
-  if(!run.downloadId)await chrome.storage.session.set({run:{...run,downloadId:item.id}});
-  if(item.state==='interrupted'){await stop();await chrome.storage.local.set({status:'Chrome chưa tải xong PDF. Kiểm tra danh sách tải xuống rồi thử lại.'});return;}
+  const gmailBlob=item.url.startsWith('blob:https://mail.google.com/');
+  if(item.referrer&&ref.hostname!=='mail.google.com'||!gmailBlob&&(url.protocol!=='https:'||!(url.hostname==='mail.google.com'||url.hostname.endsWith('.googleusercontent.com'))))return;
+  if(pending.downloadId===null){pending.downloadId=item.id;await chrome.storage.session.set({run:{...run,pending}});}
+  if(item.state==='interrupted'){pending.error='Chrome báo tải PDF thất bại.';await chrome.storage.session.set({run:{...run,pending}});return;}
   if(item.state!=='complete')return;
   if(!/\.pdf(?:$|[?#])/i.test(item.filename||'')&&item.mime!=='application/pdf')return;
   if(claimedDownloads.has(item.id))return;claimedDownloads.add(item.id);if(claimedDownloads.size>100)claimedDownloads.delete(claimedDownloads.values().next().value);
-  await stop();await chrome.storage.local.set({status:'Đang chuyển PDF về tool...'});
-  const {capabilities}=await chrome.storage.local.get('capabilities');
-  if(capabilities?.includes('linux-local-pdf')&&item.filename){const result=await api('/extension/import-local',{path:item.filename});if(result.available){await chrome.storage.local.set({status:resultMessage(result)});return;}}
-  const response=await fetch(url.href,{credentials:'include'});if(!response.ok)throw Error('Không đọc lại được file tải xuống. Chọn PDF bằng tay trong tiện ích.');
-  const length=Number(response.headers.get('content-length'));if(length>20*1024*1024)throw Error('PDF vượt 20 MB.');
-  const result=await upload(await response.blob(),(item.filename||'Gmail.pdf').split(/[\\/]/).pop());await chrome.storage.local.set({status:resultMessage(result)});
- }catch(e){await chrome.storage.local.set({status:e.message});}
+  await chrome.storage.local.set({status:'Đang chuyển PDF về tool...'});
+  const {capabilities}=await chrome.storage.local.get('capabilities');let result;
+  if(capabilities?.includes('linux-local-pdf')&&item.filename){result=await api('/extension/import-local',{path:item.filename});if(!result.available)result=null;}
+  if(!result){
+   if(gmailBlob)throw Error('Chrome lưu PDF dưới dạng blob; hãy chọn file vừa tải trong tiện ích để đưa vào sổ.');
+   const response=await fetch(url.href,{credentials:'include'});if(!response.ok)throw Error('Không đọc lại được file tải xuống. Chọn PDF bằng tay trong tiện ích.');
+   const length=Number(response.headers.get('content-length'));if(length>20*1024*1024)throw Error('PDF vượt 20 MB.');
+   result=await upload(await response.blob(),(item.filename||'Gmail.pdf').split(/[\\/]/).pop());
+  }
+  const latest=(await chrome.storage.session.get('run')).run;
+  if(latest?.pending?.downloadId===item.id){latest.pending.result=result;await chrome.storage.session.set({run:latest});await chrome.storage.local.set({status:resultMessage(result)});}
+ }catch(e){
+  const latest=(await chrome.storage.session.get('run')).run;
+  if(latest?.pending?.downloadId===item.id){latest.pending.error=e.message;await chrome.storage.session.set({run:latest});await chrome.storage.local.set({status:e.message});}
+ }
 }
 chrome.downloads.onCreated.addListener(item=>handleDownload(item));
-chrome.downloads.onChanged.addListener(async change=>{if(!change.filename&&!change.mime&&!change.state)return;const {run}=await chrome.storage.session.get('run');if(run?.downloadId!==change.id)return;const [item]=await chrome.downloads.search({id:change.id});if(item)await handleDownload(item);});
+chrome.downloads.onChanged.addListener(async change=>{if(!change.filename&&!change.mime&&!change.state)return;const {run}=await chrome.storage.session.get('run');if(run?.pending?.downloadId!==change.id)return;const [item]=await chrome.downloads.search({id:change.id});if(item)await handleDownload(item);});

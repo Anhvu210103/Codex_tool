@@ -25,7 +25,7 @@ global.fetch = async (url, options) => {
   requests.push(url);
   if (url.startsWith('https://mail.google.com')) return new Response(new Blob(['%PDF-test'], {type: 'application/pdf'}));
   if (url.endsWith('/extension/import-local')) {
-    assert.equal(JSON.parse(options.body).path, '/Downloads/report.pdf');
+    assert(['/Downloads/report.pdf','/Downloads/first.pdf','/Downloads/second.pdf'].includes(JSON.parse(options.body).path));
     return new Response(JSON.stringify({available: localAvailable, ...saved}), {headers: {'content-type': 'application/json'}});
   }
   assert(url.endsWith('/extension/pdf'));
@@ -35,13 +35,13 @@ global.fetch = async (url, options) => {
 vm.runInThisContext(fs.readFileSync('chrome-extension/worker.js', 'utf8'));
 function begin(id, capabilities = []) {
   activeTab = 1; requests = []; local.capabilities = capabilities;
-  session.run = {tab: 1, started: Date.now(), armedAt: Date.now()};
+  session.run = {tab: 1, started: Date.now(), pending: {armedAt: Date.now(), downloadId: null, result: null, error: null}};
   item = {id, url: 'https://mail.google.com/mail/u/0/?view=att', referrer: '', filename: '', mime: '', state: 'in_progress'};
 }
 (async () => {
   begin(7);
   await listeners.created({...item});
-  assert.equal(session.run.downloadId, 7);
+  assert.equal(session.run.pending.downloadId, 7);
   item.filename = '/Downloads/report.pdf';
   await listeners.changed({id: 7, filename: {current: item.filename}});
   assert.equal(requests.length, 0, 'Must wait for the file to finish downloading');
@@ -49,7 +49,7 @@ function begin(id, capabilities = []) {
   await listeners.changed({id: 7, state: {current: 'complete'}});
   assert.equal(requests.length, 2);
   assert(local.status.includes('Ngân sách'));
-  assert(!session.run);
+  assert(session.run.pending.result);
 
   begin(8, ['linux-local-pdf']);
   item.filename = '/Downloads/report.pdf'; item.state = 'complete';
@@ -57,6 +57,7 @@ function begin(id, capabilities = []) {
   assert.equal(requests.length, 1);
   assert(requests[0].endsWith('/extension/import-local'));
   assert(local.status.includes('/data/ai'));
+  assert(session.run.pending.result);
 
   begin(9, ['linux-local-pdf']); localAvailable = false;
   item.filename = '/Downloads/report.pdf'; item.state = 'complete';
@@ -65,7 +66,17 @@ function begin(id, capabilities = []) {
 
   begin(10); await listeners.created({...item}); item.state = 'interrupted';
   await listeners.changed({id: 10, state: {current: 'interrupted'}});
-  assert.equal(requests.length, 0); assert(!session.run);
-  assert(local.status.includes('chưa tải xong'));
-  console.log('Extension download passed: completion, local import, URL fallback, interrupted file and result groups');
+  assert.equal(requests.length, 0); assert(session.run.pending.error);
+  assert(session.run.pending.error.includes('thất bại'));
+  begin(11, ['linux-local-pdf']); localAvailable = true;
+  item.filename = '/Downloads/first.pdf'; item.state = 'complete';
+  await listeners.created({...item});
+  assert.equal(session.run.pending.result.filename, 'report.pdf');
+  session.run.pending = {armedAt: Date.now(), downloadId: null, result: null, error: null};
+  item = {id: 12, url: 'https://mail.google.com/mail/u/0/?view=att', referrer: '', filename: '/Downloads/second.pdf', mime: 'application/pdf', state: 'complete'};
+  await listeners.created({...item});
+  assert.equal(session.run.pending.downloadId, 12);
+  assert(session.run.pending.result);
+  assert(session.run, 'Processing one PDF must keep the run alive for the next PDF');
+  console.log('Extension download passed: multiple files per run, completion, local import, URL fallback and interruption');
 })().catch(error => { console.error(error); process.exit(1); });

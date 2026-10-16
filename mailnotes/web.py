@@ -271,7 +271,7 @@ def create_app(base=None, data_root=None, public_url=None):
         return jsonify(result)
 
     def store_ai_document(data, filename):
-        added = admin.process_pdf(data, filename, reprocess=True, source='ai')
+        added = admin.process_pdf(data, filename, reprocess=False, source='ai')
         identifier = 'ai:' + hashlib.sha256(data).hexdigest()
         with connect(admin.root / 'ai' / 'notes.sqlite3') as connection:
             row = connection.execute('SELECT subject,categories,review_reason FROM notes WHERE id=?', (identifier,)).fetchone()

@@ -1,9 +1,9 @@
 # Chốt luồng Linux trước khi bàn giao
 
-Phạm vi: tiện ích Chrome thao tác một thư/lượt; tool lấy PDF, tạo Markdown, dùng DeepSeek phân nhóm/tóm tắt, lưu vào nguồn AI thao tác và xuất thư mục nhóm. Bản scan vào Cần xem lại, không chạy OCR. Gmail API là bộ kết nối theo lịch riêng, không phải lịch tự thao tác của tiện ích.
+Phạm vi: tiện ích Chrome thao tác tối đa 20 thư/lượt và mọi PDF nhìn thấy trong mỗi thư; tool lấy PDF, tạo Markdown, dùng DeepSeek phân nhóm/tóm tắt, lưu vào nguồn AI thao tác và xuất thư mục nhóm. Bản scan vào Cần xem lại, không chạy OCR. Gmail API là bộ kết nối theo lịch riêng, không phải lịch tự thao tác của tiện ích.
 
-1. Mở tool và Chrome bình thường. Lưu DeepSeek key trong tool, bật AI và lưu nhóm mẫu. Ghép nối tiện ích phiên bản 0.3.0 với đúng địa chỉ/cổng tool.
-2. Trong Gmail tìm một email mẫu có PDF bôi đen/copy chữ được. Bấm Bắt đầu AI, theo dõi mở thư → xem PDF → tải xuống. Nếu Chrome hỏi nơi lưu, chọn Downloads và chờ tải hoàn tất.
+1. Mở tool và Chrome bình thường. Lưu DeepSeek key trong tool, bật AI và lưu nhóm mẫu. Ghép nối tiện ích phiên bản 0.4.0 với đúng địa chỉ/cổng tool.
+2. Trong Gmail tìm một email mẫu có PDF bôi đen/copy chữ được. Bấm Thử 1 thư, theo dõi mở thư → xem PDF → tải xuống. Nếu Chrome hỏi nơi lưu, chọn Downloads và chờ tải hoàn tất.
 3. Trên Linux, tool ưu tiên nhập đúng file PDF vừa tải trong thư mục Downloads do XDG cấu hình; không quét thư mục. Không đọc đường dẫn ngoài thư mục đó hoặc liên kết trỏ ra ngoài. Nếu không nhập trực tiếp được, tiện ích thử URL tệp đính kèm; có ô chọn file bằng tay khi Google không cho đọc lại URL.
 4. Tiện ích phải hiện tên file, nhóm và thư mục lưu. Kiểm tra Sổ ghi chép → AI thao tác: có dòng tài liệu, tóm tắt và nhóm. Bấm Mở thư mục tài liệu: có PDF gốc trong files/, Markdown trong Markdown/, và bản có tóm tắt trong Theo-nhom/.
 5. Sửa nhóm trong sổ: bản Markdown phải chuyển đúng nhóm mà không tăng số lượt gọi AI. Đọc lại cùng PDF với cấu hình giống nhau: không tạo dòng trùng; cache phân nhóm không thêm token. Các lượt AI chọn nút vẫn có token riêng.

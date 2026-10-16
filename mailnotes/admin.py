@@ -317,6 +317,7 @@ class Admin:
             database = Path(config['data_dir']) / 'notes.sqlite3'
             if not reprocess and database.exists():
                 with connect(database) as connection:
+                    ensure_schema(connection)
                     if connection.execute('SELECT 1 FROM notes WHERE id=?', (identifier,)).fetchone():
                         return 0
             if reprocess:

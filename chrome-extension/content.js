@@ -1,81 +1,153 @@
 'use strict';
-if(!globalThis.mailnotesPilotInstalled){
-globalThis.mailnotesPilotInstalled=true;
-let stopped=true,activeRun=0;
-const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-const driveAction=/add.{0,50}drive|save.{0,50}drive|thêm.{0,50}drive|lưu.{0,50}drive/i;
-const forbidden=/compose|soạn thư|send|gửi|delete|xóa|archive|lưu trữ|spam|reply|trả lời|forward|chuyển tiếp|settings|cài đặt/i;
-const cleanText=value=>String(value||'').normalize('NFC').trim().replace(/\s+/g,' ');
-async function send(data){const result=await chrome.runtime.sendMessage(data);if(result.error)throw Error(result.error);return result;}
-function controls(kind,attempted=new Set()){
- const nodes=[];const selector=kind==='mail'?'[role="row"],.zA':'[role="button"],button,a,[role="link"],[data-tooltip],[aria-label],[title],.aQH .aZo,.aQH [tabindex="0"],.aV3';
- for(const node of document.querySelectorAll(selector)){
-  const rect=node.getBoundingClientRect();if(rect.width<12||rect.height<12||rect.bottom<0||rect.top>innerHeight||getComputedStyle(node).visibility==='hidden')continue;
-  const x=Math.min(innerWidth-1,Math.max(0,rect.left+rect.width/2)),y=Math.min(innerHeight-1,Math.max(0,rect.top+rect.height/2));
-  const top=document.elementFromPoint(x,y);if(!top||!(node===top||node.contains(top)))continue;
-  const raw=cleanText(node.getAttribute('aria-label')||node.getAttribute('title')||node.getAttribute('data-tooltip')||node.innerText);
-  if(kind==='pdf'&&driveAction.test(raw))continue;
-  const attachment=node.closest('.aZo');
-  const filenameNode=node.matches('.aV3')&&/\.pdf\b/i.test(node.textContent||'');
-  const filename=cleanText(attachment?.querySelector('.aV3')?.textContent);
-  const isDownload=/download|tải xuống|tải về/i.test(raw);
-  // Gmail may put only 'Preview attachment' on the clickable tile and the
-  // filename on a child. Keep the PDF filename visible to the AI.
-  const previewTile=attachment&&(node===attachment||/preview|xem trước/i.test(raw));
-  const label=(kind==='pdf'&&filenameNode?'Mở PDF đính kèm: '+cleanText(node.textContent):kind==='pdf'&&!isDownload&&previewTile&&/\.pdf\b/i.test(filename)?'Mở PDF đính kèm: '+filename:raw).slice(0,240);
-  if(!label||forbidden.test(label)||attempted.has(label))continue;
-  if(kind==='mail'&&(label.length<8||node.closest('[role="row"]')&&node.closest('[role="row"]')!==node))continue;
-  if(kind==='pdf'&&!/\.pdf\b|download|tải xuống|tải về|preview|xem trước/i.test(label))continue;
-  if(node.getAttribute('href')){const url=new URL(node.getAttribute('href'),location.href);if(url.protocol!=='https:'||!(url.hostname==='mail.google.com'||kind==='pdf'&&url.hostname.endsWith('.googleusercontent.com')))continue;}
-  if(filenameNode){
-   // The filename itself bubbles the click to Gmail's preview handler even
-   // when its surrounding tile has no link/button role or uses new classes.
-   for(let i=nodes.length-1;i>=0;i--)if(nodes[i].node.contains(node))nodes.splice(i,1);
-  }else if(nodes.some(item=>item.label===label&&(item.node.contains(node)||node.contains(item.node))))continue;
-  nodes.push({node,label});if(nodes.length>=70)break;
- }
- // Open the PDF tile before considering inline download icons. Once the
- // preview covers the tile, the visibility check leaves its Download button.
- const previews=kind==='pdf'?nodes.filter(item=>(item.node.matches('.aV3')||item.node.closest('.aZo'))&&/\.pdf\b/i.test(item.label)&&!/download|tải xuống|tải về/i.test(item.label)):[];
- const downloads=kind==='pdf'?nodes.filter(item=>/download|tải xuống|tải về/i.test(item.label)&&!/download all|tải xuống tất cả/i.test(item.label)):[];
- return previews.length?previews:downloads.length?downloads:nodes;
+if (!globalThis.mailnotesPilotInstalled) {
+globalThis.mailnotesPilotInstalled = true;
+let stopped = true, epoch = 0;
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+const clean = value => String(value || '').normalize('NFC').trim().replace(/\s+/g, ' ');
+const downloadName = /download|tải xuống|tải về/i;
+const dangerous = /compose|soạn thư|send|gửi|delete|xóa|archive|lưu trữ|spam|reply|trả lời|forward|chuyển tiếp/i;
+async function send(data) { const answer = await chrome.runtime.sendMessage(data); if (answer?.error) throw Error(answer.error); return answer; }
+function label(node) { return clean(node?.getAttribute('aria-label') || node?.getAttribute('data-tooltip') || node?.getAttribute('title') || node?.innerText); }
+function visible(node) {
+ if (!node?.isConnected) return false;
+ const r = node.getBoundingClientRect();
+ if (r.width < 10 || r.height < 10 || r.bottom <= 0 || r.top >= innerHeight || r.right <= 0 || r.left >= innerWidth || getComputedStyle(node).visibility === 'hidden') return false;
+ const top = document.elementFromPoint(Math.min(innerWidth-1, Math.max(0, r.left+r.width/2)), Math.min(innerHeight-1, Math.max(0, r.top+r.height/2)));
+ return !!top && (node === top || node.contains(top));
 }
-function revealViewerToolbar(){
- // Gmail hides the viewer toolbar until the pointer enters/moves over it.
- // Move only; never click an unidentified location or send keyboard shortcuts.
- const points=[[innerWidth/2,innerHeight/2],[innerWidth/2,24],[innerWidth-50,48]];
- for(const [x,y] of points){
-  const node=document.elementFromPoint(x,y);if(!node)continue;
-  if(typeof PointerEvent==='function')for(const type of ['pointerover','pointermove'])node.dispatchEvent(new PointerEvent(type,{bubbles:true,view:window,clientX:x,clientY:y,pointerType:'mouse'}));
-  for(const type of ['mouseover','mousemove'])node.dispatchEvent(new MouseEvent(type,{bubbles:true,view:window,clientX:x,clientY:y}));
+function viewerOpen() {
+ return [...document.querySelectorAll('[aria-label],[role="status"]')].some(node => visible(node) && /đang hiển thị người xem|showing viewer|trang\s*\d+\s*\/\s*\d+|page\s*\d+\s*(?:of|\/)/i.test(label(node)));
+}
+function mailRows() {
+ const nodes = [...document.querySelectorAll('.zA')];
+ if (!nodes.length) nodes.push(...document.querySelectorAll('[role="row"]'));
+ return nodes.filter(node => {const r=node.getBoundingClientRect(),css=getComputedStyle(node);return r.width>=10 && r.height>=10 && css.visibility!=='hidden' && css.display!=='none' && label(node).length>=8 && !dangerous.test(label(node));}).map((node, index) => ({node, key:node.getAttribute('data-legacy-thread-id') || node.getAttribute('data-thread-id') || '', text:label(node), index}));
+}
+function pdfTiles() {
+ const nodes = [...document.querySelectorAll('.aV3')];
+ return nodes.filter(node => {const r=node.getBoundingClientRect(),css=getComputedStyle(node);return /\.pdf\b/i.test(clean(node.textContent)) && r.width>=10 && r.height>=10 && css.visibility!=='hidden' && css.display!=='none' && !/drive/i.test(label(node.closest('[role="button"],button')));}).map((node,index) => ({node, name:clean(node.textContent), index}));
+}
+async function until(get, ms, cancelled) {
+ const deadline = Date.now() + ms;
+ while (!cancelled()) { const value = get(); if (value) return value; if (Date.now() >= deadline) break; await pause(300); }
+ return null;
+}
+async function progress(text) { await send({type:'progress', text}); }
+function revealToolbar() {
+ // The viewer may reveal controls only when the pointer moves over its header.
+ for (const [x,y] of [[innerWidth/2,innerHeight/2],[innerWidth/2,25],[innerWidth-65,30]]) {
+  const node = document.elementFromPoint(x,y); if (!node) continue;
+  for (const type of ['mouseover','mousemove']) node.dispatchEvent(new MouseEvent(type,{bubbles:true,view:window,clientX:x,clientY:y}));
  }
 }
-function downloadDiagnostics(){
- const labels=controls('inspect').slice(0,20).map(item=>item.label).join(' | ');
- const hidden=[];
- for(const node of document.querySelectorAll('[aria-label],[data-tooltip],[title]')){
-  const label=cleanText([node.getAttribute('aria-label'),node.getAttribute('data-tooltip'),node.getAttribute('title')].filter(Boolean).join(' '));
-  if(!/download|tải xuống|tải về/i.test(label)||driveAction.test(label))continue;
-  const r=node.getBoundingClientRect(),css=getComputedStyle(node);
-  const top=document.elementFromPoint(Math.min(innerWidth-1,Math.max(0,r.left+r.width/2)),Math.min(innerHeight-1,Math.max(0,r.top+r.height/2)));
-  hidden.push(label.slice(0,100)+' ['+(r.width<12||r.height<12?'ẩn/kích thước nhỏ':css.visibility==='hidden'?'đang ẩn':!(top&&(node===top||node.contains(top)))?'bị che':'hiện')+']');
-  if(hidden.length>=6)break;
+function controlAt(x,y) {
+ let node = document.elementFromPoint(x,y);
+ while (node && node !== document.body) {
+  if (node.matches('button,[role="button"],a,[tabindex="0"]') && visible(node)) return node;
+  node = node.parentElement;
  }
- return 'Các nút đang thấy: '+labels+'. Nút tải trong trang: '+(hidden.join(' | ')||'không có nhãn tải')+'.';
+ return null;
 }
-async function run(){
- stopped=false;const epoch=++activeRun;const cancelled=()=>stopped||activeRun!==epoch;let kind=controls('mail').length?'mail':'pdf';const attempted=new Set();
- try{
-  for(let step=0;step<9&&!cancelled();step++){
-   let options=controls(kind,attempted);for(let i=0;i<12&&!options.length&&!cancelled();i++){if(kind==='pdf')revealViewerToolbar();await pause(500);options=controls(kind,attempted);}
-   if(cancelled())return;if(!options.length)throw Error(kind==='mail'?'Không thấy hàng thư có thể mở.':('Chưa tìm thấy nút tải PDF sau khi mở. '+downloadDiagnostics()+' Hãy gửi nguyên dòng trạng thái này.'));
-   const result=await send({type:'choose',kind,candidates:options.map((item,index)=>({index,label:item.label,role:item.node.getAttribute('role')||item.node.tagName.toLowerCase()}))});
-   if(cancelled())return;if(!result.choice)throw Error((kind==='mail'?'DeepSeek chưa chọn được hàng thư.':'DeepSeek chưa chọn được nút tải/xem PDF.')+' Tiện ích đọc được: '+options.slice(0,4).map(item=>item.label).join(' | ')+'. Hãy gửi dòng trạng thái này để kiểm tra.');
-   const target=options[result.choice.index];if(!target||!target.node.isConnected||forbidden.test(target.label))throw Error('Trang đã đổi; dừng để tránh bấm nhầm.');
-   await send({type:'progress',text:'AI chọn: '+target.label});if(kind==='pdf')await send({type:'arm-download'});if(cancelled())return;target.node.click();if(kind==='pdf')attempted.add(target.label);kind='pdf';await pause(2200);
+function downloadControl() {
+ const candidates = [...document.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"]')]
+  .filter(node => visible(node) && downloadName.test(label(node)) && !/drive|tất cả|all attachments/i.test(label(node)) && !dangerous.test(label(node)));
+ if (candidates.length) {
+  // A tooltip can carry the text but not the click handler. Prefer its
+  // associated button, and never click the tooltip itself.
+  for (const node of candidates) {
+   const button = node.closest('button,[role="button"],a,[tabindex="0"]');
+   if (button && visible(button)) return button;
   }
-  if(!cancelled())await send({type:'progress',text:'Đã kết thúc lượt thử. Nếu PDF đã tải nhưng chưa vào sổ, chọn file trong tiện ích để ghi vào sổ.'});
- }catch(e){await send({type:'progress',text:e.message}).catch(()=>{});}finally{if(activeRun===epoch)stopped=true;}
+ }
+ // Gmail's PDF viewer can render icon-only controls. In its header, the
+ // download button sits between Print and More. Verify the Print neighbour.
+ if (!viewerOpen()) return null;
+ const print = controlAt(innerWidth-115,29), target = controlAt(innerWidth-65,29), more = controlAt(innerWidth-19,29);
+ const printText = label(print), targetText=label(target);
+ const aligned=[print,target,more].every(node=>{if(!node)return false;const r=node.getBoundingClientRect();return r.top>=0&&r.bottom<=65&&r.width>=20&&r.width<=64;});
+ // The user's Gmail viewer has three adjacent toolbar buttons at these
+ // positions: Print, Download, More. Accept an icon-only Print button only
+ // when the whole three-button layout matches; never click More or Print.
+ if (aligned && print !== target && target !== more && print !== more &&
+     (!printText || /^(print|in)(?:\b|$)/i.test(printText)) &&
+     !dangerous.test(targetText) && !/drive|print|^in$|more|thêm|khác/i.test(targetText)) return target;
+ return null;
 }
-chrome.runtime.onMessage.addListener(message=>{if(message.type==='run')run();if(message.type==='stop'){stopped=true;activeRun++;}});
+async function waitDownload(cancelled) {
+ const deadline = Date.now()+120000;
+ while (!cancelled() && Date.now()<deadline) {
+  const state = await send({type:'download-state'});
+  if (state.error) throw Error(state.error);
+  if (state.result) return state.result;
+  await pause(500);
+ }
+ throw Error('Chưa nhận được PDF từ Chrome trong 2 phút.');
+}
+async function closeViewer(cancelled) {
+ if (!viewerOpen()) return;
+ const close = [...document.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"]')]
+  .find(node => visible(node) && /^(đóng|close)(?:\b|$)/i.test(label(node)));
+ if (!close) throw Error('Không tìm thấy nút đóng trình xem PDF.');
+ close.click();
+ if (!await until(() => !viewerOpen(),5000,cancelled)) throw Error('Trình xem PDF chưa đóng.');
+}
+async function backToList(listURL,cancelled) {
+ if (mailRows().some(item=>visible(item.node))) return true;
+ const back = [...document.querySelectorAll('[aria-label],[data-tooltip],[title],[role="button"]')]
+  .find(node => visible(node) && /quay lại|\bback\b/i.test(label(node)) && !dangerous.test(label(node)));
+ if (back) back.click();
+ else if (location.href !== listURL) history.back();
+ else return false;
+ return !!await until(() => mailRows().some(item=>visible(item.node)),10000,cancelled);
+}
+async function run(limit) {
+ stopped=false; const current=++epoch, cancelled=()=>stopped||epoch!==current;
+ let mails=0, files=0, errors=0; const faults=[];
+ try {
+  const rows = await until(() => mailRows().length ? mailRows() : null,10000,cancelled);
+  if (!rows) throw Error('Mở danh sách thư Gmail trước khi chạy.');
+  const listURL=location.href, queue=rows.slice(0, limit).map(row=>({key:row.key,text:row.text,index:row.index}));
+  await progress('Đã thấy '+queue.length+' thư trên trang. Đang xử lý lần lượt...');
+  for (const entry of queue) {
+   if (cancelled()) return;
+   const currentRows=mailRows();
+   const row=entry.key ? currentRows.find(item=>item.key===entry.key) : currentRows.find(item=>item.index===entry.index && item.text===entry.text);
+   if (!row) { errors++; faults.push('Không tìm lại được thư '+(entry.index+1)); continue; }
+   row.node.scrollIntoView({block:'center'});
+   if (!visible(row.node)) {errors++;faults.push('Thư '+(entry.index+1)+': không hiển thị sau khi cuộn');continue;}
+   row.node.click(); mails++;
+   const tiles=await until(() => pdfTiles().length ? pdfTiles() : null,10000,cancelled);
+   if (!tiles) {errors++;faults.push('Thư '+mails+': không thấy PDF');}
+   else {
+    const attachments=tiles.map(item=>({name:item.name,index:item.index}));
+    for (const attachment of attachments) {
+     if (cancelled()) return;
+     try {
+      const tile=pdfTiles().find(item=>item.index===attachment.index && item.name===attachment.name);
+      if (!tile) throw Error('Không tìm lại được ô PDF.');
+      await progress('Thư '+mails+'/'+queue.length+' · PDF '+(files+1)+' · Mở '+attachment.name);
+      tile.node.scrollIntoView({block:'center'});
+      if (!visible(tile.node)) throw Error('Ô PDF bị che hoặc chưa hiển thị.');
+      tile.node.click();
+      if (!await until(viewerOpen,10000,cancelled)) throw Error('PDF chưa mở trong Gmail.');
+      let button=null;
+      for (let i=0;i<20 && !cancelled();i++) {revealToolbar();button=downloadControl();if(button)break;await pause(300);}
+      if (!button) throw Error('Không thấy nút tải trong trình xem PDF.');
+      await send({type:'arm-download'});
+      button.click();
+      const result=await waitDownload(cancelled);
+      files++;
+      await progress('Đã lưu '+files+' PDF từ '+mails+' thư. Mới nhất: '+result.filename+(result.added===0?' (đã có trong sổ)':''));
+     } catch (error) {errors++;faults.push(attachment.name+': '+error.message);await progress('Lỗi '+attachment.name+': '+error.message);}
+     await closeViewer(cancelled);
+    }
+   }
+   if (cancelled()) return;
+   if (!await backToList(listURL,cancelled)) throw Error('Không trở lại được danh sách thư. Đã lưu '+files+' PDF.');
+  }
+  await progress('Hoàn tất: '+mails+' thư, '+files+' PDF đã lưu, '+errors+' lỗi.'+(faults.length?'\n'+faults.slice(0,4).join('\n'):''));
+ } catch (error) {await progress('Đã lưu '+files+' PDF từ '+mails+' thư. Dừng: '+error.message).catch(()=>{});}
+ finally {if(epoch===current){stopped=true;await send({type:'finish'}).catch(()=>{});}}
+}
+chrome.runtime.onMessage.addListener(message=>{if(message.type==='run')run(message.limit===1?1:20);if(message.type==='stop'){stopped=true;epoch++;}});
 }

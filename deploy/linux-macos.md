@@ -7,14 +7,14 @@ Linux, Mac Intel và Mac Apple Silicon dùng cùng mã xử lý, giao diện, ti
 | Mở tool | Bấm ứng dụng Sổ ghi chép, tool mở giao diện quản trị. |
 | Cài AI | Lưu DeepSeek API key, đồng ý gửi chữ tài liệu, chọn model và nhóm. |
 | Dùng tiện ích | Tải cùng ZIP tiện ích trong Cài đặt, cài vào Chrome, ghép nối bằng địa chỉ tool và mã trên chính máy đó. |
-| Chạy AI thao tác | Mở Gmail đã đăng nhập bình thường trong Chrome, tìm thư có PDF, bấm Bắt đầu AI. Có nút Dừng. |
+| Chạy AI thao tác | Mở Gmail đã đăng nhập bình thường trong Chrome, tìm thư có PDF, bấm Xử lý tối đa 20 thư đang hiện. Có nút Dừng. |
 | Xử lý tài liệu | PDF có chữ → Markdown trên máy → DeepSeek phân nhóm và tóm tắt → ghi sổ và thư mục nhóm. |
 | PDF scan | Giữ bản gốc, tạo ghi chú Cần xem lại, không chạy OCR và không yêu cầu Tesseract/Poppler. |
 | Xem kết quả | Sổ ghi chép → AI thao tác → Mở thư mục tài liệu hoặc Tải Markdown. |
 | Sửa nhóm | Sửa trong sổ, bản Markdown theo nhóm cập nhật theo, không gọi AI lại. |
 | Tắt | Bấm Tắt tool. Đóng tab không tắt dịch vụ; máy ngủ hoặc tắt thì việc xử lý ngừng. |
 
-Gmail API vẫn là nguồn riêng có thể kiểm tra theo lịch đã lưu trên cả hai hệ điều hành. Luồng tiện ích AI hiện chạy thủ công một thư/lượt trong Chrome, chưa tự quét theo lịch.
+Gmail API vẫn là nguồn riêng có thể kiểm tra theo lịch đã lưu trên cả hai hệ điều hành. Luồng tiện ích hiện xử lý thủ công tối đa 20 thư đang hiện trong Chrome và các PDF tìm thấy trong từng thư; chưa tự quét theo lịch.
 
 ## Khác biệt do hệ điều hành
 
