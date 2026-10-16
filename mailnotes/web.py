@@ -62,6 +62,19 @@ def create_app(base=None, data_root=None, public_url=None):
 
     @app.before_request
     def security():
+        if request.path.startswith('/extension/'):
+            if parsed.hostname not in ('localhost', '127.0.0.1') or request.remote_addr not in ('127.0.0.1', '::1'):
+                return jsonify(error='Tiện ích chỉ kết nối tool trên cùng máy.'), 403
+            origin = request.headers.get('Origin', '')
+            if not re.fullmatch(r'chrome-extension://[a-p]{32}', origin):
+                return jsonify(error='Nguồn tiện ích không hợp lệ.'), 403
+            if request.method == 'OPTIONS':
+                return '', 204
+            supplied = request.headers.get('Authorization', '').removeprefix('Bearer ')
+            expected = read_json(admin.private / 'extension-token.json', {}).get('hash', '')
+            if not expected or not hmac.compare_digest(hashlib.sha256(supplied.encode()).hexdigest(), expected):
+                return jsonify(error='Mã ghép nối không đúng. Tạo lại trong Cài đặt.'), 401
+            return
         if request.path.startswith('/static/'):
             return
         csrf()
@@ -85,6 +98,12 @@ def create_app(base=None, data_root=None, public_url=None):
 
     @app.after_request
     def headers(response):
+        origin = request.headers.get('Origin', '')
+        if request.path.startswith('/extension/') and re.fullmatch(r'chrome-extension://[a-p]{32}', origin):
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
+            response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+            response.headers['Vary'] = 'Origin'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['Referrer-Policy'] = 'no-referrer'
@@ -185,6 +204,61 @@ def create_app(base=None, data_root=None, public_url=None):
     @app.get('/api/group-presets')
     def group_presets():
         return jsonify(read_json(admin.base / 'config.json', {})['rules'])
+
+    @app.post('/api/extension/pair')
+    def extension_pair():
+        token = secrets.token_urlsafe(32)
+        private_json(admin.private / 'extension-token.json', {'hash':hashlib.sha256(token.encode()).hexdigest()})
+        return jsonify(token=token)
+
+    @app.get('/api/extension/download')
+    def extension_download():
+        import zipfile
+        directory = admin.base / 'chrome-extension'
+        output = io.BytesIO()
+        with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
+            for name in ('manifest.json', 'popup.html', 'popup.css', 'popup.js', 'content.js', 'worker.js'):
+                archive.write(directory / name, 'SoGhiChep-AI-Gmail/' + name)
+        output.seek(0)
+        return send_file(output, mimetype='application/zip', as_attachment=True, download_name='SoGhiChep-AI-Gmail.zip')
+
+    @app.post('/extension/choose')
+    def extension_choose():
+        from .gmail_browser_pilot import select_with_ai
+        import sqlite3
+        data = payload()
+        kind = data.get('kind')
+        candidates = data.get('candidates')
+        if kind not in ('mail', 'pdf') or not isinstance(candidates, list) or len(candidates) > 70:
+            raise ValueError('Danh sách điều khiển không hợp lệ.')
+        for item in candidates:
+            if not isinstance(item, dict) or type(item.get('index')) is not int or not isinstance(item.get('label'), str) or len(item['label']) > 240:
+                raise ValueError('Điều khiển không hợp lệ.')
+        config = admin.runtime_config('pdf')
+        if config['summary']['mode'] != 'openai' or not config['summary']['ai_consent']:
+            raise ValueError('Bật DeepSeek AI và đồng ý gửi chữ tài liệu trong Cài đặt trước.')
+        key = config.get('_api_key') or os.environ.get('DEEPSEEK_API_KEY')
+        if not key:
+            raise ValueError('Chưa lưu DeepSeek key trong tool.')
+        root = Path(config['data_dir']);root.mkdir(parents=True, exist_ok=True)
+        try:
+            with sqlite3.connect(root / 'notes.sqlite3') as connection:
+                choice = select_with_ai(None, candidates, kind, key, config['summary']['model'], connection, config['summary']['pricing'])
+        except Exception as error:
+            return jsonify(error=error_message(error)), 400
+        return jsonify(choice=choice)
+
+    @app.post('/extension/pdf')
+    def extension_pdf():
+        from .documents import MAX_PDF_BYTES
+        file = request.files.get('file')
+        if not file:
+            raise ValueError('Chọn PDF.')
+        try:
+            added = admin.process_pdf(file.stream.read(MAX_PDF_BYTES + 1), Path(file.filename or 'Gmail.pdf').name, reprocess=True)
+        except Exception as error:
+            return jsonify(error=error_message(error)), 400
+        return jsonify(added=added)
 
     @app.get('/api/status')
     def status():

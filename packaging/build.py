@@ -10,6 +10,7 @@ args = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--name',
         '--onefile', '--windowed', '--collect-data', 'certifi', '--paths', str(root), '--collect-all', 'pypdf', '--collect-all', 'waitress',
         '--add-data', str(root/'config.json') + ':.' ,
         '--add-data', str(root/'examples') + ':examples',
+        '--add-data', str(root/'chrome-extension') + ':chrome-extension',
         '--add-data', str(root/'mailnotes/templates') + ':mailnotes/templates',
         '--add-data', str(root/'mailnotes/static') + ':mailnotes/static']
 if sys.platform == 'darwin':

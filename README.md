@@ -8,7 +8,11 @@ Có launcher **Mo-So-Ghi-Chep.sh** cho bản mã nguồn Linux đã cài và gó
 
 Xem [cách tải app, cài và giữ dữ liệu](packaging/README.md). Bản Linux đã build và kiểm chứng chạy độc lập tại môi trường phát triển; bản Mac có quy trình build GitHub Actions riêng cho Apple Silicon/Intel, chưa khẳng định hoạt động trên máy khách trước khi có kết quả build và kiểm thử. App Mac thử nghiệm chưa ký/notarize. Dữ liệu riêng được giữ ngoài app để không mất khi cập nhật.
 
-## Bản thử AI thao tác Gmail bằng trình duyệt
+## Tiện ích Chrome — thử trên Gmail đã đăng nhập
+
+Dùng **Cài đặt → Tiện ích Chrome → Tải tiện ích Chrome** để lấy ZIP. Giải nén, mở `chrome://extensions`, bật Developer mode và Load unpacked thư mục có manifest.json. Tạo mã ghép nối trong Cài đặt tool, dán mã cùng địa chỉ localhost của tool vào popup tiện ích. Mở danh sách thư có PDF trên Gmail bình thường rồi bấm **Bắt đầu AI**. Không cần Playwright; DeepSeek chọn điều khiển từ chữ trên trang. Chi tiết, quyền truy cập và giới hạn bản thử: [chrome-extension/README.md](chrome-extension/README.md). Chưa kiểm chứng Gmail thật khi chưa có phiên người dùng.
+
+## Bản thử AI thao tác Gmail bằng trình duyệt — cách Playwright cũ
 
 Trên máy Linux đang chạy bản mã nguồn, dùng **Mo-AI-Gmail.sh** để mở bản thử riêng. Lần đầu launcher cài `requirements-browser.txt` vào `.venv` hiện có; cần Chrome hoặc Chromium cài trên máy. Bản thử dùng hồ sơ trình duyệt riêng tại `.local/browser-gmail/profile`; người dùng đăng nhập Gmail ngay trong cửa sổ đó. Không gửi mật khẩu cho tool hay cho người hỗ trợ. Nếu Google từ chối đăng nhập bằng trình duyệt tự động, dừng bản thử và tiếp tục dùng kết nối Gmail API đã có.
 

@@ -5,6 +5,7 @@ on:
     branches: ['codex/admin-web']
     paths:
       - 'mailnotes/**'
+      - 'chrome-extension/**'
       - 'packaging/**'
       - 'requirements*.txt'
       - '.github/workflows/desktop.yml'

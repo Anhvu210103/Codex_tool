@@ -199,6 +199,7 @@ action('stop-app',async()=>{if(!confirm('Tắt tool và dừng lịch tự độ
 action('logout',async()=>{await post('/api/logout');await boot();});
 action('run-now',()=>run());action('demo-run',()=>run('demo'));
 action('save-settings',()=>saveSettings());action('save-rules',()=>saveSettings(true));
+action('pair-extension',async()=>{const data=await post('/api/extension/pair');$('extension-token').value=data.token;notice('Đã tạo mã ghép nối mới. Dán mã vào tiện ích Chrome; mã cũ đã hết hiệu lực. Không gửi mã vào chat.');});
 action('add-preset-groups',async()=>{
   const presets=await api('/api/group-presets');
   const existing=new Set([...document.querySelectorAll('.rule-category')].map(node=>node.value.trim().toLocaleLowerCase('vi-VN')));
