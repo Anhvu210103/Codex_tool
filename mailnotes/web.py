@@ -252,7 +252,9 @@ def create_app(base=None, data_root=None, public_url=None):
 
     @app.post('/extension/ping')
     def extension_ping():
-        return jsonify(app='mailnotes-extension', protocol=1)
+        import sys
+        return jsonify(app='mailnotes-extension', protocol=1,
+                       capabilities=['linux-local-pdf'] if sys.platform == 'linux' else [])
 
     @app.post('/extension/pdf')
     def extension_pdf():
@@ -261,10 +263,32 @@ def create_app(base=None, data_root=None, public_url=None):
         if not file:
             raise ValueError('Chọn PDF.')
         try:
-            added = admin.process_pdf(file.stream.read(MAX_PDF_BYTES + 1), Path(file.filename or 'Gmail.pdf').name, reprocess=True, source='ai')
+            result = store_ai_document(file.stream.read(MAX_PDF_BYTES + 1), Path(file.filename or 'Gmail.pdf').name)
         except Exception as error:
             return jsonify(error=error_message(error)), 400
-        return jsonify(added=added)
+        return jsonify(result)
+
+    def store_ai_document(data, filename):
+        added = admin.process_pdf(data, filename, reprocess=True, source='ai')
+        identifier = 'ai:' + hashlib.sha256(data).hexdigest()
+        with connect(admin.root / 'ai' / 'notes.sqlite3') as connection:
+            row = connection.execute('SELECT subject,categories,review_reason FROM notes WHERE id=?', (identifier,)).fetchone()
+        if row is None:
+            raise ValueError('Tài liệu chưa được lưu: không khớp nhóm nào. Bật nhóm mặc định hoặc cấu hình lại nhóm.')
+        return {'added':added, 'source':'ai', 'filename':row[0],
+                'categories':json.loads(row[1]), 'review_reason':row[2],
+                'folder':str(admin.root / 'ai')}
+
+    @app.post('/extension/import-local')
+    def extension_import_local():
+        from .linux_downloads import read_download
+        downloaded = read_download(payload().get('path'))
+        if downloaded is None:
+            return jsonify(available=False)
+        try:
+            return jsonify(available=True, **store_ai_document(*downloaded))
+        except Exception as error:
+            return jsonify(error=error_message(error)), 400
 
     @app.get('/api/status')
     def status():

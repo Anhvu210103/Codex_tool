@@ -12,6 +12,8 @@ Xem [cách tải app, cài và giữ dữ liệu](packaging/README.md). Bản Li
 
 ## Tiện ích Chrome — thử trên Gmail đã đăng nhập
 
+Ưu tiên hoàn thiện Linux trước: [quy trình kiểm tra Linux](deploy/linux-test.md). Tiện ích 0.3.0 đợi tải xong, ưu tiên nhập trực tiếp PDF đã tải trong Downloads, rồi báo rõ nhóm và thư mục kết quả.
+
 Dùng **Cài đặt → Tiện ích Chrome → Tải tiện ích Chrome** để lấy ZIP. Giải nén, mở `chrome://extensions`, bật Developer mode và Load unpacked thư mục có manifest.json. Tạo mã ghép nối trong Cài đặt tool, dán mã cùng địa chỉ localhost của tool vào popup tiện ích. Mở danh sách thư có PDF trên Gmail bình thường rồi bấm **Bắt đầu AI**. Không cần Playwright; DeepSeek chọn điều khiển từ chữ trên trang. Chi tiết, quyền truy cập và giới hạn bản thử: [chrome-extension/README.md](chrome-extension/README.md). Chưa kiểm chứng Gmail thật khi chưa có phiên người dùng.
 
 ## Bản thử AI thao tác Gmail bằng trình duyệt — cách Playwright cũ

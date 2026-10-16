@@ -23,7 +23,8 @@ class ExtensionTests(unittest.TestCase):
     def test_bridge_requires_pair_token_and_extension_origin(self):
         ping=self.client.post('/extension/ping',json={},headers=self.headers)
         self.assertEqual(ping.status_code,200)
-        self.assertEqual(ping.get_json(),{'app':'mailnotes-extension','protocol':1})
+        self.assertEqual(ping.get_json()['app'],'mailnotes-extension')
+        self.assertEqual(ping.get_json()['protocol'],1)
         self.assertEqual(self.client.post('/extension/choose',json={}).status_code,403)
         self.assertEqual(self.client.post('/extension/choose',json={},headers={'Origin':self.headers['Origin']}).status_code,401)
         preflight=self.client.options('/extension/choose',headers={'Origin':self.headers['Origin']})
@@ -47,6 +48,7 @@ class ExtensionTests(unittest.TestCase):
         writer=PdfWriter();writer.add_blank_page(width=600,height=800);pdf=io.BytesIO();writer.write(pdf);pdf.seek(0)
         result=self.client.post('/extension/pdf',data={'file':(pdf,'scan.pdf')},headers=self.headers)
         self.assertEqual(result.status_code,200)
+        self.assertEqual(result.get_json()['categories'],['Cần xem lại'])
         self.assertEqual(self.client.get('/api/notes?source=ai').get_json()['total'],1)
         self.assertEqual(self.client.get('/api/notes?source=pdf').get_json()['total'],0)
         note=self.client.get('/api/notes?source=ai').get_json()['notes'][0]
@@ -68,3 +70,17 @@ class ExtensionTests(unittest.TestCase):
         result=self.client.get('/api/extension/download');self.assertEqual(result.status_code,200)
         with zipfile.ZipFile(io.BytesIO(result.data)) as archive:
             self.assertIn('SoGhiChep-AI-Gmail/manifest.json',archive.namelist())
+
+    def test_local_import_reads_only_the_download_directory(self):
+        downloads=self.root/'Downloads';downloads.mkdir()
+        writer=PdfWriter();writer.add_blank_page(width=600,height=800)
+        with (downloads/'scan.pdf').open('wb') as stream:writer.write(stream)
+        with patch('mailnotes.linux_downloads.download_directory',return_value=downloads),patch('sys.platform','linux'):
+            denied=self.client.post('/extension/import-local',json={'path':str(self.root/'private.pdf')},headers=self.headers)
+            self.assertEqual(denied.get_json(),{'available':False})
+            result=self.client.post('/extension/import-local',json={'path':str(downloads/'scan.pdf')},headers=self.headers)
+        self.assertEqual(result.status_code,200)
+        self.assertTrue(result.get_json()['available'])
+        self.assertEqual(result.get_json()['source'],'ai')
+        self.assertEqual(result.get_json()['categories'],['Cần xem lại'])
+        self.assertEqual(self.client.get('/api/notes?source=ai').get_json()['total'],1)

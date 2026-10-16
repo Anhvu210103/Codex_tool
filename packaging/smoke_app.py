@@ -22,8 +22,9 @@ APP = (ROOT / 'dist' / 'SoGhiChep.app' / 'Contents' / 'MacOS' / 'SoGhiChep'
 
 
 def verify_workflow(opener, base, session, data):
-    def request(path, payload=None, raw=None, content_type=None):
+    def request(path, payload=None, raw=None, content_type=None, extra_headers=None):
         headers={'X-CSRF-Token':session['csrf']}
+        headers.update(extra_headers or {})
         body=raw
         if payload is not None:
             body=json.dumps(payload).encode();content_type='application/json'
@@ -46,7 +47,8 @@ def verify_workflow(opener, base, session, data):
         boundary='mailnotes-smoke-boundary'
         body=(f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="test.pdf"\r\nContent-Type: application/pdf\r\n\r\n'.encode()+output.getvalue()+f'\r\n--{boundary}--\r\n'.encode())
         request('/api/pdf',raw=body,content_type='multipart/form-data; boundary='+boundary)
-    upload('Local Markdown parity test')
+        return output.getvalue()
+    text_pdf=upload('Local Markdown parity test')
     notes=json.loads(request('/api/notes?source=pdf'))['notes']
     if len(notes)!=1 or notes[0]['categories']!=['Nhóm kiểm thử']:
         raise RuntimeError('Packaged PDF classification failed')
@@ -60,6 +62,15 @@ def verify_workflow(opener, base, session, data):
         manifest=json.loads(archive.read('SoGhiChep-AI-Gmail/manifest.json'))
         if manifest['manifest_version']!=3:
             raise RuntimeError('Packaged extension missing')
+    if sys.platform == 'linux':
+        downloads=data/'Downloads';downloads.mkdir(exist_ok=True)
+        local_pdf=downloads/'browser.pdf';local_pdf.write_bytes(text_pdf)
+        token=json.loads(request('/api/extension/pair',{}))['token']
+        result=json.loads(request('/extension/import-local',{'path':str(local_pdf)},extra_headers={
+            'Origin':'chrome-extension://'+'a'*32,'Authorization':'Bearer '+token}))
+        if not result.get('available') or result['categories']!=['Nhóm kiểm thử'] or not list((data/'ai/Theo-nhom').glob('*/*.md')):
+            raise RuntimeError('Packaged Linux local download import failed')
+        print('Packaged Linux local PDF -> AI source -> grouped Markdown passed')
     print('Packaged workflow passed: PDF -> Markdown -> groups, scan review, Chrome extension')
 
 
@@ -72,6 +83,10 @@ def main():
         environment = os.environ.copy()
         environment['MAILNOTES_DATA_DIR'] = directory
         environment.pop('MAILNOTES_ADMIN_PASSWORD', None)
+        if sys.platform == 'linux':
+            config_dir=data/'config';config_dir.mkdir()
+            (config_dir/'user-dirs.dirs').write_text('XDG_DOWNLOAD_DIR="'+str(data/'Downloads')+'"\n')
+            environment['XDG_CONFIG_HOME']=str(config_dir)
         with (data / 'app.log').open('wb') as log:
             child = subprocess.Popen([str(APP), '--serve'], env=environment,
                                      stdin=subprocess.DEVNULL, stdout=log, stderr=log)
