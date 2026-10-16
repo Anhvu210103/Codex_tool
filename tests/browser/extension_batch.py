@@ -125,4 +125,21 @@ with sync_playwright() as playwright:
     assert page.evaluate('status').startswith('Hoàn tất: 1 thư, 1 PDF đã lưu, 1 lỗi.'), page.evaluate('status')
     assert any(e['phase']=='loi' and 'không nhận sự kiện click' in e['detail'] for e in page.evaluate('report'))
     print('Browser passed: missing click is reported immediately and next PDF continues')
+    page.evaluate('''() => {
+      suppressClick=null;suppressDownload=null;blockClose=null;
+      events=[];report=[];finished=false;window.unreadIds=[0,1,2];
+      window.baseShowMail=showMail;
+      showMail=i=>{unreadIds=unreadIds.filter(id=>id!==i);baseShowMail(i);};
+      showList=()=>{
+        document.getElementById('app').innerHTML=unreadIds.map(i=>
+          `<div class="zA" data-legacy-thread-id="unread-${i}" style="padding:14px;width:600px">Thư chưa đọc ${i}: Đã gửi hồ sơ, chuyển tiếp công văn PDF</div>`).join('');
+        document.querySelectorAll('.zA').forEach((row,index)=>row.onclick=()=>showMail(unreadIds[index]));
+      };
+      showList();listener({type:'run',limit:3});
+    }''')
+    page.wait_for_function('finished', timeout=30000)
+    assert page.evaluate('status').startswith('Hoàn tất: 3 thư, 4 PDF đã lưu, 0 lỗi.'), page.evaluate('status')
+    assert sum(item.startswith('open-mail-') for item in page.evaluate('events'))==3
+    assert page.evaluate('unreadIds')==[]
+    print('Browser passed: unread search rows with dangerous words disappear after reading; remaining PDFs still process')
     browser.close()
