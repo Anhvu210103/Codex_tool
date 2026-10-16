@@ -80,6 +80,15 @@ function controlAt(x,y) {
  return null;
 }
 function downloadControl() {
+ if (!viewerOpen()) return null;
+ // Gmail can expose other visible "Tải xuống" controls behind the PDF
+ // overlay. Only the viewer's compact, top-right toolbar can download
+ // the PDF currently open.
+ const inViewerHeader = button => {
+  const r = button.getBoundingClientRect();
+  return r.top >= 0 && r.bottom <= 80 && r.width >= 20 && r.width <= 80 &&
+   r.right >= innerWidth - 160 && r.left >= innerWidth - 220;
+ };
  const candidates = [...document.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"]')]
   .filter(node => visible(node) && downloadName.test(label(node)) && !/drive|tất cả|all attachments/i.test(label(node)) && !dangerous.test(label(node)));
  if (candidates.length) {
@@ -87,12 +96,11 @@ function downloadControl() {
   // associated button, and never click the tooltip itself.
   for (const node of candidates) {
    const button = node.closest('button,[role="button"],a,[tabindex="0"]');
-   if (button && visible(button)) return button;
+   if (button && visible(button) && inViewerHeader(button)) return button;
   }
  }
  // Gmail's PDF viewer can render icon-only controls. In its header, the
  // download button sits between Print and More. Verify the Print neighbour.
- if (!viewerOpen()) return null;
  const print = controlAt(innerWidth-115,29), target = controlAt(innerWidth-65,29), more = controlAt(innerWidth-19,29);
  const printText = label(print), targetText=label(target);
  const aligned=[print,target,more].every(node=>{if(!node)return false;const r=node.getBoundingClientRect();return r.top>=0&&r.bottom<=65&&r.width>=20&&r.width<=64;});

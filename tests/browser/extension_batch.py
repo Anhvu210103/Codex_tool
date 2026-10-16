@@ -48,7 +48,7 @@ with sync_playwright() as playwright:
         const viewer=document.createElement('div');viewer.id='viewer';
         viewer.style='position:fixed;inset:0;background:white;z-index:100';
         viewer.innerHTML='<div aria-label="Đang hiển thị người xem." style="padding:20px">PDF</div><button aria-label="Đóng" style="padding:15px">Đóng</button>'+
-          (name==='Two.pdf'?'<button style="position:fixed;right:95px;top:9px;width:40px;height:40px"><svg width="20" height="20"></svg></button><button id="download" style="position:fixed;right:45px;top:9px;width:40px;height:40px">↓</button><button aria-label="Tùy chọn khác" style="position:fixed;right:0;top:9px;width:38px;height:40px">⋮</button>':'<button id="download" aria-label="Tải xuống" style="padding:15px">↓</button>');
+          (name==='Two.pdf'?'<button id="decoy" aria-label="Tải xuống" style="position:fixed;left:800px;top:380px;width:90px;height:40px">Tải xuống</button><button style="position:fixed;right:95px;top:9px;width:40px;height:40px"><svg width="20" height="20"></svg></button><button id="download" style="position:fixed;right:45px;top:9px;width:40px;height:40px">↓</button><button aria-label="Tùy chọn khác" style="position:fixed;right:0;top:9px;width:38px;height:40px">⋮</button>':'<button id="download" aria-label="Tải xuống" style="position:fixed;right:45px;top:9px;width:40px;height:40px">↓</button>');
         document.body.append(viewer);
         viewer.querySelector('[aria-label="Đóng"]').onclick=event=>{
           if(event.isTrusted && window.blockClose!==name)viewer.remove();
@@ -57,6 +57,7 @@ with sync_playwright() as playwright:
           if(window.suppressDownload===name){events.push('ignored-download-'+name);return;}
           events.push('download-'+name);pending={result:{filename:name,added:1}};
         };
+        viewer.querySelector('#decoy')?.addEventListener('click',()=>events.push('wrong-middle-download'));
       };
       showList();
     }''')
@@ -68,6 +69,7 @@ with sync_playwright() as playwright:
     assert sum(item.startswith('download-') for item in events)==21, events
     assert events.index('download-One.pdf')<events.index('open-pdf-Two.pdf')
     assert 'wrong-drive' not in events
+    assert 'wrong-middle-download' not in events
     assert len(page.evaluate('report'))>=20
     assert page.evaluate('status').startswith('Hoàn tất: 20 thư, 21 PDF đã lưu, 0 lỗi.'), page.evaluate('status')
     print('Browser passed: 20 mails, 21 PDFs including a PDF obscured by its own Drive button')

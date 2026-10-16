@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sổ ghi chép — AI Gmail",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "Tự thao tác trên Gmail để xử lý tối đa 20 thư và mọi PDF đính kèm.",
   "permissions": ["activeTab", "scripting", "storage", "downloads", "debugger"],
   "host_permissions": ["http://localhost/*", "http://127.0.0.1/*", "https://mail.google.com/*", "https://*.googleusercontent.com/*"],

@@ -12,7 +12,7 @@ Xem [cách tải app, cài và giữ dữ liệu](packaging/README.md). Bản Li
 
 ## Tiện ích Chrome — thử trên Gmail đã đăng nhập
 
-Ưu tiên hoàn thiện Linux trước: [quy trình kiểm tra Linux](deploy/linux-test.md). Tiện ích 0.4.5 nhận diện thư trong kết quả tìm kiếm Gmail, kể cả khi nội dung thư có chữ “gửi/chuyển tiếp” và khi thư biến khỏi bộ lọc Chưa đọc sau khi mở. Một thư có nhiều PDF được xử lý lần lượt; PDF trùng được báo rõ là đã có trong nguồn AI thao tác.
+Ưu tiên hoàn thiện Linux trước: [quy trình kiểm tra Linux](deploy/linux-test.md). Tiện ích 0.4.6 nhận diện thư trong kết quả tìm kiếm Gmail, kể cả khi nội dung thư có chữ “gửi/chuyển tiếp” và khi thư biến khỏi bộ lọc Chưa đọc sau khi mở. Khi xem PDF, tiện ích chỉ chọn nút tải ở thanh công cụ trên cùng bên phải để tránh bấm nhầm nút giữa trang. Một thư có nhiều PDF được xử lý lần lượt; PDF trùng được báo rõ là đã có trong nguồn AI thao tác.
 
 Dùng **Cài đặt → Tiện ích Chrome → Tải tiện ích Chrome** để lấy ZIP. Giải nén, mở `chrome://extensions`, bật Developer mode và Load unpacked thư mục có manifest.json. Tạo mã ghép nối trong Cài đặt tool, dán mã cùng địa chỉ localhost của tool vào popup tiện ích. Mở danh sách thư có PDF trên Gmail bình thường rồi bấm **Xử lý tối đa 20 thư đang hiện**. Không cần Playwright; tiện ích thao tác trên trang Gmail, còn DeepSeek phân loại và tóm tắt PDF sau khi tải. Chi tiết, quyền truy cập và giới hạn bản thử: [chrome-extension/README.md](chrome-extension/README.md). Chưa kiểm chứng Gmail thật khi chưa có phiên người dùng.
 
