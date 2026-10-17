@@ -146,6 +146,7 @@ function begin(id, capabilities = [], expectedName = 'report.pdf') {
   assert.deepEqual(await fromPopup({type:'set-auto',enabled:true}),{});
   assert.equal(listeners.alarmSpec.options.periodInMinutes,30);
   assert(listeners.createdTab.url.includes('filename%3Apdf'));
+  assert.equal(listeners.createdTab.active,true,'The first automatic scan must be visible so the user can observe it');
   assert(listeners.createdTab.url.includes('/mail/u/1/'));
   assert.equal(listeners.tabMessage.limit,100);
   assert.equal(session.run.automatic,true);

@@ -47,7 +47,7 @@ async function beginRun(tab,limit,only=[],automatic=false,accountIndex='0',scanS
  }catch(error){await chrome.storage.session.remove('run');await detach(tab.id);throw error;}
 }
 let autoStarting=false;
-async function autoScan(){
+async function autoScan(reveal=false){
  if(autoStarting)return;
  autoStarting=true;
  try {
@@ -63,8 +63,11 @@ async function autoScan(){
   if(tab && !tab.url?.startsWith('https://mail.google.com/'))tab=null;
   const accountIndex=saved.autoAccountIndex||'0';const scanStartedAt=Date.now();const since=saved.scanCursors?.[accountIndex]||saved.autoEnabledAt||scanStartedAt-86400000;
   const url=searchURL(accountIndex,since);
-  if(tab){if(tab.url===url)await chrome.tabs.reload(tab.id);else tab=await chrome.tabs.update(tab.id,{url});}
-  else {tab=await chrome.tabs.create({url,active:false});await chrome.storage.local.set({autoTabId:tab.id});}
+  if(tab){
+   if(tab.url===url){if(reveal)tab=await chrome.tabs.update(tab.id,{active:true});await chrome.tabs.reload(tab.id);}
+   else tab=await chrome.tabs.update(tab.id,reveal?{url,active:true}:{url});
+  }
+  else {tab=await chrome.tabs.create({url,active:reveal});await chrome.storage.local.set({autoTabId:tab.id});}
   await new Promise(resolve=>setTimeout(resolve,500));
   await readyTab(tab.id);
   if(!(await chrome.storage.local.get('autoEnabled')).autoEnabled)return;
@@ -78,7 +81,7 @@ async function setAuto(enabled){
   const [active]=await chrome.tabs.query({active:true,currentWindow:true}),gmailTabs=await chrome.tabs.query({url:'https://mail.google.com/*'});
   const source=active?.url?.startsWith('https://mail.google.com/')?active:gmailTabs[0];
   const accountIndex=source?.url?.match(/^https:\/\/mail\.google\.com\/mail\/u\/(\d+)\//)?.[1]||'0';
-  const previous=await chrome.storage.local.get('autoEnabledAt');await chrome.storage.local.set({autoEnabled:true,autoAccountIndex:accountIndex,autoEnabledAt:previous.autoEnabledAt||Date.now()});await mirrorAutomationState();await chrome.alarms.create(AUTO_ALARM,{periodInMinutes:30});await autoScan();
+  const previous=await chrome.storage.local.get('autoEnabledAt');await chrome.storage.local.set({autoEnabled:true,autoAccountIndex:accountIndex,autoEnabledAt:previous.autoEnabledAt||Date.now()});await mirrorAutomationState();await chrome.alarms.create(AUTO_ALARM,{periodInMinutes:30});await autoScan(true);
  }
  else {await chrome.storage.local.set({autoEnabled:false});await chrome.alarms.clear(AUTO_ALARM);if((await chrome.storage.session.get('run')).run?.automatic)await stop();}
 }

@@ -5,7 +5,7 @@ async function status(){const data=await chrome.storage.local.get(['base','token
 async function message(data){const result=await chrome.runtime.sendMessage(data);if(result.error)throw Error(result.error);return result;}
 function action(id,fn){$(id).onclick=async()=>{try{await fn();}catch(e){$('status').textContent=e.message;}};}
 action('save',async()=>{await message({type:'save',base:$('base').value,token:$('token').value});$('status').textContent='Đã kết nối đúng tool và kiểm tra mã ghép nối.';});
-$('auto').onchange=async()=>{const enabled=$('auto').checked;try{await message({type:'set-auto',enabled});$('status').textContent=enabled?(await chrome.storage.local.get('status')).status||'Đã bật lịch 30 phút.':'Đã tắt lịch tự động.';}catch(e){$('auto').checked=!enabled;$('status').textContent=e.message;}};
+$('auto').onchange=async()=>{const enabled=$('auto').checked;try{await message({type:'set-auto',enabled});$('status').textContent=enabled?(await chrome.storage.local.get('status')).status||'Đã bật lịch và đang chạy lượt đầu tiên.':'Đã tắt lịch tự động.';}catch(e){$('auto').checked=!enabled;$('status').textContent=e.message;}};
 action('start',async()=>{await message({type:'start',limit:20});$('status').textContent='Đang chạy. Bạn có thể đóng cửa sổ nhỏ này để xem Gmail.';});
 action('start-one',async()=>{await message({type:'start',limit:1});$('status').textContent='Đang thử 1 thư.';});
 action('retry',async()=>{await message({type:'start',retry:true,limit:20});$('status').textContent='Đang thử lại file lỗi trên danh sách Gmail hiện tại.';});
