@@ -156,7 +156,7 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
  })().then(reply).catch(error=>reply({error:error.message}));return true;
 });
 const claimedDownloads=new Set();
-function comparableName(path){return String(path||'').split(/[\\/]/).pop().normalize('NFC').replace(/\s*\(\d+\)(?=\.pdf$)/i,'').toLocaleLowerCase('vi');}
+function comparableName(path){return String(path||'').split(/[\\/]/).pop().normalize('NFC').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').replace(/\s*\(\d+\)(?=\s*\.pdf$)/i,'').replace(/\s+(?=\.pdf$)/i,'').replace(/\s+/g,' ').trim().toLocaleLowerCase('vi');}
 async function handleDownload(item){
  const {run}=await chrome.storage.session.get('run');const pending=run?.pending;
  if(!pending||pending.result||pending.error||Date.now()-run.started>3600000)return;
@@ -171,7 +171,8 @@ async function handleDownload(item){
   if(!gmailBlob&&(url.protocol!=='https:'||!(url.hostname==='mail.google.com'||url.hostname.endsWith('.googleusercontent.com'))))return;
   if(pending.downloadId===null){
    if(!pending.candidates.includes(item.id))pending.candidates.push(item.id);
-   if(!item.filename||comparableName(item.filename)!==comparableName(pending.expectedName)){await chrome.storage.session.set({run:{...run,pending}});return;}
+   if(!item.filename){await chrome.storage.session.set({run:{...run,pending}});return;}
+   if(comparableName(item.filename)!==comparableName(pending.expectedName)){const mismatch=comparableName(item.filename);if(pending.lastMismatch!==mismatch){pending.lastMismatch=mismatch;await appendReport({phase:'chrome-ten-khong-khop',file:(item.filename||'').split(/[\\/]/).pop(),detail:'đang chờ '+pending.expectedName});}await chrome.storage.session.set({run:{...run,pending}});return;}
    pending.downloadId=item.id;await chrome.storage.session.set({run:{...run,pending}});await appendReport({phase:'chrome-bat-dau',detail:'lượt '+item.id+' · sau '+Math.round((Date.now()-pending.armedAt)/1000)+' giây · '+url.protocol+' · '+url.hostname+' · '+item.state,file:(item.filename||'').split(/[\\/]/).pop()});
   }
   if(item.state==='interrupted'){pending.error='Chrome báo tải PDF thất bại.';await chrome.storage.session.set({run:{...run,pending}});await appendReport({phase:'chrome-loi',detail:'Lượt tải '+item.id+' bị gián đoạn'});return;}
@@ -201,7 +202,7 @@ chrome.downloads.onCreated.addListener(async item=>{
  try{
   const after=(await chrome.storage.session.get('run')).run;
   const url=new URL(item.url),claimed=after?.pending?.downloadId===item.id;
-  if(after?.pending&&!claimed)await appendReport({phase:'chrome-bo-qua',detail:'lượt '+item.id+' · '+url.protocol+' · '+url.hostname+' · '+item.state+' · '+(after.pending.downloadId!==null?'đang chờ lượt '+after.pending.downloadId:'nguồn tải không thuộc Gmail/Google'),file:(item.filename||'').split(/[\\/]/).pop()});
+  if(after?.pending&&!claimed){const google=item.url.startsWith('blob:https://mail.google.com/')||(url.protocol==='https:'&&(url.hostname==='mail.google.com'||url.hostname.endsWith('.googleusercontent.com')));await appendReport({phase:google?'chrome-cho-ten':'chrome-bo-qua',detail:'lượt '+item.id+' · '+url.protocol+' · '+url.hostname+' · '+item.state+' · '+(google?'đang chờ Chrome cung cấp đúng tên '+after.pending.expectedName:'nguồn tải không thuộc Gmail/Google'),file:(item.filename||'').split(/[\\/]/).pop()});}
  }catch{}
 });
 chrome.downloads.onChanged.addListener(async change=>{if(!change.filename&&!change.mime&&!change.state)return;const {run}=await chrome.storage.session.get('run');const pending=run?.pending;if(!pending)return;if(pending.downloadId!==change.id&&!pending.candidates?.includes(change.id))return;const [item]=await chrome.downloads.search({id:change.id});if(item)await handleDownload(item);});

@@ -18,12 +18,25 @@ function visible(node) {
 function viewerOpen() {
  return [...document.querySelectorAll('[aria-label],[role="status"]')].some(node => visible(node) && /đang hiển thị người xem|showing viewer|trang\s*\d+\s*\/\s*\d+|page\s*\d+\s*(?:of|\/)/i.test(label(node)));
 }
+function shortHash(value){let hash=2166136261;for(let i=0;i<value.length;i++){hash^=value.charCodeAt(i);hash=Math.imul(hash,16777619);}return (hash>>>0).toString(16).padStart(8,'0');}
+function mailNodeIdentity(node){
+ const metadata=node.matches('[data-legacy-thread-id],[data-thread-id],[data-legacy-message-id],[data-message-id]')?node:node.querySelector('[data-legacy-thread-id],[data-thread-id],[data-legacy-message-id],[data-message-id]');
+ const thread=metadata?.getAttribute('data-legacy-thread-id')||metadata?.getAttribute('data-thread-id')||node.getAttribute('data-legacy-thread-id')||node.getAttribute('data-thread-id')||'';
+ const message=metadata?.getAttribute('data-legacy-message-id')||metadata?.getAttribute('data-message-id')||node.getAttribute('data-legacy-message-id')||node.getAttribute('data-message-id')||'';
+ if(thread||message)return {key:thread||message,version:message};
+ for(const anchor of node.querySelectorAll('a[href]')){const segment=(anchor.getAttribute('href')||'').split('/').pop();if(/^[A-Za-z0-9_-]{12,}$/.test(segment))return {key:'gmail-link:'+segment,version:''};}
+ const sender=clean(node.querySelector('.yP[email],.zF[email],[email]')?.getAttribute('email')||node.querySelector('.yP,.zF')?.textContent);
+ const subject=clean(node.querySelector('.bog')?.textContent);
+ const dateNode=node.querySelector('.xW [title],.xW');const received=clean(dateNode?.getAttribute('title')||dateNode?.textContent);
+ if(subject&&(sender||received)){const stable=JSON.stringify([sender,subject,received]);return {key:'gmail-row:'+shortHash(stable)+':'+subject.slice(0,80),version:''};}
+ return {key:'',version:''};
+}
 function mailRows() {
  const nodes = [...document.querySelectorAll('.zA')];
  if (!nodes.length) nodes.push(...document.querySelectorAll('[role="row"][data-thread-id],[role="row"][data-legacy-thread-id],[role="row"][data-legacy-message-id]'));
  // Subjects and snippets can legitimately say "gửi", "forward" or "archive".
  // Reject dangerous controls at click selection, not entire email rows.
- return nodes.filter(node => {const r=node.getBoundingClientRect(),css=getComputedStyle(node);return r.width>=10 && r.height>=10 && css.visibility!=='hidden' && css.display!=='none' && label(node).length>=8;}).map((node, index) => ({node, key:node.getAttribute('data-legacy-thread-id') || node.getAttribute('data-thread-id') || node.getAttribute('data-legacy-message-id') || '', text:label(node), version:node.getAttribute('data-legacy-message-id') || node.getAttribute('data-message-id') || '', index}));
+ return nodes.filter(node => {const r=node.getBoundingClientRect(),css=getComputedStyle(node);return r.width>=10 && r.height>=10 && css.visibility!=='hidden' && css.display!=='none' && label(node).length>=8;}).map((node, index) => ({node,...mailNodeIdentity(node),text:label(node),index}));
 }
 function mailRouteKey(listURL) {
  if(location.href===listURL)return '';
@@ -278,7 +291,7 @@ async function run(limit,only=[],automatic=false) {
    }
    if(key&&known.complete)await send({type:'mail-incomplete',...identity});
    let mailFailed=false;
-   if (!tiles) {const error=Error('Thư '+mails+': danh sách PDF chưa ổn định hoặc không thấy PDF');errors++;mailFailed=true;faults.push(error.message);await rememberFailure('list-pdf',{...entry,key},error);}
+   if (!tiles) {const error=Error('Thư '+mails+': danh sách PDF chưa ổn định hoặc không thấy PDF');errors++;mailFailed=true;faults.push(error.message);await rememberFailure('list-pdf',{...entry,key},error);await trace('loi-danh-sach-pdf',mails,'',error.message);}
    else {
     const attachments=tiles.map(item=>({name:item.name,index:item.index,fileKey:item.fileKey,legacyKey:item.legacyKey})).filter(item=>!only.length||only.some(failed=>(failed.key?failed.key===key:failed.rowIndex===entry.index&&failed.text===entry.text)&&(failed.fileKey?[item.fileKey,item.legacyKey].includes(failed.fileKey):failed.fileIndex===item.index&&failed.name===item.name)));
     const recordedFiles=new Set(known.files);

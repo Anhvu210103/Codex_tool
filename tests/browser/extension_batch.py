@@ -257,6 +257,23 @@ with sync_playwright() as playwright:
     assert page.evaluate('status').startswith('Hoàn tất: 2 thư mở, 0 PDF đã lưu, 2 thư đã có, 0 lỗi.'), page.evaluate('status')
     print('Browser passed: Gmail URL identifies mails when result rows have no thread ID')
     page.evaluate('''() => {
+      processedMails={};failures=[];events=[];report=[];finished=false;history.replaceState(null,'','#advanced-search/test');
+      showList=()=>{
+        document.getElementById('app').innerHTML='<div class="zA" style="padding:14px;width:600px"><span class="zF" email="office@example.gov.vn">Cơ quan</span><span class="bog">Công văn ổn định</span><span class="xW"><span title="17/10/2026 15:00">15:00</span></span></div>';
+        document.querySelector('.zA').onclick=()=>originalShowMail(0);
+      };
+      showList();listener({type:'run',limit:1});
+    }''')
+    page.wait_for_function('finished', timeout=30000)
+    assert sum(item.startswith('download-') for item in page.evaluate('events'))==2
+    assert len(page.evaluate('processedMails'))==1
+    page.evaluate('''() => {events=[];report=[];finished=false;showList();listener({type:'run',limit:1});}''')
+    page.wait_for_function('finished', timeout=30000)
+    assert not any(item.startswith('download-') for item in page.evaluate('events'))
+    assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 0 PDF đã lưu, 1 thư đã có, 0 lỗi.'), page.evaluate('status')
+    assert all('ID từ danh sách' in e['detail'] for e in page.evaluate('report') if e['phase']=='kiem-tra-thu')
+    print('Browser passed: sender, subject and full date provide a stable fallback when Gmail exposes no IDs')
+    page.evaluate('''() => {
       processedMails={};failures=[];events=[];report=[];finished=false;
       showList=()=>{
         document.getElementById('app').innerHTML='<div class="zA" data-legacy-thread-id="delayed-mail" style="padding:14px;width:600px">Thư có tệp tải chậm</div>';

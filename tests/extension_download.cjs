@@ -32,7 +32,7 @@ global.fetch = async (url, options) => {
   if (url.endsWith('/extension/ping')) return new Response(JSON.stringify({app:'mailnotes-extension',protocol:1,capabilities:['linux-local-pdf']}),{headers:{'content-type':'application/json'}});
   if (url.endsWith('/extension/automation-state')) return new Response(JSON.stringify(JSON.parse(options.body).action==='load'?{failures:[],scan_cursors:{},auto_enabled_at:null}:{ok:true}),{headers:{'content-type':'application/json'}});
   if (url.endsWith('/extension/import-local')) {
-    assert(['/Downloads/report.pdf','/Downloads/first.pdf','/Downloads/second.pdf','/Downloads/wanted.pdf'].includes(JSON.parse(options.body).path));
+    assert(['/Downloads/report.pdf','/Downloads/first.pdf','/Downloads/second.pdf','/Downloads/wanted.pdf','/Downloads/Itinerary_5RFR45.pdf'].includes(JSON.parse(options.body).path));
     return new Response(JSON.stringify({available: localAvailable, ...saved}), {headers: {'content-type': 'application/json'}});
   }
   assert(url.endsWith('/extension/pdf'));
@@ -97,6 +97,11 @@ function begin(id, capabilities = [], expectedName = 'report.pdf') {
   item={id:15,url:'https://mail.google.com/mail/u/0/?view=att',referrer:'',filename:'/Downloads/wanted.pdf',mime:'application/pdf',state:'complete'};
   await listeners.created({...item});
   assert.equal(session.run.pending.downloadId,15);
+  assert(session.run.pending.result);
+  begin(16,['linux-local-pdf'],'Itinerary_5RFR45 .pdf');
+  item={id:16,url:'https://mail.google.com/mail/u/0/?view=att',referrer:'',filename:'/Downloads/Itinerary_5RFR45.pdf',mime:'application/pdf',state:'complete'};
+  await listeners.created({...item});
+  assert.equal(session.run.pending.downloadId,16,'Chrome removing whitespace before .pdf must not hide a real Gmail download');
   assert(session.run.pending.result);
   begin(13);
   activeTab = 2;
