@@ -8,13 +8,13 @@ with sync_playwright() as playwright:
     page.set_content('<main id="app"></main>')
     page.evaluate('''() => {
       window.events=[];window.report=[];window.failures=[];window.finished=false;window.status='';window.listener=null;window.pending={};window.processedMails={};
-      window.chrome={runtime:{onMessage:{addListener(fn){window.listener=fn;}},async sendMessage(data){
+      window.chrome={runtime:{getManifest(){return {version:'0.5.2'};},onMessage:{addListener(fn){window.listener=fn;}},async sendMessage(data){
         if(data.type==='progress'){window.status=data.text;return {};}
         if(data.type==='trace'){window.report.push(data.event);return {};}
         if(data.type==='failure'){window.failures.push(data.failure);return {};}
         if(data.type==='pending-failures')return {failures:window.failures};
         if(data.type==='clear-failure'){window.failures=window.failures.filter(item=>item.key!==data.key||(item.fileKey&&data.fileKey?item.fileKey!==data.fileKey:item.fileIndex!==data.fileIndex||item.name!==data.name));return {};}
-        if(data.type==='mail-state'){const row=processedMails[data.key];return row?.fingerprint===data.fingerprint?{complete:row.complete,files:row.files}:{complete:false,files:[]};}
+        if(data.type==='mail-state'){const row=processedMails[data.key];return row?.fingerprint===data.fingerprint?{complete:row.complete,files:row.files,record:'match'}:{complete:false,files:[],record:row?'changed':'missing'};}
         if(data.type==='pdf-record'){let row=processedMails[data.key];if(!row||row.fingerprint!==data.fingerprint)row=processedMails[data.key]={fingerprint:data.fingerprint,files:[],complete:false};if(!row.files.includes(data.fileKey))row.files.push(data.fileKey);return {};}
         if(data.type==='mail-complete'){processedMails[data.key].complete=true;return {};}
         if(data.type==='mail-incomplete'){processedMails[data.key].complete=false;return {};}
@@ -222,4 +222,27 @@ with sync_playwright() as playwright:
     page.wait_for_function('finished', timeout=5000)
     assert page.evaluate('status')=='Đã kiểm tra Gmail hôm nay: không có thư PDF mới.'
     print('Browser passed: an empty Gmail search is a successful no-op')
+    page.evaluate('''() => {
+      processedMails={};failures=[];events=[];report=[];finished=false;
+      showMail=i=>{
+        history.replaceState(null,'','#inbox/FMfcgzAAAA00000'+i);
+        originalShowMail(i);
+      };
+      showList=()=>{
+        history.replaceState(null,'','#inbox');
+        document.getElementById('app').innerHTML=[0,1].map(i=>
+          `<div class="zA" style="padding:14px;width:600px">Công văn số ${i+1} · PDF đính kèm</div>`).join('');
+        document.querySelectorAll('.zA').forEach((row,i)=>row.onclick=()=>showMail(i));
+      };
+      showList();listener({type:'run',limit:20});
+    }''')
+    page.wait_for_function('finished', timeout=30000)
+    assert sum(item.startswith('download-') for item in page.evaluate('events'))==3
+    assert len(page.evaluate('processedMails'))==2
+    assert all(e['detail'].startswith('ID từ URL') for e in page.evaluate('report') if e['phase']=='kiem-tra-thu')
+    page.evaluate('''() => {events=[];report=[];finished=false;showList();listener({type:'run',limit:20});}''')
+    page.wait_for_function('finished', timeout=30000)
+    assert not any(item.startswith('download-') for item in page.evaluate('events'))
+    assert page.evaluate('status').startswith('Hoàn tất: 2 thư mở, 0 PDF đã lưu, 2 thư đã có, 0 lỗi.'), page.evaluate('status')
+    print('Browser passed: Gmail URL identifies mails when result rows have no thread ID')
     browser.close()

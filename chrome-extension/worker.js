@@ -102,7 +102,7 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
     // The thread key and the attachment list are stable enough to reuse the record.
     row.fingerprint=key;await chrome.storage.local.set({processedMails:records});
    }
-   return row?.fingerprint===fingerprint?{complete:!!row.complete,files:row.files||[]}:{complete:false,files:[]};
+   return row?.fingerprint===fingerprint?{complete:!!row.complete,files:row.files||[],record:'match'}:{complete:false,files:[],record:row?'changed':'missing'};
   }
   if(message.type==='pdf-record'){await updateLedger(message,false);return {};}
   if(message.type==='mail-complete'){await updateLedger(message,true);return {};}

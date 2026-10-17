@@ -25,6 +25,13 @@ function mailRows() {
  // Reject dangerous controls at click selection, not entire email rows.
  return nodes.filter(node => {const r=node.getBoundingClientRect(),css=getComputedStyle(node);return r.width>=10 && r.height>=10 && css.visibility!=='hidden' && css.display!=='none' && label(node).length>=8;}).map((node, index) => ({node, key:node.getAttribute('data-legacy-thread-id') || node.getAttribute('data-thread-id') || node.getAttribute('data-legacy-message-id') || '', text:label(node), version:node.getAttribute('data-legacy-message-id') || node.getAttribute('data-message-id') || '', index}));
 }
+function mailRouteKey(listURL) {
+ if(location.href===listURL)return '';
+ const segment=location.hash.split('/').pop()||'';
+ if(!/^[A-Za-z0-9_-]{12,}$/.test(segment))return '';
+ const account=location.pathname.match(/\/mail\/u\/(\d+)\//)?.[1]||'0';
+ return 'gmail-route:'+account+':'+segment;
+}
 function pdfTiles() {
  const nodes = [...document.querySelectorAll('.aV3')];
  const counts=new Map();
@@ -174,6 +181,7 @@ async function run(limit,only=[],automatic=false) {
  stopped=false; const current=++epoch, cancelled=()=>stopped||epoch!==current;
  let mails=0, files=0, errors=0, duplicateMails=0, duplicateStreak=0; const faults=[];
  try {
+  await trace('bat-dau',0,'','Tiện ích '+(chrome.runtime.getManifest?.().version||'không rõ phiên bản')+' · '+(automatic?'lịch tự động':'chạy tay'));
   const pendingFailures=automatic?(await send({type:'pending-failures'})).failures||[]:[];
   const unvisitedFailureKeys=new Set(pendingFailures.map(item=>item.key));
   let stoppedOnDuplicates=false, page=0, pageLimitReached=false;
@@ -191,24 +199,27 @@ async function run(limit,only=[],automatic=false) {
   }
   // Row text changes after reading; use a message ID when Gmail exposes it,
   // otherwise the stable thread ID. The PDF tile list still detects additions.
-  const listURL=location.href, queue=rows.slice(0, limit).map(row=>({key:row.key,text:row.text,fingerprint:row.version||row.key,index:row.index})).filter(row=>!only.length||only.some(item=>item.key?item.key===row.key:item.rowIndex===row.index&&item.text===row.text));
+  const listURL=location.href, queue=rows.slice(0, limit).map(row=>({key:row.key,text:row.text,fingerprint:row.version||row.key,index:row.index})).filter(row=>!only.length||only.some(item=>item.key&&row.key?item.key===row.key:item.rowIndex===row.index&&item.text===row.text));
   if(!queue.length)throw Error('Không thấy các thư lỗi trên trang Gmail hiện tại. Mở lại danh sách cũ rồi thử lại.');
   await progress('Đã thấy '+queue.length+' thư ở trang '+(page+1)+'. Đang xử lý lần lượt...');
   for (let position=0;position<queue.length;position++) {
    const entry=queue[position];
    if (cancelled()) return;
-   const identity={key:entry.key,fingerprint:entry.fingerprint};
-   const known=entry.key ? await send({type:'mail-state',...identity}) : {complete:false,files:[]};
    const currentRows=mailRows();
    const row=entry.key ? currentRows.find(item=>item.key===entry.key) :
     currentRows.find(item=>item.index===entry.index && item.text===entry.text) || currentRows.find(item=>item.text===entry.text);
    if (!row) { errors++; faults.push('Không tìm lại được thư '+(entry.index+1)); continue; }
    row.node.scrollIntoView({block:'center'});
    if (!visible(row.node)) {errors++;faults.push('Thư '+(entry.index+1)+': không hiển thị sau khi cuộn');continue;}
-   row.node.click(); mails++;unvisitedFailureKeys.delete(entry.key);await trace('mo-thu',mails,'');
+   row.node.click(); mails++;await trace('mo-thu',mails,'');
+   const key=entry.key||await until(()=>mailRouteKey(listURL),3000,cancelled)||'';
+   const identity={key,fingerprint:entry.fingerprint||key};
+   unvisitedFailureKeys.delete(key);
+   const known=key?await send({type:'mail-state',...identity}):{complete:false,files:[],record:'no-id'};
+   await trace('kiem-tra-thu',mails,'',(entry.key?'ID từ danh sách':key?'ID từ URL':'Không có ID ổn định')+' · '+(known.record||'không rõ')+' · '+known.files.length+' PDF ghi nhớ');
    const tiles=await until(() => pdfTiles().length ? pdfTiles() : null,10000,cancelled);
-   if(!only.length&&entry.key&&known.complete&&tiles&&tiles.every(item=>known.files.includes(item.fileKey))){
-    for(let index=pendingFailures.length-1;index>=0;index--)if(pendingFailures[index].key===entry.key){const failure=pendingFailures[index];await send({type:'clear-failure',key:entry.key,fileIndex:failure.fileIndex,name:failure.name,fileKey:failure.fileKey});pendingFailures.splice(index,1);}
+   if(!only.length&&key&&known.complete&&tiles&&tiles.every(item=>known.files.includes(item.fileKey))){
+    for(let index=pendingFailures.length-1;index>=0;index--)if(pendingFailures[index].key===key){const failure=pendingFailures[index];await send({type:'clear-failure',key,fileIndex:failure.fileIndex,name:failure.name,fileKey:failure.fileKey});pendingFailures.splice(index,1);}
     duplicateMails++;duplicateStreak++;
     await trace('thu-da-co',mails,'','Đã kiểm tra đủ PDF; liên tiếp '+duplicateStreak+'/2');
     const laterFailure=automatic&&unvisitedFailureKeys.size>0;
@@ -219,17 +230,17 @@ async function run(limit,only=[],automatic=false) {
     continue;
    }
    duplicateStreak=0;
-   if(entry.key&&known.complete)await send({type:'mail-incomplete',...identity});
+   if(key&&known.complete)await send({type:'mail-incomplete',...identity});
    let mailFailed=false;
    if (!tiles) {errors++;mailFailed=true;faults.push('Thư '+mails+': không thấy PDF');}
    else {
-    const attachments=tiles.map(item=>({name:item.name,index:item.index,fileKey:item.fileKey})).filter(item=>!only.length||only.some(failed=>(failed.key?failed.key===entry.key:failed.rowIndex===entry.index&&failed.text===entry.text)&&(failed.fileKey?failed.fileKey===item.fileKey:failed.fileIndex===item.index&&failed.name===item.name)));
+    const attachments=tiles.map(item=>({name:item.name,index:item.index,fileKey:item.fileKey})).filter(item=>!only.length||only.some(failed=>(failed.key?failed.key===key:failed.rowIndex===entry.index&&failed.text===entry.text)&&(failed.fileKey?failed.fileKey===item.fileKey:failed.fileIndex===item.index&&failed.name===item.name)));
     const recordedFiles=new Set(known.files);
     if(!attachments.length&&only.length){errors++;mailFailed=true;faults.push('Thư '+mails+': PDF lỗi trước đó không còn trong thư');}
     for (const attachment of attachments) {
      if (cancelled()) return;
      const fileKey=attachment.fileKey;
-     if (entry.key && known.files.includes(fileKey)) {await send({type:'clear-failure',key:entry.key,fileIndex:attachment.index,name:attachment.name,fileKey});await trace('pdf-da-co',mails,attachment.name,'Đã lưu ở lượt trước, không tải lại');continue;}
+     if (key && known.files.includes(fileKey)) {await send({type:'clear-failure',key,fileIndex:attachment.index,name:attachment.name,fileKey});await trace('pdf-da-co',mails,attachment.name,'Đã lưu ở lượt trước, không tải lại');continue;}
      try {
       const tile=pdfTiles().find(item=>item.index===attachment.index && item.name===attachment.name);
       if (!tile) throw Error('Không tìm lại được ô PDF.');
@@ -251,16 +262,16 @@ async function run(limit,only=[],automatic=false) {
       if (!clicked) throw Error('Chrome đã gửi thao tác chuột nhưng nút tải không nhận sự kiện click.');
       await trace('da-bam-tai',mails,attachment.name,'Gmail đã nhận click tại x='+Math.round(point.x)+', y='+Math.round(point.y));
       const result=await waitDownload(cancelled);
-      if (entry.key) await send({type:'pdf-record',...identity,fileKey});
-      await send({type:'clear-failure',key:entry.key,fileIndex:attachment.index,name:attachment.name,fileKey});
-      for(let index=pendingFailures.length-1;index>=0;index--)if(pendingFailures[index].key===entry.key&&(pendingFailures[index].fileKey?pendingFailures[index].fileKey===fileKey:pendingFailures[index].fileIndex===attachment.index&&pendingFailures[index].name===attachment.name))pendingFailures.splice(index,1);
+      if (key) await send({type:'pdf-record',...identity,fileKey});
+      await send({type:'clear-failure',key,fileIndex:attachment.index,name:attachment.name,fileKey});
+      for(let index=pendingFailures.length-1;index>=0;index--)if(pendingFailures[index].key===key&&(pendingFailures[index].fileKey?pendingFailures[index].fileKey===fileKey:pendingFailures[index].fileIndex===attachment.index&&pendingFailures[index].name===attachment.name))pendingFailures.splice(index,1);
       recordedFiles.add(fileKey);
       files++;await trace('da-luu',mails,attachment.name,result.added===0?'đã có trong sổ':'mới');
       await progress('Đã xử lý '+files+' PDF từ '+mails+' thư. Mới nhất: '+result.filename+(result.added===0?' (đã có trong Sổ ghi chép → AI thao tác, không tạo dòng mới)':' (xem tại Sổ ghi chép → AI thao tác)'));
-     } catch (error) {errors++;mailFailed=true;faults.push(attachment.name+': '+error.message);await send({type:'failure',failure:{rowIndex:entry.index,key:entry.key,text:entry.text,fileIndex:attachment.index,name:attachment.name,fileKey}}).catch(()=>{});await trace('loi',mails,attachment.name,error.message);await progress('Bỏ qua PDF lỗi, tiếp tục file sau: '+attachment.name+' — '+error.message);}
+     } catch (error) {errors++;mailFailed=true;faults.push(attachment.name+': '+error.message);await send({type:'failure',failure:{rowIndex:entry.index,key,text:entry.text,fileIndex:attachment.index,name:attachment.name,fileKey}}).catch(()=>{});await trace('loi',mails,attachment.name,error.message);await progress('Bỏ qua PDF lỗi, tiếp tục file sau: '+attachment.name+' — '+error.message);}
      await closeViewer(cancelled,mails,attachment.name);
     }
-    if(entry.key && !mailFailed && tiles.every(item=>recordedFiles.has(item.fileKey))) await send({type:'mail-complete',...identity});
+    if(key && !mailFailed && tiles.every(item=>recordedFiles.has(item.fileKey))) await send({type:'mail-complete',...identity});
    }
    if (cancelled()) return;
    if ((automatic||position+1<queue.length) && !await backToList(listURL,cancelled)) throw Error('Không trở lại được danh sách thư. Đã lưu '+files+' PDF.');
