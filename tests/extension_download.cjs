@@ -143,9 +143,13 @@ function begin(id, capabilities = [], expectedName = 'report.pdf') {
   delete session.run;
   listeners.activeURL='https://mail.google.com/mail/u/1/#inbox';
   const fromPopup = data => new Promise(resolve => listeners.message(data,{},resolve));
+  assert((await fromPopup({type:'set-filter',filter:{period:'range',start:'2026-10-10',end:'2026-10-01'}})).error);
+  assert.deepEqual(await fromPopup({type:'set-filter',filter:{period:'range',start:'2026-10-01',end:'2026-10-05'}}),{filter:{period:'range',start:'2026-10-01',end:'2026-10-05'}});
   assert.deepEqual(await fromPopup({type:'set-auto',enabled:true}),{});
   assert.equal(listeners.alarmSpec.options.periodInMinutes,30);
   assert(listeners.createdTab.url.includes('filename%3Apdf'));
+  assert(listeners.createdTab.url.includes('after%3A2026%2F10%2F01'));
+  assert(listeners.createdTab.url.includes('before%3A2026%2F10%2F06'));
   assert.equal(listeners.createdTab.active,true,'The first automatic scan must be visible so the user can observe it');
   assert(listeners.createdTab.url.includes('/mail/u/1/'));
   assert.equal(listeners.tabMessage.limit,100);
@@ -164,5 +168,6 @@ function begin(id, capabilities = [], expectedName = 'report.pdf') {
   assert.deepEqual(await fromPopup({type:'set-auto',enabled:false}),{});
   assert.equal(local.autoEnabled,false);
   assert.equal(listeners.clearedAlarm,listeners.alarmSpec.name);
+  assert(!decodeURIComponent(searchURL('0',{period:'all'})).includes(' after:'),'All-mail mode must omit date operators');
   console.log('Extension download passed: multiple files per run, persisted error report, local import and interruption');
 })().catch(error => { console.error(error); process.exit(1); });

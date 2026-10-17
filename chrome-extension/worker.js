@@ -3,8 +3,8 @@ chrome.storage.local.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});
 function baseURL(value){const url=new URL(value);if(url.protocol!=='http:'||!['localhost','127.0.0.1'].includes(url.hostname)||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw Error('Chỉ dùng địa chỉ tool localhost trên máy này.');return url.origin;}
 async function api(path,body,override){const config=override||await chrome.storage.local.get(['base','token']);if(!config.token)throw Error('Dán mã ghép nối từ Cài đặt tool trước.');const headers={Authorization:'Bearer '+config.token};if(!(body instanceof FormData))headers['Content-Type']='application/json';const response=await fetch(baseURL(config.base||'http://localhost:8080')+path,{method:'POST',headers,body:body instanceof FormData?body:JSON.stringify(body)});if(!response.headers.get('content-type')?.includes('application/json'))throw Error('Địa chỉ này trả về trang HTML. Kiểm tra đúng cổng tool, tắt hẳn phiên tool cũ và mở bản mới.');let result;try{result=await response.json();}catch{throw Error('Tool trả dữ liệu không hợp lệ. Mở lại tool rồi thử lại.');}if(!response.ok)throw Error(result.error||'Tool từ chối kết nối.');return result;}
 function migratedFailures(items){return (items||[]).filter(item=>item&&typeof item==='object').map(item=>({...item,stage:item.stage||'process-pdf',attempts:item.attempts||1,updatedAt:item.updatedAt||item.createdAt||Date.now()}));}
-async function mirrorAutomationState(){const saved=await chrome.storage.local.get(['failures','scanCursors','autoEnabledAt']),failures=migratedFailures(saved.failures);await chrome.storage.local.set({failures});await api('/extension/automation-state',{action:'save',failures,scan_cursors:saved.scanCursors||{},auto_enabled_at:saved.autoEnabledAt||null});}
-async function restoreAutomationState(config){const remote=await api('/extension/automation-state',{action:'load'},config);const local=await chrome.storage.local.get(['failures','scanCursors','autoEnabledAt']);const failures=[...migratedFailures(remote.failures),...migratedFailures(local.failures)];const unique=[];for(const item of failures){const key=[item.stage,item.key,item.fileKey||'',item.fileIndex,item.name].join('\u0000');if(!unique.some(entry=>entry._key===key))unique.push({...item,_key:key});}const scanCursors={};for(const source of [remote.scan_cursors||{},local.scanCursors||{}])for(const [account,stamp] of Object.entries(source))scanCursors[account]=Math.max(scanCursors[account]||0,stamp);const enabled=[local.autoEnabledAt,remote.auto_enabled_at].filter(Number.isFinite);await chrome.storage.local.set({failures:unique.slice(-100).map(({_key,...item})=>item),scanCursors,autoEnabledAt:enabled.length?Math.min(...enabled):Date.now()});}
+async function mirrorAutomationState(){const saved=await chrome.storage.local.get(['failures','scanCursors','autoEnabledAt','autoFilter']),failures=migratedFailures(saved.failures),autoFilter=validateAutoFilter(saved.autoFilter);await chrome.storage.local.set({failures,autoFilter});await api('/extension/automation-state',{action:'save',failures,scan_cursors:saved.scanCursors||{},auto_enabled_at:saved.autoEnabledAt||null,auto_filter:autoFilter});}
+async function restoreAutomationState(config){const remote=await api('/extension/automation-state',{action:'load'},config);const local=await chrome.storage.local.get(['failures','scanCursors','autoEnabledAt','autoFilter']);const failures=[...migratedFailures(remote.failures),...migratedFailures(local.failures)];const unique=[];for(const item of failures){const key=[item.stage,item.key,item.fileKey||'',item.fileIndex,item.name].join('\u0000');if(!unique.some(entry=>entry._key===key))unique.push({...item,_key:key});}const scanCursors={};for(const source of [remote.scan_cursors||{},local.scanCursors||{}])for(const [account,stamp] of Object.entries(source))scanCursors[account]=Math.max(scanCursors[account]||0,stamp);const enabled=[local.autoEnabledAt,remote.auto_enabled_at].filter(Number.isFinite),autoFilter=validateAutoFilter(local.autoFilter||remote.auto_filter);await chrome.storage.local.set({failures:unique.slice(-100).map(({_key,...item})=>item),scanCursors,autoEnabledAt:enabled.length?Math.min(...enabled):Date.now(),autoFilter});}
 async function upload(blob,name){if(blob.size>20*1024*1024)throw Error('PDF tối đa 20 MB.');const head=new TextDecoder().decode(await blob.slice(0,5).arrayBuffer());if(head!=='%PDF-')throw Error('Không tải được PDF hợp lệ. Hãy chọn PDF đã tải trong tiện ích.');const form=new FormData();form.append('file',blob,name);return api('/extension/pdf',form);}
 function resultMessage(result){return (result.added===0?'Đã có trong sổ, không tạo dòng mới: ':'Đã lưu mới: ')+(result.filename||'PDF')+'\nXem tại Sổ ghi chép → chọn nguồn AI thao tác.'+'\nNhóm: '+(result.categories?.join(', ')||'Cần xem lại')+(result.review_reason?'\nCần kiểm tra: '+result.review_reason:'')+(result.local_pdf_paths?.length?'\nPDF trên máy:\n'+result.local_pdf_paths.join('\n'):result.folder?'\nThư mục: '+result.folder:'');}
 async function detach(tab){if(tab!==undefined)await chrome.debugger.detach({tabId:tab}).catch(()=>{});}
@@ -27,10 +27,17 @@ async function updateLedger(message,complete){
  if(keys.length>5000)for(const old of keys.sort((a,b)=>(records[a].touched||0)-(records[b].touched||0)).slice(0,keys.length-5000))delete records[old];
  await chrome.storage.local.set({processedMails:records});
 }
-function searchURL(accountIndex='0',since=Date.now()-86400000){
- const today=new Date(),start=new Date(since);start.setDate(start.getDate()-1);const tomorrow=new Date(today);tomorrow.setDate(today.getDate()+1);
+function validDate(value){if(!/^\d{4}-\d{2}-\d{2}$/.test(value||''))return false;const [year,month,date]=value.split('-').map(Number),parsed=new Date(year,month-1,date);return parsed.getFullYear()===year&&parsed.getMonth()===month-1&&parsed.getDate()===date;}
+function validateAutoFilter(raw){const filter=raw&&typeof raw==='object'?raw:{period:'catchup'};if(!['catchup','today','days7','range','all'].includes(filter.period))throw Error('Phạm vi thư không hợp lệ.');if(filter.period==='range'){if(!validDate(filter.start)||!validDate(filter.end)||filter.start>filter.end)throw Error('Chọn khoảng ngày hợp lệ.');return {period:'range',start:filter.start,end:filter.end};}return {period:filter.period};}
+function searchURL(accountIndex='0',filter={period:'catchup'},since=Date.now()-86400000){
+ filter=validateAutoFilter(filter);const today=new Date(),tomorrow=new Date(today);tomorrow.setDate(today.getDate()+1);let start,end=tomorrow;
  const day=date=>[date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('/');
- return 'https://mail.google.com/mail/u/'+accountIndex+'/#search/'+encodeURIComponent('has:attachment filename:pdf after:'+day(start)+' before:'+day(tomorrow));
+ if(filter.period==='catchup'){start=new Date(since);start.setDate(start.getDate()-1);}
+ if(filter.period==='today')start=new Date(today.getFullYear(),today.getMonth(),today.getDate());
+ if(filter.period==='days7'){start=new Date(today.getFullYear(),today.getMonth(),today.getDate());start.setDate(start.getDate()-6);}
+ if(filter.period==='range'){start=new Date(filter.start+'T00:00:00');end=new Date(filter.end+'T00:00:00');end.setDate(end.getDate()+1);}
+ const query='has:attachment filename:pdf'+(filter.period==='all'?'':' after:'+day(start)+' before:'+day(end));
+ return 'https://mail.google.com/mail/u/'+accountIndex+'/#search/'+encodeURIComponent(query);
 }
 async function readyTab(tabId){
  for(let i=0;i<30;i++){const tab=await chrome.tabs.get(tabId);if(tab.status==='complete')return;await new Promise(resolve=>setTimeout(resolve,500));}
@@ -41,7 +48,7 @@ async function beginRun(tab,limit,only=[],automatic=false,accountIndex='0',scanS
  await chrome.debugger.attach({tabId:tab.id},'1.3');
  try{
   await chrome.storage.session.set({run:{tab:tab.id,started:Date.now(),limit,automatic,accountIndex,scanStartedAt}});
-  await chrome.storage.local.set({status:automatic?'Đang tự kiểm tra Gmail từ lần quét thành công gần nhất...':only.length?'Đang thử lại file lỗi...':'Đang tìm thư có PDF...',report:[]});
+  await chrome.storage.local.set({status:automatic?'Đang tự kiểm tra Gmail theo phạm vi đã chọn...':only.length?'Đang thử lại file lỗi...':'Đang tìm thư có PDF...',report:[]});
   await chrome.scripting.executeScript({target:{tabId:tab.id},files:['content.js']});
   await chrome.tabs.sendMessage(tab.id,{type:'run',limit,only,automatic});
  }catch(error){await chrome.storage.session.remove('run');await detach(tab.id);throw error;}
@@ -51,7 +58,7 @@ async function autoScan(reveal=false){
  if(autoStarting)return;
  autoStarting=true;
  try {
-  const saved=await chrome.storage.local.get(['autoEnabled','autoTabId','autoAccountIndex','autoEnabledAt','scanCursors']);if(!saved.autoEnabled)return;
+  const saved=await chrome.storage.local.get(['autoEnabled','autoTabId','autoAccountIndex','autoEnabledAt','scanCursors','autoFilter']);if(!saved.autoEnabled)return;
   const running=(await chrome.storage.session.get('run')).run;
   if(running){
    const tab=await chrome.tabs.get(running.tab).catch(()=>null);
@@ -62,7 +69,7 @@ async function autoScan(reveal=false){
   let tab=saved.autoTabId?await chrome.tabs.get(saved.autoTabId).catch(()=>null):null;
   if(tab && !tab.url?.startsWith('https://mail.google.com/'))tab=null;
   const accountIndex=saved.autoAccountIndex||'0';const scanStartedAt=Date.now();const since=saved.scanCursors?.[accountIndex]||saved.autoEnabledAt||scanStartedAt-86400000;
-  const url=searchURL(accountIndex,since);
+  const filter=validateAutoFilter(saved.autoFilter);const url=searchURL(accountIndex,filter,since);
   if(tab){
    if(tab.url===url){if(reveal)tab=await chrome.tabs.update(tab.id,{active:true});await chrome.tabs.reload(tab.id);}
    else tab=await chrome.tabs.update(tab.id,reveal?{url,active:true}:{url});
@@ -93,6 +100,7 @@ chrome.runtime.onInstalled.addListener(restoreAlarm);
 chrome.runtime.onMessage.addListener((message,sender,reply)=>{
  (async()=>{
   if(message.type==='save'){if(sender.tab)throw Error('Thao tác chỉ từ tiện ích.');const config={base:baseURL(message.base),token:message.token.trim()};const check=await api('/extension/ping',{},config);if(check.app!=='mailnotes-extension'||check.protocol!==1)throw Error('Phiên bản tool chưa hỗ trợ tiện ích.');await restoreAutomationState(config);await chrome.storage.local.set({...config,capabilities:check.capabilities||[]});await mirrorAutomationState();return {};}
+  if(message.type==='set-filter'){if(sender.tab)throw Error('Thao tác chỉ từ tiện ích.');const autoFilter=validateAutoFilter(message.filter);await chrome.storage.local.set({autoFilter});if((await chrome.storage.local.get('token')).token)await mirrorAutomationState();if(message.runNow&&(await chrome.storage.local.get('autoEnabled')).autoEnabled){await stop();await autoScan(true);}return {filter:autoFilter};}
   if(message.type==='set-auto'){if(sender.tab)throw Error('Thao tác chỉ từ tiện ích.');if(typeof message.enabled!=='boolean')throw Error('Lịch quét không hợp lệ.');await setAuto(message.enabled);return {};}
   if(message.type==='start'){
    if(sender.tab)throw Error('Thao tác chỉ từ tiện ích.');const check=await api('/extension/ping',{});await chrome.storage.local.set({capabilities:check.capabilities||[]});await stop();const [tab]=await chrome.tabs.query({active:true,currentWindow:true});if(!tab?.url?.startsWith('https://mail.google.com/'))throw Error('Mở tab Gmail rồi bấm lại.');

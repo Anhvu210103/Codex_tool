@@ -13,7 +13,7 @@ import sys
 import threading
 import time
 import urllib.parse
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 from .database import connect
@@ -263,10 +263,10 @@ def create_app(base=None, data_root=None, public_url=None):
         data = payload()
         path = admin.private / 'extension-automation.json'
         if data.get('action') == 'load':
-            return jsonify(read_json(path, {'failures': [], 'scan_cursors': {}, 'auto_enabled_at': None}))
+            return jsonify(read_json(path, {'failures': [], 'scan_cursors': {}, 'auto_enabled_at': None, 'auto_filter': {'period':'catchup'}}))
         if data.get('action') != 'save':
             raise ValueError('Thao tác trạng thái không hợp lệ.')
-        failures, cursors, enabled_at = data.get('failures'), data.get('scan_cursors'), data.get('auto_enabled_at')
+        failures, cursors, enabled_at, auto_filter = data.get('failures'), data.get('scan_cursors'), data.get('auto_enabled_at'), data.get('auto_filter', {'period':'catchup'})
         if not isinstance(failures, list) or len(failures) > 100 or not isinstance(cursors, dict) or len(cursors) > 10:
             raise ValueError('Trạng thái tự động vượt giới hạn.')
         clean_failures = []
@@ -281,8 +281,21 @@ def create_app(base=None, data_root=None, public_url=None):
             clean_cursors[str(account)] = int(stamp)
         if enabled_at is not None and (isinstance(enabled_at, bool) or not isinstance(enabled_at, (int, float)) or enabled_at < 0):
             raise ValueError('Thời điểm bật lịch không hợp lệ.')
+        if not isinstance(auto_filter, dict) or auto_filter.get('period') not in ('catchup','today','days7','range','all'):
+            raise ValueError('Phạm vi thư không hợp lệ.')
+        clean_filter = {'period':auto_filter['period']}
+        if auto_filter['period'] == 'range':
+            start, end = auto_filter.get('start'), auto_filter.get('end')
+            try:
+                date.fromisoformat(start);date.fromisoformat(end)
+            except (TypeError, ValueError):
+                raise ValueError('Khoảng ngày không hợp lệ.') from None
+            if start > end:
+                raise ValueError('Khoảng ngày không hợp lệ.')
+            clean_filter.update(start=start, end=end)
         state = {'failures': clean_failures, 'scan_cursors': clean_cursors,
-                 'auto_enabled_at': int(enabled_at) if enabled_at is not None else None}
+                 'auto_enabled_at': int(enabled_at) if enabled_at is not None else None,
+                 'auto_filter': clean_filter}
         with operations:
             private_json(path, state)
         return jsonify(ok=True)
