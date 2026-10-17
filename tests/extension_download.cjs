@@ -120,6 +120,9 @@ function begin(id, capabilities = []) {
   await fromTab({type:'mail-incomplete',...identity});
   assert.deepEqual(await fromTab({type:'mail-state',...identity}),{complete:false,files:[fileKey]});
   assert.deepEqual(await fromTab({type:'mail-state',key:'thread-1',fingerprint:'changed thread'}),{complete:false,files:[]});
+  local.processedMails['legacy-thread']={fingerprint:'1234567890abcdef:42',files:['["report.pdf",0]'],complete:true};
+  assert.deepEqual(await fromTab({type:'mail-state',key:'legacy-thread',fingerprint:'legacy-thread'}),{complete:true,files:['["report.pdf",0]']});
+  assert.equal(local.processedMails['legacy-thread'].fingerprint,'legacy-thread');
   delete session.run;
   listeners.activeURL='https://mail.google.com/mail/u/1/#inbox';
   const fromPopup = data => new Promise(resolve => listeners.message(data,{},resolve));

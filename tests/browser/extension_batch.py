@@ -86,6 +86,26 @@ with sync_playwright() as playwright:
     assert any(e['phase']=='dung-trung' for e in page.evaluate('report'))
     print('Browser passed: second scan skips downloads and stops after two processed mails')
     page.evaluate('''() => {
+      window.stableShowList=showList;
+      showList=()=>{stableShowList();document.querySelectorAll('.zA').forEach(row=>row.textContent+=' · Đã đọc');};
+      events=[];report=[];finished=false;showList();listener({type:'run',limit:20});
+    }''')
+    page.wait_for_function('finished', timeout=30000)
+    assert not any(item.startswith('download-') for item in page.evaluate('events'))
+    assert page.evaluate('status').startswith('Hoàn tất: 2 thư mở, 0 PDF đã lưu, 2 thư đã có, 0 lỗi.'), page.evaluate('status')
+    page.evaluate('''() => {showList=stableShowList;}''')
+    print('Browser passed: changing visible Gmail row text does not re-download saved PDFs')
+    page.evaluate('''() => {
+      processedMails['mail-0'].complete=false;processedMails['mail-1'].complete=false;
+      failures=[{key:'mail-0',fileKey:'["old.pdf",0]'},{key:'mail-1',fileKey:'["old.pdf",0]'}];
+      events=[];report=[];finished=false;showList();listener({type:'run',limit:20,automatic:true});
+    }''')
+    page.wait_for_function('finished', timeout=30000)
+    assert sum(item.startswith('open-mail-') for item in page.evaluate('events'))==4, page.evaluate('events')
+    assert any(e['phase']=='dung-trung' for e in page.evaluate('report'))
+    page.evaluate('''() => {failures=[];}''')
+    print('Browser passed: automatic scan stops after two old mails despite already visited failures')
+    page.evaluate('''() => {
       events=[];report=[];finished=false;window.oldShowMail=showMail;
       showMail=i=>{
         oldShowMail(i);

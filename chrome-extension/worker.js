@@ -95,7 +95,15 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
   if(message.type==='stop'){await stop();return {};}
   if(message.type==='upload'){if(sender.tab)throw Error('Thao tác chỉ từ tiện ích.');const result=await upload(new Blob([new Uint8Array(message.bytes)],{type:'application/pdf'}),message.name);const status=resultMessage(result);await chrome.storage.local.set({status});return {...result,status};}
   const {run}=await chrome.storage.session.get('run');if(!run||sender.tab?.id!==run.tab||Date.now()-run.started>3600000)throw Error('Lượt thử đã dừng/hết hạn.');
-  if(message.type==='mail-state'){const {key,fingerprint}=mailIdentity(message),row=(await ledger())[key];return row?.fingerprint===fingerprint?{complete:!!row.complete,files:row.files||[]}:{complete:false,files:[]};}
+  if(message.type==='mail-state'){
+   const {key,fingerprint}=mailIdentity(message),records=await ledger(),row=records[key];
+   if(row&&row.fingerprint!==fingerprint&&fingerprint===key&&/^[0-9a-f]{16}:\d+$/.test(row.fingerprint||'')){
+    // Older versions hashed the visible row text, which changes when a mail is read.
+    // The thread key and the attachment list are stable enough to reuse the record.
+    row.fingerprint=key;await chrome.storage.local.set({processedMails:records});
+   }
+   return row?.fingerprint===fingerprint?{complete:!!row.complete,files:row.files||[]}:{complete:false,files:[]};
+  }
   if(message.type==='pdf-record'){await updateLedger(message,false);return {};}
   if(message.type==='mail-complete'){await updateLedger(message,true);return {};}
   if(message.type==='mail-incomplete'){const {key,fingerprint}=mailIdentity(message),records=await ledger();if(records[key]?.fingerprint===fingerprint){records[key].complete=false;await chrome.storage.local.set({processedMails:records});}return {};}

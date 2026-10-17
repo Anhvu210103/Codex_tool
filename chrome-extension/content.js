@@ -4,7 +4,6 @@ globalThis.mailnotesPilotInstalled = true;
 let stopped = true, epoch = 0;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const clean = value => String(value || '').normalize('NFC').trim().replace(/\s+/g, ' ');
-function textFingerprint(value){let first=2166136261,second=374761393;for(let i=0;i<value.length;i++){first=Math.imul(first^value.charCodeAt(i),16777619);second=Math.imul(second^value.charCodeAt(i),2246822519);}return (first>>>0).toString(16).padStart(8,'0')+(second>>>0).toString(16).padStart(8,'0')+':'+value.length;}
 const downloadName = /download|tải xuống|tải về/i;
 const dangerous = /compose|soạn thư|send|gửi|delete|xóa|archive|lưu trữ|spam|reply|trả lời|forward|chuyển tiếp/i;
 async function send(data) { const answer = await chrome.runtime.sendMessage(data); if (answer?.error) throw Error(answer.error); return answer; }
@@ -24,7 +23,7 @@ function mailRows() {
  if (!nodes.length) nodes.push(...document.querySelectorAll('[role="row"][data-thread-id],[role="row"][data-legacy-thread-id],[role="row"][data-legacy-message-id]'));
  // Subjects and snippets can legitimately say "gửi", "forward" or "archive".
  // Reject dangerous controls at click selection, not entire email rows.
- return nodes.filter(node => {const r=node.getBoundingClientRect(),css=getComputedStyle(node);return r.width>=10 && r.height>=10 && css.visibility!=='hidden' && css.display!=='none' && label(node).length>=8;}).map((node, index) => ({node, key:node.getAttribute('data-legacy-thread-id') || node.getAttribute('data-thread-id') || node.getAttribute('data-legacy-message-id') || '', text:label(node), fingerprintText:textFingerprint(clean(node.textContent)), version:node.getAttribute('data-legacy-message-id') || node.getAttribute('data-message-id') || '', index}));
+ return nodes.filter(node => {const r=node.getBoundingClientRect(),css=getComputedStyle(node);return r.width>=10 && r.height>=10 && css.visibility!=='hidden' && css.display!=='none' && label(node).length>=8;}).map((node, index) => ({node, key:node.getAttribute('data-legacy-thread-id') || node.getAttribute('data-thread-id') || node.getAttribute('data-legacy-message-id') || '', text:label(node), version:node.getAttribute('data-legacy-message-id') || node.getAttribute('data-message-id') || '', index}));
 }
 function pdfTiles() {
  const nodes = [...document.querySelectorAll('.aV3')];
@@ -176,6 +175,7 @@ async function run(limit,only=[],automatic=false) {
  let mails=0, files=0, errors=0, duplicateMails=0, duplicateStreak=0; const faults=[];
  try {
   const pendingFailures=automatic?(await send({type:'pending-failures'})).failures||[]:[];
+  const unvisitedFailureKeys=new Set(pendingFailures.map(item=>item.key));
   let stoppedOnDuplicates=false, page=0, pageLimitReached=false;
   while(page<20 && !cancelled()){
   const rows = await until(() => {
@@ -189,7 +189,9 @@ async function run(limit,only=[],automatic=false) {
    }
    throw Error('Không nhận diện được hàng thư Gmail (Gmail đang có '+document.querySelectorAll('.zA').length+' hàng .zA). Tải lại Gmail và mở danh sách thư trước khi chạy.');
   }
-  const listURL=location.href, queue=rows.slice(0, limit).map(row=>({key:row.key,text:row.text,fingerprint:row.version||row.fingerprintText||row.text,index:row.index})).filter(row=>!only.length||only.some(item=>item.key?item.key===row.key:item.rowIndex===row.index&&item.text===row.text));
+  // Row text changes after reading; use a message ID when Gmail exposes it,
+  // otherwise the stable thread ID. The PDF tile list still detects additions.
+  const listURL=location.href, queue=rows.slice(0, limit).map(row=>({key:row.key,text:row.text,fingerprint:row.version||row.key,index:row.index})).filter(row=>!only.length||only.some(item=>item.key?item.key===row.key:item.rowIndex===row.index&&item.text===row.text));
   if(!queue.length)throw Error('Không thấy các thư lỗi trên trang Gmail hiện tại. Mở lại danh sách cũ rồi thử lại.');
   await progress('Đã thấy '+queue.length+' thư ở trang '+(page+1)+'. Đang xử lý lần lượt...');
   for (let position=0;position<queue.length;position++) {
@@ -203,13 +205,13 @@ async function run(limit,only=[],automatic=false) {
    if (!row) { errors++; faults.push('Không tìm lại được thư '+(entry.index+1)); continue; }
    row.node.scrollIntoView({block:'center'});
    if (!visible(row.node)) {errors++;faults.push('Thư '+(entry.index+1)+': không hiển thị sau khi cuộn');continue;}
-   row.node.click(); mails++;await trace('mo-thu',mails,'');
+   row.node.click(); mails++;unvisitedFailureKeys.delete(entry.key);await trace('mo-thu',mails,'');
    const tiles=await until(() => pdfTiles().length ? pdfTiles() : null,10000,cancelled);
    if(!only.length&&entry.key&&known.complete&&tiles&&tiles.every(item=>known.files.includes(item.fileKey))){
     for(let index=pendingFailures.length-1;index>=0;index--)if(pendingFailures[index].key===entry.key){const failure=pendingFailures[index];await send({type:'clear-failure',key:entry.key,fileIndex:failure.fileIndex,name:failure.name,fileKey:failure.fileKey});pendingFailures.splice(index,1);}
     duplicateMails++;duplicateStreak++;
     await trace('thu-da-co',mails,'','Đã kiểm tra đủ PDF; liên tiếp '+duplicateStreak+'/2');
-    const laterFailure=automatic&&pendingFailures.length>0;
+    const laterFailure=automatic&&unvisitedFailureKeys.size>0;
     if(duplicateStreak===2&&!laterFailure){await trace('dung-trung',mails,'','Gặp 2 thư đã xử lý liên tiếp');stoppedOnDuplicates=true;}
     else if(duplicateStreak===2){await trace('tiep-file-loi',mails,'','Còn PDF lỗi ở thư phía sau');duplicateStreak=0;}
     if((automatic||position+1<queue.length)&&!await backToList(listURL,cancelled))throw Error('Không trở lại được danh sách thư sau khi kiểm tra thư đã có.');
