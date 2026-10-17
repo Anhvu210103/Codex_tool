@@ -141,6 +141,42 @@ function clickPoint(button) {
  if (!hit || !(button===hit || button.contains(hit))) throw Error('Nút tải PDF bị che hoặc đã đổi vị trí.');
  return {x,y};
 }
+function downloadButtonDisabled(button) {
+ return !button.isConnected||button.hasAttribute('disabled')||button.getAttribute('aria-disabled')==='true'||getComputedStyle(button).pointerEvents==='none';
+}
+async function clickAndWaitDownload(button,cancelled,mail,file) {
+ for(let attempt=1;attempt<=2;attempt++){
+  if(cancelled())throw Error('Đã dừng lượt quét.');
+  const point=clickPoint(button);
+  await send({type:'arm-download'});
+  let clicked=false,trusted=false;
+  const observe=event=>{if(event.target===button||button.contains(event.target)){clicked=true;trusted=event.isTrusted;}};
+  document.addEventListener('click',observe,true);
+  try{await send({type:'trusted-click',...point});await pause(100);}
+  finally{document.removeEventListener('click',observe,true);}
+  if(!clicked)throw Error('Chrome đã gửi thao tác chuột nhưng nút tải không nhận sự kiện click.');
+  await trace(attempt===1?'da-bam-tai':'da-bam-lai',mail,file,'Nút nhận click '+(trusted?'thật':'chưa xác nhận')+' tại x='+Math.round(point.x)+', y='+Math.round(point.y));
+  try{return await waitDownload(cancelled);}
+  catch(error){
+   if(attempt===2){
+    if(error.message.startsWith('Chrome chưa bắt đầu tải PDF'))throw Error('Chrome chưa bắt đầu tải PDF sau 2 lần bấm. Mở Báo cáo lần chạy để xem từng lần thử.');
+    throw error;
+   }
+   if(!error.message.startsWith('Chrome chưa bắt đầu tải PDF'))throw error;
+   await trace('tai-chua-bat-dau',mail,file,'Trình xem '+(viewerOpen()?'còn mở':'đã đóng')+' · nút '+(downloadButtonDisabled(button)?'chưa sẵn sàng':'đang bật'));
+   // Let a late Chrome event arrive before trying the same PDF again.
+   await pause(3200);
+   const state=await send({type:'download-state'});
+   if(state.error)throw Error(state.error);
+   if(state.result){await trace('tai-den-tre',mail,file,'Chrome bắt đầu tải sau 12 giây');return state.result;}
+   if(state.downloadId){await trace('tai-den-tre',mail,file,'Chrome đang tải sau 12 giây');return await waitDownload(cancelled);}
+   if(!viewerOpen())throw Error('Trình xem PDF đã đóng trước khi thử tải lại.');
+   button=await until(()=>{revealToolbar();const found=downloadControl();return found&&!downloadButtonDisabled(found)?found:null;},6000,cancelled);
+   if(!button)throw Error('Nút tải PDF chưa sẵn sàng để thử lại.');
+   await trace('thu-lai-tai',mail,file,'Chrome chưa có lượt tải; thử bấm lại nút đang hiển thị');
+  }
+ }
+}
 async function closeViewer(cancelled,mail,file) {
  if (!viewerOpen()) return;
  const close = [...document.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"]')]
@@ -248,20 +284,11 @@ async function run(limit,only=[],automatic=false) {
       await trace('mo-pdf',mails,attachment.name);
       await openTile(tile.node,cancelled);
       if (!await until(viewerOpen,10000,cancelled)) throw Error('PDF chưa mở trong Gmail.');
-      let button=null;
-      for (let i=0;i<20 && !cancelled();i++) {revealToolbar();button=downloadControl();if(button)break;await pause(300);}
-      if (!button) throw Error('Không thấy nút tải trong trình xem PDF.');
+      const button=await until(()=>{revealToolbar();const found=downloadControl();return found&&!downloadButtonDisabled(found)?found:null;},6000,cancelled);
+      if (!button) throw Error('Không thấy nút tải PDF đã sẵn sàng trong trình xem.');
       const point=clickPoint(button);
       await trace('tim-nut-tai',mails,attachment.name,'Nút '+button.tagName.toLowerCase()+' · '+(label(button)||'không có nhãn')+' · x='+Math.round(point.x)+', y='+Math.round(point.y));
-      await send({type:'arm-download'});
-      let clicked=false;
-      const observe=event=>{if(event.target===button||button.contains(event.target))clicked=true;};
-      document.addEventListener('click',observe,true);
-      try {await send({type:'trusted-click',...point});await pause(100);}
-      finally {document.removeEventListener('click',observe,true);}
-      if (!clicked) throw Error('Chrome đã gửi thao tác chuột nhưng nút tải không nhận sự kiện click.');
-      await trace('da-bam-tai',mails,attachment.name,'Gmail đã nhận click tại x='+Math.round(point.x)+', y='+Math.round(point.y));
-      const result=await waitDownload(cancelled);
+      const result=await clickAndWaitDownload(button,cancelled,mails,attachment.name);
       if (key) await send({type:'pdf-record',...identity,fileKey});
       await send({type:'clear-failure',key,fileIndex:attachment.index,name:attachment.name,fileKey});
       for(let index=pendingFailures.length-1;index>=0;index--)if(pendingFailures[index].key===key&&(pendingFailures[index].fileKey?pendingFailures[index].fileKey===fileKey:pendingFailures[index].fileIndex===attachment.index&&pendingFailures[index].name===attachment.name))pendingFailures.splice(index,1);

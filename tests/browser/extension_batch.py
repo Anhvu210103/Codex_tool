@@ -60,6 +60,7 @@ with sync_playwright() as playwright:
           if(event.isTrusted && window.blockClose!==name)viewer.remove();
         };
         viewer.querySelector('#download').onclick=()=>{
+          if(window.suppressDownloadOnce===name){events.push('ignored-once-'+name);window.suppressDownloadOnce=null;return;}
           if(window.suppressDownload===name){events.push('ignored-download-'+name);return;}
           events.push('download-'+name);pending={result:{filename:name,added:1}};
         };
@@ -163,10 +164,20 @@ with sync_playwright() as playwright:
     assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 1 PDF đã lưu, 0 thư đã có, 0 lỗi.'), page.evaluate('status')
     print('Browser passed: retry processed only the failed PDF')
     page.evaluate('''() => {
+      processedMails={};suppressDownloadOnce='One.pdf';events=[];report=[];finished=false;showList();
+      listener({type:'run',limit:1});
+    }''')
+    page.wait_for_function('finished', timeout=45000)
+    assert 'ignored-once-One.pdf' in page.evaluate('events')
+    assert 'download-One.pdf' in page.evaluate('events')
+    assert any(e['phase']=='thu-lai-tai' for e in page.evaluate('report'))
+    assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 2 PDF đã lưu, 0 thư đã có, 0 lỗi.'), page.evaluate('status')
+    print('Browser passed: Chrome download missing after first click is retried once')
+    page.evaluate('''() => {
       processedMails={};suppressDownload='One.pdf';blockClose='One.pdf';events=[];report=[];finished=false;showList();
       listener({type:'run',limit:1});
     }''')
-    page.wait_for_function('finished', timeout=30000)
+    page.wait_for_function('finished', timeout=50000)
     assert 'ignored-download-One.pdf' in page.evaluate('events')
     assert 'download-Two.pdf' in page.evaluate('events')
     assert 'escape-One.pdf' in page.evaluate('events')
