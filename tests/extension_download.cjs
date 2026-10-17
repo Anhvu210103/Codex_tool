@@ -30,8 +30,9 @@ global.fetch = async (url, options) => {
   requests.push(url);
   if (url.startsWith('https://mail.google.com')) return new Response(new Blob(['%PDF-test'], {type: 'application/pdf'}));
   if (url.endsWith('/extension/ping')) return new Response(JSON.stringify({app:'mailnotes-extension',protocol:1,capabilities:['linux-local-pdf']}),{headers:{'content-type':'application/json'}});
+  if (url.endsWith('/extension/automation-state')) return new Response(JSON.stringify(JSON.parse(options.body).action==='load'?{failures:[],scan_cursors:{},auto_enabled_at:null}:{ok:true}),{headers:{'content-type':'application/json'}});
   if (url.endsWith('/extension/import-local')) {
-    assert(['/Downloads/report.pdf','/Downloads/first.pdf','/Downloads/second.pdf'].includes(JSON.parse(options.body).path));
+    assert(['/Downloads/report.pdf','/Downloads/first.pdf','/Downloads/second.pdf','/Downloads/wanted.pdf'].includes(JSON.parse(options.body).path));
     return new Response(JSON.stringify({available: localAvailable, ...saved}), {headers: {'content-type': 'application/json'}});
   }
   assert(url.endsWith('/extension/pdf'));
@@ -39,18 +40,19 @@ global.fetch = async (url, options) => {
   return new Response(JSON.stringify(saved), {headers: {'content-type': 'application/json'}});
 };
 vm.runInThisContext(fs.readFileSync('chrome-extension/worker.js', 'utf8'));
-function begin(id, capabilities = []) {
+function begin(id, capabilities = [], expectedName = 'report.pdf') {
   activeTab = 1; requests = []; local.capabilities = capabilities;
-  session.run = {tab: 1, started: Date.now(), pending: {armedAt: Date.now(), downloadId: null, result: null, error: null}};
+  session.run = {tab: 1, started: Date.now(), pending: {armedAt: Date.now(), downloadId: null, candidates: [], expectedName, result: null, error: null}};
   item = {id, url: 'https://mail.google.com/mail/u/0/?view=att', referrer: '', filename: '', mime: '', state: 'in_progress'};
 }
 (async () => {
   begin(7);
   await listeners.created({...item});
-  assert.equal(session.run.pending.downloadId, 7);
-  assert(local.report.some(entry=>entry.phase==='chrome-bat-dau' && entry.detail.includes('lượt 7')));
+  assert.equal(session.run.pending.downloadId, null, 'Do not claim a download before Chrome reports its filename');
   item.filename = '/Downloads/report.pdf';
   await listeners.changed({id: 7, filename: {current: item.filename}});
+  assert.equal(session.run.pending.downloadId, 7);
+  assert(local.report.some(entry=>entry.phase==='chrome-bat-dau' && entry.detail.includes('lượt 7')));
   assert.equal(requests.length, 0, 'Must wait for the file to finish downloading');
   activeTab = 2; item.state = 'complete';
   await listeners.changed({id: 7, state: {current: 'complete'}});
@@ -73,21 +75,29 @@ function begin(id, capabilities = []) {
   await listeners.created({...item});
   assert.equal(requests.length, 3, 'Unsupported local path must fall back to the attachment URL');
 
-  begin(10); await listeners.created({...item}); item.state = 'interrupted';
+  begin(10); item.filename='/Downloads/report.pdf';item.state='in_progress';await listeners.created({...item}); item.state = 'interrupted';
   await listeners.changed({id: 10, state: {current: 'interrupted'}});
   assert.equal(requests.length, 0); assert(session.run.pending.error);
   assert(session.run.pending.error.includes('thất bại'));
-  begin(11, ['linux-local-pdf']); localAvailable = true;
+  begin(11, ['linux-local-pdf'], 'first.pdf'); localAvailable = true;
   item.filename = '/Downloads/first.pdf'; item.state = 'complete';
   await listeners.created({...item});
   assert.equal(session.run.pending.result.filename, 'report.pdf');
-  session.run.pending = {armedAt: Date.now(), downloadId: null, result: null, error: null};
+  session.run.pending = {armedAt: Date.now(), downloadId: null, candidates: [], expectedName:'second.pdf', result: null, error: null};
   activeTab = 2;
   item = {id: 12, url: 'https://mail.google.com/mail/u/0/?view=att', referrer: '', filename: '/Downloads/second.pdf', mime: 'application/pdf', state: 'complete'};
   await listeners.created({...item});
   assert.equal(session.run.pending.downloadId, 12);
   assert(session.run.pending.result);
   assert(session.run, 'Processing one PDF must keep the run alive for the next PDF');
+  begin(14, ['linux-local-pdf'], 'wanted.pdf');
+  item.filename='/Downloads/unrelated.pdf';item.state='complete';
+  await listeners.created({...item});
+  assert.equal(session.run.pending.downloadId,null,'A Gmail download with another PDF name must not be attached to this job');
+  item={id:15,url:'https://mail.google.com/mail/u/0/?view=att',referrer:'',filename:'/Downloads/wanted.pdf',mime:'application/pdf',state:'complete'};
+  await listeners.created({...item});
+  assert.equal(session.run.pending.downloadId,15);
+  assert(session.run.pending.result);
   begin(13);
   activeTab = 2;
   item.url = 'https://example.org/unrelated.pdf'; item.filename = '/Downloads/unrelated.pdf'; item.state = 'complete';
@@ -98,10 +108,12 @@ function begin(id, capabilities = []) {
   let reply=await fromTab({type:'trace',event:{phase:'loi',mail:1,file:'blocked.pdf',detail:'Ô PDF bị che'}});
   assert.deepEqual(reply,{});
   assert(local.report.some(entry=>entry.file==='blocked.pdf' && entry.phase==='loi'));
-  reply=await fromTab({type:'failure',failure:{rowIndex:0,key:'mail-0',text:'Công văn số 1',fileIndex:1,name:'blocked.pdf'}});
+  reply=await fromTab({type:'failure',failure:{stage:'process-pdf',rowIndex:0,key:'mail-0',text:'Công văn số 1',fileIndex:1,name:'blocked.pdf',error:'Ô PDF bị che'}});
   assert.deepEqual(reply,{});
   assert.equal(local.failures[0].name,'blocked.pdf');
   assert.equal((await fromTab({type:'pending-failures'})).failures.length,1);
+  await fromTab({type:'failure',failure:{stage:'open-mail',rowIndex:2,key:'mail-old',text:'Công văn cũ',fileIndex:-1,name:'',error:'Không mở được'}});
+  assert.equal((await fromTab({type:'pending-failures'})).failures.length,2,'Failures must remain queued across dates and stages');
   reply=await fromTab({type:'trusted-click',x:150,y:30});
   assert.deepEqual(reply,{});
   assert.deepEqual(mouseEvents.map(event=>event.params.type),['mouseMoved','mousePressed','mouseReleased']);
@@ -133,6 +145,13 @@ function begin(id, capabilities = []) {
   assert.equal(listeners.tabMessage.limit,100);
   assert.equal(session.run.automatic,true);
   assert.equal(local.autoEnabled,true);
+  assert(local.autoEnabledAt);
+  const scanStartedAt=session.run.scanStartedAt;
+  await new Promise(resolve => listeners.message({type:'scan-complete',success:true},{tab:{id:session.run.tab}},resolve));
+  assert.equal(local.scanCursors['1'],scanStartedAt,'Only a successful automatic scan advances the catch-up cursor');
+  session.run.scanStartedAt=scanStartedAt+60000;
+  await new Promise(resolve => listeners.message({type:'scan-complete',success:false},{tab:{id:session.run.tab}},resolve));
+  assert.equal(local.scanCursors['1'],scanStartedAt,'A failed automatic scan must be retried from the prior cursor');
   delete session.run;
   await listeners.alarm({name:listeners.alarmSpec.name});
   assert.equal(listeners.reloadedTab,33);

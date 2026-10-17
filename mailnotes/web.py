@@ -258,6 +258,35 @@ def create_app(base=None, data_root=None, public_url=None):
         return jsonify(app='mailnotes-extension', protocol=1,
                        capabilities=['linux-local-pdf'] if sys.platform == 'linux' else [])
 
+    @app.post('/extension/automation-state')
+    def extension_automation_state():
+        data = payload()
+        path = admin.private / 'extension-automation.json'
+        if data.get('action') == 'load':
+            return jsonify(read_json(path, {'failures': [], 'scan_cursors': {}, 'auto_enabled_at': None}))
+        if data.get('action') != 'save':
+            raise ValueError('Thao tác trạng thái không hợp lệ.')
+        failures, cursors, enabled_at = data.get('failures'), data.get('scan_cursors'), data.get('auto_enabled_at')
+        if not isinstance(failures, list) or len(failures) > 100 or not isinstance(cursors, dict) or len(cursors) > 10:
+            raise ValueError('Trạng thái tự động vượt giới hạn.')
+        clean_failures = []
+        for item in failures:
+            if not isinstance(item, dict) or not isinstance(item.get('stage'), str) or not isinstance(item.get('key'), str):
+                raise ValueError('Hàng đợi lỗi không hợp lệ.')
+            clean_failures.append({name: item.get(name) for name in ('stage','rowIndex','key','text','fileIndex','name','fileKey','lastError','attempts','createdAt','updatedAt')})
+        clean_cursors = {}
+        for account, stamp in cursors.items():
+            if not re.fullmatch(r'\d{1,3}', str(account)) or isinstance(stamp, bool) or not isinstance(stamp, (int, float)) or stamp < 0:
+                raise ValueError('Mốc quét không hợp lệ.')
+            clean_cursors[str(account)] = int(stamp)
+        if enabled_at is not None and (isinstance(enabled_at, bool) or not isinstance(enabled_at, (int, float)) or enabled_at < 0):
+            raise ValueError('Thời điểm bật lịch không hợp lệ.')
+        state = {'failures': clean_failures, 'scan_cursors': clean_cursors,
+                 'auto_enabled_at': int(enabled_at) if enabled_at is not None else None}
+        with operations:
+            private_json(path, state)
+        return jsonify(ok=True)
+
     @app.post('/extension/pdf')
     def extension_pdf():
         from .documents import MAX_PDF_BYTES

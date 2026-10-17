@@ -8,7 +8,7 @@ with sync_playwright() as playwright:
     page.set_content('<main id="app"></main>')
     page.evaluate('''() => {
       window.events=[];window.report=[];window.failures=[];window.finished=false;window.status='';window.listener=null;window.pending={};window.processedMails={};
-      window.chrome={runtime:{getManifest(){return {version:'0.5.2'};},onMessage:{addListener(fn){window.listener=fn;}},async sendMessage(data){
+      window.chrome={runtime:{getManifest(){return {version:'0.6.0'};},onMessage:{addListener(fn){window.listener=fn;}},async sendMessage(data){
         if(data.type==='progress'){window.status=data.text;return {};}
         if(data.type==='trace'){window.report.push(data.event);return {};}
         if(data.type==='failure'){window.failures.push(data.failure);return {};}
@@ -32,6 +32,7 @@ with sync_playwright() as playwright:
           events.push('escape-'+(window.openPdfName||''));document.querySelector('#viewer')?.remove();return {};
         }
         if(data.type==='download-state')return window.pending;
+        if(data.type==='scan-complete'){window.scanComplete=data.success;return {};}
         if(data.type==='finish'){window.finished=true;return {};}
         return {};
       }}};
@@ -81,19 +82,19 @@ with sync_playwright() as playwright:
     assert page.evaluate('status').startswith('Hoàn tất: 20 thư mở, 21 PDF đã lưu, 0 thư đã có, 0 lỗi.'), page.evaluate('status')
     print('Browser passed: 20 mails, 21 PDFs including a PDF obscured by its own Drive button')
     page.evaluate('''() => {events=[];report=[];finished=false;showList();listener({type:'run',limit:20});}''')
-    page.wait_for_function('finished', timeout=30000)
+    page.wait_for_function('finished', timeout=60000)
     assert not any(item.startswith('download-') for item in page.evaluate('events'))
-    assert page.evaluate('status').startswith('Hoàn tất: 2 thư mở, 0 PDF đã lưu, 2 thư đã có, 0 lỗi.'), page.evaluate('status')
-    assert any(e['phase']=='dung-trung' for e in page.evaluate('report'))
-    print('Browser passed: second scan skips downloads and stops after two processed mails')
+    assert page.evaluate('status').startswith('Hoàn tất: 20 thư mở, 0 PDF đã lưu, 20 thư đã có, 0 lỗi.'), page.evaluate('status')
+    assert not any(e['phase']=='dung-trung' for e in page.evaluate('report'))
+    print('Browser passed: second scan verifies every visible mail without redownloading')
     page.evaluate('''() => {
       window.stableShowList=showList;
       showList=()=>{stableShowList();document.querySelectorAll('.zA').forEach(row=>row.textContent+=' · Đã đọc');};
       events=[];report=[];finished=false;showList();listener({type:'run',limit:20});
     }''')
-    page.wait_for_function('finished', timeout=30000)
+    page.wait_for_function('finished', timeout=60000)
     assert not any(item.startswith('download-') for item in page.evaluate('events'))
-    assert page.evaluate('status').startswith('Hoàn tất: 2 thư mở, 0 PDF đã lưu, 2 thư đã có, 0 lỗi.'), page.evaluate('status')
+    assert page.evaluate('status').startswith('Hoàn tất: 20 thư mở, 0 PDF đã lưu, 20 thư đã có, 0 lỗi.'), page.evaluate('status')
     page.evaluate('''() => {showList=stableShowList;}''')
     print('Browser passed: changing visible Gmail row text does not re-download saved PDFs')
     page.evaluate('''() => {
@@ -101,11 +102,11 @@ with sync_playwright() as playwright:
       failures=[{key:'mail-0',fileKey:'["old.pdf",0]'},{key:'mail-1',fileKey:'["old.pdf",0]'}];
       events=[];report=[];finished=false;showList();listener({type:'run',limit:20,automatic:true});
     }''')
-    page.wait_for_function('finished', timeout=30000)
-    assert sum(item.startswith('open-mail-') for item in page.evaluate('events'))==4, page.evaluate('events')
-    assert any(e['phase']=='dung-trung' for e in page.evaluate('report'))
+    page.wait_for_function('finished', timeout=60000)
+    assert sum(item.startswith('open-mail-') for item in page.evaluate('events'))==20, page.evaluate('events')
+    assert not any(e['phase']=='dung-trung' for e in page.evaluate('report'))
     page.evaluate('''() => {failures=[];}''')
-    print('Browser passed: automatic scan stops after two old mails despite already visited failures')
+    print('Browser passed: automatic scan checks the full result set even when old mails are complete')
     page.evaluate('''() => {
       events=[];report=[];finished=false;window.oldShowMail=showMail;
       showMail=i=>{
@@ -128,8 +129,7 @@ with sync_playwright() as playwright:
     page.wait_for_function('finished', timeout=30000)
     assert 'download-Mail-2.pdf' in page.evaluate('events')
     assert page.evaluate('failures')==[]
-    assert any(e['phase']=='tiep-file-loi' for e in page.evaluate('report'))
-    print('Browser passed: automatic scan reaches failed PDF beyond two already processed mails')
+    print('Browser passed: automatic scan reaches failed PDF among already processed mails')
     page.evaluate('''() => {
       events=[];report=[];finished=false;processedMails={};showList();
       window.originalShowMail=showMail;const previous=showMail;
@@ -231,7 +231,7 @@ with sync_playwright() as playwright:
     print('Browser passed: automatic scan advances to the next Gmail results page')
     page.evaluate('''() => {events=[];report=[];finished=false;document.getElementById('app').innerHTML='<p>Không tìm thấy thư nào phù hợp với tìm kiếm</p>';listener({type:'run',limit:100,automatic:true});}''')
     page.wait_for_function('finished', timeout=5000)
-    assert page.evaluate('status')=='Đã kiểm tra Gmail hôm nay: không có thư PDF mới.'
+    assert page.evaluate('status')=='Đã kiểm tra Gmail: không có thư PDF mới.'
     print('Browser passed: an empty Gmail search is a successful no-op')
     page.evaluate('''() => {
       processedMails={};failures=[];events=[];report=[];finished=false;
@@ -247,7 +247,7 @@ with sync_playwright() as playwright:
       };
       showList();listener({type:'run',limit:20});
     }''')
-    page.wait_for_function('finished', timeout=30000)
+    page.wait_for_function('finished', timeout=60000)
     assert sum(item.startswith('download-') for item in page.evaluate('events'))==3
     assert len(page.evaluate('processedMails'))==2
     assert all(e['detail'].startswith('ID từ URL') for e in page.evaluate('report') if e['phase']=='kiem-tra-thu')
@@ -256,4 +256,22 @@ with sync_playwright() as playwright:
     assert not any(item.startswith('download-') for item in page.evaluate('events'))
     assert page.evaluate('status').startswith('Hoàn tất: 2 thư mở, 0 PDF đã lưu, 2 thư đã có, 0 lỗi.'), page.evaluate('status')
     print('Browser passed: Gmail URL identifies mails when result rows have no thread ID')
+    page.evaluate('''() => {
+      processedMails={};failures=[];events=[];report=[];finished=false;
+      showList=()=>{
+        document.getElementById('app').innerHTML='<div class="zA" data-legacy-thread-id="delayed-mail" style="padding:14px;width:600px">Thư có tệp tải chậm</div>';
+        document.querySelector('.zA').onclick=()=>{
+          document.getElementById('app').innerHTML='<button aria-label="Quay lại" style="padding:15px">Trở về</button><span class="aV3" style="display:inline-block;padding:20px">First.pdf</span>';
+          document.querySelector('button').onclick=event=>{if(event.isTrusted)showList();};
+          document.querySelector('.aV3').onclick=()=>showViewer('First.pdf');
+          setTimeout(()=>{const tile=document.createElement('span');tile.className='aV3';tile.style='display:inline-block;padding:20px';tile.textContent='Late.pdf';tile.onclick=()=>showViewer('Late.pdf');document.getElementById('app').append(tile);},450);
+        };
+      };
+      showList();listener({type:'run',limit:1});
+    }''')
+    page.wait_for_function('finished', timeout=30000)
+    assert 'download-First.pdf' in page.evaluate('events')
+    assert 'download-Late.pdf' in page.evaluate('events')
+    assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 2 PDF đã lưu, 0 thư đã có, 0 lỗi.'), page.evaluate('status')
+    print('Browser passed: waits for a stable attachment list and includes a PDF rendered late')
     browser.close()

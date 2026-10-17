@@ -78,6 +78,16 @@ class ExtensionTests(unittest.TestCase):
         with zipfile.ZipFile(io.BytesIO(result.data)) as archive:
             self.assertIn('SoGhiChep-AI-Gmail/manifest.json',archive.namelist())
 
+    def test_automation_state_is_persisted_for_extension_restart(self):
+        state={'action':'save','failures':[{'stage':'process-pdf','rowIndex':0,'key':'mail-1','text':'Công văn','fileIndex':0,'name':'one.pdf','fileKey':'gmail:a','lastError':'Tải lỗi','attempts':2,'createdAt':1,'updatedAt':2}], 'scan_cursors':{'0':123456}, 'auto_enabled_at':120000}
+        saved=self.client.post('/extension/automation-state',json=state,headers=self.headers)
+        self.assertEqual(saved.status_code,200)
+        loaded=self.client.post('/extension/automation-state',json={'action':'load'},headers=self.headers)
+        self.assertEqual(loaded.status_code,200)
+        self.assertEqual(loaded.get_json()['failures'][0]['stage'],'process-pdf')
+        self.assertEqual(loaded.get_json()['scan_cursors'],{'0':123456})
+        self.assertEqual(loaded.get_json()['auto_enabled_at'],120000)
+
     def test_local_import_reads_only_the_download_directory(self):
         downloads=self.root/'Downloads';downloads.mkdir()
         writer=PdfWriter();writer.add_blank_page(width=600,height=800)
