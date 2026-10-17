@@ -13,9 +13,12 @@ const storage = obj => ({
 });
 global.chrome = {
   storage: {local: storage(local), session: storage(session)},
-  runtime: {onMessage: {addListener(fn) { listeners.message = fn; }}},
-  debugger: {onDetach: {addListener(fn) { listeners.detached = fn; }}, async sendCommand(target, method, params) { mouseEvents.push({target, method, params}); }, async detach() {}},
-  tabs: {async query() { return [{id: activeTab}]; }, async sendMessage() {}},
+  runtime: {onMessage: {addListener(fn) { listeners.message = fn; }}, onStartup: {addListener(fn) { listeners.startup = fn; }}, onInstalled: {addListener(fn) { listeners.installed = fn; }}},
+  alarms: {onAlarm: {addListener(fn) { listeners.alarm = fn; }}, async create(name, options) { listeners.alarmSpec = {name, options}; }, async clear(name) { listeners.clearedAlarm = name; }},
+  permissions: {async contains() { return true; }},
+  scripting: {async executeScript(options) { listeners.injected = options; }},
+  debugger: {onDetach: {addListener(fn) { listeners.detached = fn; }}, async sendCommand(target, method, params) { mouseEvents.push({target, method, params}); }, async attach() {}, async detach() {}},
+  tabs: {async query() { return [{id: activeTab,url:listeners.activeURL}]; }, async sendMessage(id, message) { listeners.tabMessage = message; }, async get(id) { return {id, status: 'complete', url: listeners.createdTab?.url || 'https://mail.google.com/'}; }, async create(options) { listeners.createdTab = options; return {id: 33, status: 'complete', url: options.url}; }, async update(id, options) { listeners.updatedTab = options; return {id, status: 'complete', url: options.url}; }, async reload(id) { listeners.reloadedTab = id; }},
   downloads: {
     onCreated: {addListener(fn) { listeners.created = fn; }},
     onChanged: {addListener(fn) { listeners.changed = fn; }},
@@ -26,6 +29,7 @@ const saved = {added: 1, filename: 'report.pdf', categories: ['Ngân sách'], fo
 global.fetch = async (url, options) => {
   requests.push(url);
   if (url.startsWith('https://mail.google.com')) return new Response(new Blob(['%PDF-test'], {type: 'application/pdf'}));
+  if (url.endsWith('/extension/ping')) return new Response(JSON.stringify({app:'mailnotes-extension',protocol:1,capabilities:['linux-local-pdf']}),{headers:{'content-type':'application/json'}});
   if (url.endsWith('/extension/import-local')) {
     assert(['/Downloads/report.pdf','/Downloads/first.pdf','/Downloads/second.pdf'].includes(JSON.parse(options.body).path));
     return new Response(JSON.stringify({available: localAvailable, ...saved}), {headers: {'content-type': 'application/json'}});
@@ -97,6 +101,7 @@ function begin(id, capabilities = []) {
   reply=await fromTab({type:'failure',failure:{rowIndex:0,key:'mail-0',text:'Công văn số 1',fileIndex:1,name:'blocked.pdf'}});
   assert.deepEqual(reply,{});
   assert.equal(local.failures[0].name,'blocked.pdf');
+  assert.equal((await fromTab({type:'pending-failures'})).failures.length,1);
   reply=await fromTab({type:'trusted-click',x:150,y:30});
   assert.deepEqual(reply,{});
   assert.deepEqual(mouseEvents.map(event=>event.params.type),['mouseMoved','mousePressed','mouseReleased']);
@@ -105,5 +110,31 @@ function begin(id, capabilities = []) {
   assert.deepEqual(reply,{});
   assert.deepEqual(mouseEvents.slice(-2).map(event=>event.params.type),['keyDown','keyUp']);
   assert(mouseEvents.slice(-2).every(event=>event.params.key==='Escape' && event.target.tabId===1));
+  const identity={key:'thread-1',fingerprint:'newest subject'};
+  const fileKey=JSON.stringify([0,'first.pdf']);
+  assert.deepEqual(await fromTab({type:'mail-state',...identity}),{complete:false,files:[]});
+  await fromTab({type:'pdf-record',...identity,fileKey});
+  assert.deepEqual(await fromTab({type:'mail-state',...identity}),{complete:false,files:[fileKey]});
+  await fromTab({type:'mail-complete',...identity});
+  assert.equal((await fromTab({type:'mail-state',...identity})).complete,true);
+  await fromTab({type:'mail-incomplete',...identity});
+  assert.deepEqual(await fromTab({type:'mail-state',...identity}),{complete:false,files:[fileKey]});
+  assert.deepEqual(await fromTab({type:'mail-state',key:'thread-1',fingerprint:'changed thread'}),{complete:false,files:[]});
+  delete session.run;
+  listeners.activeURL='https://mail.google.com/mail/u/1/#inbox';
+  const fromPopup = data => new Promise(resolve => listeners.message(data,{},resolve));
+  assert.deepEqual(await fromPopup({type:'set-auto',enabled:true}),{});
+  assert.equal(listeners.alarmSpec.options.periodInMinutes,30);
+  assert(listeners.createdTab.url.includes('filename%3Apdf'));
+  assert(listeners.createdTab.url.includes('/mail/u/1/'));
+  assert.equal(listeners.tabMessage.limit,100);
+  assert.equal(session.run.automatic,true);
+  assert.equal(local.autoEnabled,true);
+  delete session.run;
+  await listeners.alarm({name:listeners.alarmSpec.name});
+  assert.equal(listeners.reloadedTab,33);
+  assert.deepEqual(await fromPopup({type:'set-auto',enabled:false}),{});
+  assert.equal(local.autoEnabled,false);
+  assert.equal(listeners.clearedAlarm,listeners.alarmSpec.name);
   console.log('Extension download passed: multiple files per run, persisted error report, local import and interruption');
 })().catch(error => { console.error(error); process.exit(1); });

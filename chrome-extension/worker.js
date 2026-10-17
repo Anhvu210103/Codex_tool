@@ -8,26 +8,106 @@ async function detach(tab){if(tab!==undefined)await chrome.debugger.detach({tabI
 async function stop(){const state=await chrome.storage.session.get('run');await chrome.storage.session.remove('run');if(state.run){await chrome.tabs.sendMessage(state.run.tab,{type:'stop'}).catch(()=>{});await detach(state.run.tab);}}
 let reportWrites=Promise.resolve();
 function appendReport(event){reportWrites=reportWrites.catch(()=>{}).then(async()=>{const current=(await chrome.storage.local.get('report')).report||[];current.push({time:new Date().toLocaleTimeString('vi-VN'),phase:String(event.phase).slice(0,32),mail:event.mail||0,file:String(event.file||'').slice(0,180),detail:String(event.detail||'').slice(0,180)});await chrome.storage.local.set({report:current.slice(-500)});});return reportWrites;}
+const AUTO_ALARM='mailnotes-gmail-30m';
+function mailIdentity(message){
+ if(typeof message.key!=='string'||!message.key||message.key.length>200||typeof message.fingerprint!=='string'||!message.fingerprint||message.fingerprint.length>2000)throw Error('Định danh thư không hợp lệ.');
+ return {key:message.key,fingerprint:message.fingerprint};
+}
+async function ledger(){return (await chrome.storage.local.get('processedMails')).processedMails||{};}
+async function updateLedger(message,complete){
+ const {key,fingerprint}=mailIdentity(message),records=await ledger();
+ const previous=records[key]?.fingerprint===fingerprint?records[key]:{fingerprint,files:[],complete:false};
+ if(!complete){if(typeof message.fileKey!=='string'||message.fileKey.length>400)throw Error('Định danh PDF không hợp lệ.');if(!previous.files.includes(message.fileKey))previous.files.push(message.fileKey);}
+ else previous.complete=true;
+ previous.touched=Date.now();records[key]=previous;
+ const keys=Object.keys(records);
+ if(keys.length>5000)for(const old of keys.sort((a,b)=>(records[a].touched||0)-(records[b].touched||0)).slice(0,keys.length-5000))delete records[old];
+ await chrome.storage.local.set({processedMails:records});
+}
+function searchURL(accountIndex='0'){
+ const today=new Date(),tomorrow=new Date(today);tomorrow.setDate(today.getDate()+1);
+ const day=date=>[date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('/');
+ return 'https://mail.google.com/mail/u/'+accountIndex+'/#search/'+encodeURIComponent('has:attachment filename:pdf after:'+day(today)+' before:'+day(tomorrow));
+}
+async function readyTab(tabId){
+ for(let i=0;i<30;i++){const tab=await chrome.tabs.get(tabId);if(tab.status==='complete')return;await new Promise(resolve=>setTimeout(resolve,500));}
+ throw Error('Gmail chưa tải xong sau 15 giây.');
+}
+async function beginRun(tab,limit,only=[],automatic=false){
+ if(!await chrome.permissions.contains({permissions:['debugger']}))throw Error('Chrome chưa cấp quyền điều khiển tab PDF.');
+ await chrome.debugger.attach({tabId:tab.id},'1.3');
+ try{
+  await chrome.storage.session.set({run:{tab:tab.id,started:Date.now(),limit,automatic}});
+  await chrome.storage.local.set({status:automatic?'Đang tự kiểm tra Gmail hôm nay...':only.length?'Đang thử lại file lỗi...':'Đang tìm thư có PDF...',report:[]});
+  await chrome.scripting.executeScript({target:{tabId:tab.id},files:['content.js']});
+  await chrome.tabs.sendMessage(tab.id,{type:'run',limit,only,automatic});
+ }catch(error){await chrome.storage.session.remove('run');await detach(tab.id);throw error;}
+}
+let autoStarting=false;
+async function autoScan(){
+ if(autoStarting)return;
+ autoStarting=true;
+ try {
+  const saved=await chrome.storage.local.get(['autoEnabled','autoTabId','autoAccountIndex']);if(!saved.autoEnabled)return;
+  const running=(await chrome.storage.session.get('run')).run;
+  if(running){
+   const tab=await chrome.tabs.get(running.tab).catch(()=>null);
+   if(!tab||Date.now()-running.started>3600000)await stop();
+   else {await appendReport({phase:'lich-bo-qua',detail:'Lượt trước vẫn đang chạy'});return;}
+  }
+  const check=await api('/extension/ping',{});await chrome.storage.local.set({capabilities:check.capabilities||[]});
+  let tab=saved.autoTabId?await chrome.tabs.get(saved.autoTabId).catch(()=>null):null;
+  if(tab && !tab.url?.startsWith('https://mail.google.com/'))tab=null;
+  const url=searchURL(saved.autoAccountIndex||'0');
+  if(tab){if(tab.url===url)await chrome.tabs.reload(tab.id);else tab=await chrome.tabs.update(tab.id,{url});}
+  else {tab=await chrome.tabs.create({url,active:false});await chrome.storage.local.set({autoTabId:tab.id});}
+  await new Promise(resolve=>setTimeout(resolve,500));
+  await readyTab(tab.id);
+  if(!(await chrome.storage.local.get('autoEnabled')).autoEnabled)return;
+  await beginRun(tab,100,[],true);
+ }catch(error){await chrome.storage.local.set({status:'Lịch Gmail: '+error.message});await appendReport({phase:'lich-loi',detail:error.message});}
+ finally{autoStarting=false;}
+}
+async function setAuto(enabled){
+ if(enabled){
+  await api('/extension/ping',{});if(!await chrome.permissions.contains({permissions:['debugger']}))throw Error('Chrome chưa cấp quyền điều khiển tab PDF.');
+  const [active]=await chrome.tabs.query({active:true,currentWindow:true}),gmailTabs=await chrome.tabs.query({url:'https://mail.google.com/*'});
+  const source=active?.url?.startsWith('https://mail.google.com/')?active:gmailTabs[0];
+  const accountIndex=source?.url?.match(/^https:\/\/mail\.google\.com\/mail\/u\/(\d+)\//)?.[1]||'0';
+  await chrome.storage.local.set({autoEnabled:true,autoAccountIndex:accountIndex});await chrome.alarms.create(AUTO_ALARM,{periodInMinutes:30});await autoScan();
+ }
+ else {await chrome.storage.local.set({autoEnabled:false});await chrome.alarms.clear(AUTO_ALARM);if((await chrome.storage.session.get('run')).run?.automatic)await stop();}
+}
+chrome.alarms.onAlarm.addListener(alarm=>{if(alarm.name===AUTO_ALARM)return autoScan();});
+async function restoreAlarm(){if((await chrome.storage.local.get('autoEnabled')).autoEnabled)await chrome.alarms.create(AUTO_ALARM,{periodInMinutes:30});}
+chrome.runtime.onStartup.addListener(restoreAlarm);
+chrome.runtime.onInstalled.addListener(restoreAlarm);
 
 chrome.runtime.onMessage.addListener((message,sender,reply)=>{
  (async()=>{
   if(message.type==='save'){if(sender.tab)throw Error('Thao tác chỉ từ tiện ích.');const config={base:baseURL(message.base),token:message.token.trim()};const check=await api('/extension/ping',{},config);if(check.app!=='mailnotes-extension'||check.protocol!==1)throw Error('Phiên bản tool chưa hỗ trợ tiện ích.');await chrome.storage.local.set({...config,capabilities:check.capabilities||[]});return {};}
+  if(message.type==='set-auto'){if(sender.tab)throw Error('Thao tác chỉ từ tiện ích.');if(typeof message.enabled!=='boolean')throw Error('Lịch quét không hợp lệ.');await setAuto(message.enabled);return {};}
   if(message.type==='start'){
    if(sender.tab)throw Error('Thao tác chỉ từ tiện ích.');const check=await api('/extension/ping',{});await chrome.storage.local.set({capabilities:check.capabilities||[]});await stop();const [tab]=await chrome.tabs.query({active:true,currentWindow:true});if(!tab?.url?.startsWith('https://mail.google.com/'))throw Error('Mở tab Gmail rồi bấm lại.');
-   if(!await chrome.permissions.contains({permissions:['debugger']}))throw Error('Cho phép Chrome điều khiển tab để bấm nút tải PDF.');
    const only=message.retry?(await chrome.storage.local.get('failures')).failures||[]:[];if(message.retry&&!only.length)throw Error('Chưa có file lỗi để thử lại.');
-   await chrome.debugger.attach({tabId:tab.id},'1.3');
-   try{
-    await chrome.storage.session.set({run:{tab:tab.id,started:Date.now(),limit:message.limit===1?1:20}});await chrome.storage.local.set({status:message.retry?'Đang thử lại file lỗi...':'Đang tìm thư có PDF...',report:[],failures:[]});await chrome.scripting.executeScript({target:{tabId:tab.id},files:['content.js']});await chrome.tabs.sendMessage(tab.id,{type:'run',limit:message.limit===1?1:20,only});return {};
-   }catch(error){await chrome.storage.session.remove('run');await detach(tab.id);throw error;}
+   await beginRun(tab,message.limit===1?1:20,only);return {};
   }
   if(message.type==='stop'){await stop();return {};}
   if(message.type==='upload'){if(sender.tab)throw Error('Thao tác chỉ từ tiện ích.');const result=await upload(new Blob([new Uint8Array(message.bytes)],{type:'application/pdf'}),message.name);const status=resultMessage(result);await chrome.storage.local.set({status});return {...result,status};}
   const {run}=await chrome.storage.session.get('run');if(!run||sender.tab?.id!==run.tab||Date.now()-run.started>3600000)throw Error('Lượt thử đã dừng/hết hạn.');
+  if(message.type==='mail-state'){const {key,fingerprint}=mailIdentity(message),row=(await ledger())[key];return row?.fingerprint===fingerprint?{complete:!!row.complete,files:row.files||[]}:{complete:false,files:[]};}
+  if(message.type==='pdf-record'){await updateLedger(message,false);return {};}
+  if(message.type==='mail-complete'){await updateLedger(message,true);return {};}
+  if(message.type==='mail-incomplete'){const {key,fingerprint}=mailIdentity(message),records=await ledger();if(records[key]?.fingerprint===fingerprint){records[key].complete=false;await chrome.storage.local.set({processedMails:records});}return {};}
+  if(message.type==='pending-failures')return {failures:((await chrome.storage.local.get('failures')).failures||[]).filter(item=>item.key&&item.createdAt&&new Date(item.createdAt).toDateString()===new Date().toDateString())};
+  if(message.type==='clear-failure'){
+   const failures=(await chrome.storage.local.get('failures')).failures||[];
+   await chrome.storage.local.set({failures:failures.filter(item=>item.key!==message.key||(item.fileKey&&message.fileKey?item.fileKey!==message.fileKey:item.fileIndex!==message.fileIndex||item.name!==message.name))});return {};
+  }
   if(message.type==='failure'){
-   const f=message.failure;if(!f||!Number.isInteger(f.rowIndex)||f.rowIndex<0||f.rowIndex>19||!Number.isInteger(f.fileIndex)||f.fileIndex<0||f.fileIndex>99||typeof f.key!=='string'||typeof f.text!=='string'||typeof f.name!=='string')throw Error('File lỗi không hợp lệ.');
+   const f=message.failure;if(!f||!Number.isInteger(f.rowIndex)||f.rowIndex<0||f.rowIndex>99||!Number.isInteger(f.fileIndex)||f.fileIndex<0||f.fileIndex>99||typeof f.key!=='string'||typeof f.text!=='string'||typeof f.name!=='string'||(f.fileKey!==undefined&&(typeof f.fileKey!=='string'||f.fileKey.length>400)))throw Error('File lỗi không hợp lệ.');
    const current=(await chrome.storage.local.get('failures')).failures||[];
-   current.push({rowIndex:f.rowIndex,key:f.key.slice(0,200),text:f.text.slice(0,240),fileIndex:f.fileIndex,name:f.name.slice(0,180)});
+   if(!current.some(item=>item.key===f.key&&(item.fileKey&&f.fileKey?item.fileKey===f.fileKey:item.fileIndex===f.fileIndex&&item.name===f.name)))current.push({rowIndex:f.rowIndex,key:f.key.slice(0,200),text:f.text.slice(0,240),fileIndex:f.fileIndex,name:f.name.slice(0,180),fileKey:f.fileKey,createdAt:Date.now()});
    await chrome.storage.local.set({failures:current.slice(-100)});return {};
   }
   if(message.type==='trace'){

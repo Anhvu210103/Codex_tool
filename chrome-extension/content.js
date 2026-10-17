@@ -4,6 +4,7 @@ globalThis.mailnotesPilotInstalled = true;
 let stopped = true, epoch = 0;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const clean = value => String(value || '').normalize('NFC').trim().replace(/\s+/g, ' ');
+function textFingerprint(value){let first=2166136261,second=374761393;for(let i=0;i<value.length;i++){first=Math.imul(first^value.charCodeAt(i),16777619);second=Math.imul(second^value.charCodeAt(i),2246822519);}return (first>>>0).toString(16).padStart(8,'0')+(second>>>0).toString(16).padStart(8,'0')+':'+value.length;}
 const downloadName = /download|tải xuống|tải về/i;
 const dangerous = /compose|soạn thư|send|gửi|delete|xóa|archive|lưu trữ|spam|reply|trả lời|forward|chuyển tiếp/i;
 async function send(data) { const answer = await chrome.runtime.sendMessage(data); if (answer?.error) throw Error(answer.error); return answer; }
@@ -23,11 +24,12 @@ function mailRows() {
  if (!nodes.length) nodes.push(...document.querySelectorAll('[role="row"][data-thread-id],[role="row"][data-legacy-thread-id],[role="row"][data-legacy-message-id]'));
  // Subjects and snippets can legitimately say "gửi", "forward" or "archive".
  // Reject dangerous controls at click selection, not entire email rows.
- return nodes.filter(node => {const r=node.getBoundingClientRect(),css=getComputedStyle(node);return r.width>=10 && r.height>=10 && css.visibility!=='hidden' && css.display!=='none' && label(node).length>=8;}).map((node, index) => ({node, key:node.getAttribute('data-legacy-thread-id') || node.getAttribute('data-thread-id') || node.getAttribute('data-legacy-message-id') || '', text:label(node), index}));
+ return nodes.filter(node => {const r=node.getBoundingClientRect(),css=getComputedStyle(node);return r.width>=10 && r.height>=10 && css.visibility!=='hidden' && css.display!=='none' && label(node).length>=8;}).map((node, index) => ({node, key:node.getAttribute('data-legacy-thread-id') || node.getAttribute('data-thread-id') || node.getAttribute('data-legacy-message-id') || '', text:label(node), fingerprintText:textFingerprint(clean(node.textContent)), version:node.getAttribute('data-legacy-message-id') || node.getAttribute('data-message-id') || '', index}));
 }
 function pdfTiles() {
  const nodes = [...document.querySelectorAll('.aV3')];
- return nodes.filter(node => {const r=node.getBoundingClientRect(),css=getComputedStyle(node);return /\.pdf\b/i.test(clean(node.textContent)) && r.width>=10 && r.height>=10 && css.visibility!=='hidden' && css.display!=='none' && !/drive/i.test(label(node.closest('[role="button"],button')));}).map((node,index) => ({node, name:clean(node.textContent), index}));
+ const counts=new Map();
+ return nodes.filter(node => {const r=node.getBoundingClientRect(),css=getComputedStyle(node);return /\.pdf\b/i.test(clean(node.textContent)) && r.width>=10 && r.height>=10 && css.visibility!=='hidden' && css.display!=='none' && !/drive/i.test(label(node.closest('[role="button"],button')));}).map((node,index) => {const name=clean(node.textContent),occurrence=counts.get(name)||0;counts.set(name,occurrence+1);return {node,name,index,fileKey:JSON.stringify([name,occurrence])};});
 }
 function tileReady(node) {
  if (!node?.isConnected || viewerOpen()) return {ok:false, reason:'PDF không còn trong thư hoặc đang mở trình xem'};
@@ -161,18 +163,40 @@ async function backToList(listURL,cancelled) {
  history.back();
  return !!await until(() => mailRows().some(item=>visible(item.node)),7000,cancelled);
 }
-async function run(limit,only=[]) {
+function nextPageButton(){
+ for(const node of document.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"]')){
+  if(!/^(cũ hơn|thư cũ hơn|older|next page)$/i.test(label(node)))continue;
+  const button=node.closest('button,[role="button"],a,[tabindex="0"]');
+  if(button&&visible(button)&&!button.disabled&&button.getAttribute('aria-disabled')!=='true')return button;
+ }
+ return null;
+}
+async function run(limit,only=[],automatic=false) {
  stopped=false; const current=++epoch, cancelled=()=>stopped||epoch!==current;
- let mails=0, files=0, errors=0; const faults=[];
+ let mails=0, files=0, errors=0, duplicateMails=0, duplicateStreak=0; const faults=[];
  try {
-  const rows = await until(() => mailRows().length ? mailRows() : null,10000,cancelled);
-  if (!rows) throw Error('Không nhận diện được hàng thư Gmail (Gmail đang có '+document.querySelectorAll('.zA').length+' hàng .zA). Tải lại Gmail và mở danh sách thư trước khi chạy.');
-  const listURL=location.href, queue=rows.slice(0, limit).map(row=>({key:row.key,text:row.text,index:row.index})).filter(row=>!only.length||only.some(item=>item.key?item.key===row.key:item.rowIndex===row.index&&item.text===row.text));
+  const pendingFailures=automatic?(await send({type:'pending-failures'})).failures||[]:[];
+  let stoppedOnDuplicates=false, page=0, pageLimitReached=false;
+  while(page<20 && !cancelled()){
+  const rows = await until(() => {
+   const found=mailRows();
+   if(found.length)return found;
+   return automatic&&/không tìm thấy (?:thư|cuộc trò chuyện|cuộc hội thoại) nào|không có (?:kết quả|thư nào|cuộc trò chuyện nào)|no conversations found|no results found|your search did not match/i.test(document.body.innerText)?[]:null;
+  },10000,cancelled);
+  if (!rows?.length) {
+   if(automatic && rows){
+    await trace('hoan-tat',0,'','Không có thư PDF trong kết quả tìm kiếm hôm nay');await progress('Đã kiểm tra Gmail hôm nay: không có thư PDF mới.');return;
+   }
+   throw Error('Không nhận diện được hàng thư Gmail (Gmail đang có '+document.querySelectorAll('.zA').length+' hàng .zA). Tải lại Gmail và mở danh sách thư trước khi chạy.');
+  }
+  const listURL=location.href, queue=rows.slice(0, limit).map(row=>({key:row.key,text:row.text,fingerprint:row.version||row.fingerprintText||row.text,index:row.index})).filter(row=>!only.length||only.some(item=>item.key?item.key===row.key:item.rowIndex===row.index&&item.text===row.text));
   if(!queue.length)throw Error('Không thấy các thư lỗi trên trang Gmail hiện tại. Mở lại danh sách cũ rồi thử lại.');
-  await progress('Đã thấy '+queue.length+' thư trên trang. Đang xử lý lần lượt...');
+  await progress('Đã thấy '+queue.length+' thư ở trang '+(page+1)+'. Đang xử lý lần lượt...');
   for (let position=0;position<queue.length;position++) {
    const entry=queue[position];
    if (cancelled()) return;
+   const identity={key:entry.key,fingerprint:entry.fingerprint};
+   const known=entry.key ? await send({type:'mail-state',...identity}) : {complete:false,files:[]};
    const currentRows=mailRows();
    const row=entry.key ? currentRows.find(item=>item.key===entry.key) :
     currentRows.find(item=>item.index===entry.index && item.text===entry.text) || currentRows.find(item=>item.text===entry.text);
@@ -181,12 +205,29 @@ async function run(limit,only=[]) {
    if (!visible(row.node)) {errors++;faults.push('Thư '+(entry.index+1)+': không hiển thị sau khi cuộn');continue;}
    row.node.click(); mails++;await trace('mo-thu',mails,'');
    const tiles=await until(() => pdfTiles().length ? pdfTiles() : null,10000,cancelled);
-   if (!tiles) {errors++;faults.push('Thư '+mails+': không thấy PDF');}
+   if(!only.length&&entry.key&&known.complete&&tiles&&tiles.every(item=>known.files.includes(item.fileKey))){
+    for(let index=pendingFailures.length-1;index>=0;index--)if(pendingFailures[index].key===entry.key){const failure=pendingFailures[index];await send({type:'clear-failure',key:entry.key,fileIndex:failure.fileIndex,name:failure.name,fileKey:failure.fileKey});pendingFailures.splice(index,1);}
+    duplicateMails++;duplicateStreak++;
+    await trace('thu-da-co',mails,'','Đã kiểm tra đủ PDF; liên tiếp '+duplicateStreak+'/2');
+    const laterFailure=automatic&&pendingFailures.length>0;
+    if(duplicateStreak===2&&!laterFailure){await trace('dung-trung',mails,'','Gặp 2 thư đã xử lý liên tiếp');stoppedOnDuplicates=true;}
+    else if(duplicateStreak===2){await trace('tiep-file-loi',mails,'','Còn PDF lỗi ở thư phía sau');duplicateStreak=0;}
+    if((automatic||position+1<queue.length)&&!await backToList(listURL,cancelled))throw Error('Không trở lại được danh sách thư sau khi kiểm tra thư đã có.');
+    if(stoppedOnDuplicates)break;
+    continue;
+   }
+   duplicateStreak=0;
+   if(entry.key&&known.complete)await send({type:'mail-incomplete',...identity});
+   let mailFailed=false;
+   if (!tiles) {errors++;mailFailed=true;faults.push('Thư '+mails+': không thấy PDF');}
    else {
-    const attachments=tiles.map(item=>({name:item.name,index:item.index})).filter(item=>!only.length||only.some(failed=>(failed.key?failed.key===entry.key:failed.rowIndex===entry.index&&failed.text===entry.text)&&failed.fileIndex===item.index&&failed.name===item.name));
-    if(!attachments.length&&only.length){errors++;faults.push('Thư '+mails+': PDF lỗi trước đó không còn trong thư');}
+    const attachments=tiles.map(item=>({name:item.name,index:item.index,fileKey:item.fileKey})).filter(item=>!only.length||only.some(failed=>(failed.key?failed.key===entry.key:failed.rowIndex===entry.index&&failed.text===entry.text)&&(failed.fileKey?failed.fileKey===item.fileKey:failed.fileIndex===item.index&&failed.name===item.name)));
+    const recordedFiles=new Set(known.files);
+    if(!attachments.length&&only.length){errors++;mailFailed=true;faults.push('Thư '+mails+': PDF lỗi trước đó không còn trong thư');}
     for (const attachment of attachments) {
      if (cancelled()) return;
+     const fileKey=attachment.fileKey;
+     if (entry.key && known.files.includes(fileKey)) {await send({type:'clear-failure',key:entry.key,fileIndex:attachment.index,name:attachment.name,fileKey});await trace('pdf-da-co',mails,attachment.name,'Đã lưu ở lượt trước, không tải lại');continue;}
      try {
       const tile=pdfTiles().find(item=>item.index===attachment.index && item.name===attachment.name);
       if (!tile) throw Error('Không tìm lại được ô PDF.');
@@ -208,19 +249,34 @@ async function run(limit,only=[]) {
       if (!clicked) throw Error('Chrome đã gửi thao tác chuột nhưng nút tải không nhận sự kiện click.');
       await trace('da-bam-tai',mails,attachment.name,'Gmail đã nhận click tại x='+Math.round(point.x)+', y='+Math.round(point.y));
       const result=await waitDownload(cancelled);
+      if (entry.key) await send({type:'pdf-record',...identity,fileKey});
+      await send({type:'clear-failure',key:entry.key,fileIndex:attachment.index,name:attachment.name,fileKey});
+      for(let index=pendingFailures.length-1;index>=0;index--)if(pendingFailures[index].key===entry.key&&(pendingFailures[index].fileKey?pendingFailures[index].fileKey===fileKey:pendingFailures[index].fileIndex===attachment.index&&pendingFailures[index].name===attachment.name))pendingFailures.splice(index,1);
+      recordedFiles.add(fileKey);
       files++;await trace('da-luu',mails,attachment.name,result.added===0?'đã có trong sổ':'mới');
       await progress('Đã xử lý '+files+' PDF từ '+mails+' thư. Mới nhất: '+result.filename+(result.added===0?' (đã có trong Sổ ghi chép → AI thao tác, không tạo dòng mới)':' (xem tại Sổ ghi chép → AI thao tác)'));
-     } catch (error) {errors++;faults.push(attachment.name+': '+error.message);await send({type:'failure',failure:{rowIndex:entry.index,key:entry.key,text:entry.text,fileIndex:attachment.index,name:attachment.name}}).catch(()=>{});await trace('loi',mails,attachment.name,error.message);await progress('Bỏ qua PDF lỗi, tiếp tục file sau: '+attachment.name+' — '+error.message);}
+     } catch (error) {errors++;mailFailed=true;faults.push(attachment.name+': '+error.message);await send({type:'failure',failure:{rowIndex:entry.index,key:entry.key,text:entry.text,fileIndex:attachment.index,name:attachment.name,fileKey}}).catch(()=>{});await trace('loi',mails,attachment.name,error.message);await progress('Bỏ qua PDF lỗi, tiếp tục file sau: '+attachment.name+' — '+error.message);}
      await closeViewer(cancelled,mails,attachment.name);
     }
+    if(entry.key && !mailFailed && tiles.every(item=>recordedFiles.has(item.fileKey))) await send({type:'mail-complete',...identity});
    }
    if (cancelled()) return;
-   if (position+1<queue.length && !await backToList(listURL,cancelled)) throw Error('Không trở lại được danh sách thư. Đã lưu '+files+' PDF.');
+   if ((automatic||position+1<queue.length) && !await backToList(listURL,cancelled)) throw Error('Không trở lại được danh sách thư. Đã lưu '+files+' PDF.');
   }
-  await trace('hoan-tat',mails,'',files+' PDF đã lưu, '+errors+' lỗi');
-  await progress('Hoàn tất: '+mails+' thư, '+files+' PDF đã lưu, '+errors+' lỗi.'+(faults.length?'\nXem Báo cáo lần chạy trong tiện ích để biết từng file lỗi.':''));
+  if(stoppedOnDuplicates||!automatic)break;
+  const next=nextPageButton();if(!next)break;
+  if(page===19){pageLimitReached=true;break;}
+  const previousFirst=rows[0].key||rows[0].text,previousURL=location.href;
+  await trace('trang-tiep',mails,'','Đang mở trang Gmail '+(page+2));
+  await send({type:'trusted-click',...clickPoint(next)});
+  if(!await until(()=>{const first=mailRows()[0];return first&&((first.key||first.text)!==previousFirst||location.href!==previousURL);},10000,cancelled))throw Error('Gmail chưa chuyển sang trang thư tiếp theo.');
+  page++;
+  }
+  if(pageLimitReached){await trace('gioi-han',mails,'','Đã quét 20 trang; còn trang khác cần xem lại');}
+  await trace('hoan-tat',mails,'',files+' PDF đã lưu, '+duplicateMails+' thư đã có, '+errors+' lỗi');
+  await progress('Hoàn tất: '+mails+' thư mở, '+files+' PDF đã lưu, '+duplicateMails+' thư đã có, '+errors+' lỗi.'+(pageLimitReached?'\nĐã chạm giới hạn 20 trang Gmail; kiểm tra báo cáo.':'')+(faults.length?'\nXem Báo cáo lần chạy trong tiện ích để biết từng file lỗi.':''));
  } catch (error) {await trace('dung',mails,'',error.message);await progress('Đã lưu '+files+' PDF từ '+mails+' thư. Dừng: '+error.message+'\nMở Báo cáo lần chạy trong tiện ích.').catch(()=>{});}
  finally {if(epoch===current){stopped=true;await send({type:'finish'}).catch(()=>{});}}
 }
-chrome.runtime.onMessage.addListener(message=>{if(message.type==='run')run(message.limit===1?1:20,message.only||[]);if(message.type==='stop'){stopped=true;epoch++;}});
+chrome.runtime.onMessage.addListener(message=>{if(message.type==='run')run(message.limit===1?1:message.limit===100?100:20,message.only||[],message.automatic===true);if(message.type==='stop'){stopped=true;epoch++;}});
 }
