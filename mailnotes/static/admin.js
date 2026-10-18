@@ -66,7 +66,7 @@ function populateSettings() {
   $('gmail-period').value=filter.period; $('gmail-start').value=filter.start_date || ''; $('gmail-end').value=filter.end_date || '';
   $('gmail-senders').value=(filter.senders || []).join(', ');$('gmail-label').value=filter.label || '';
   $('gmail-only-pdf').checked=!!filter.pdf_only;$('gmail-spam').checked=!!filter.include_spam_trash;updateGmailFilter(); $('interval').value=config.interval_seconds/60;
-  $('timezone').value=config.timezone; $('schedule').checked=config.schedule_enabled;
+  $('timezone').value=config.timezone; $('schedule').checked=config.schedule_enabled;$('folder-inbox-enabled').checked=!!config.folder_inbox_enabled;
   $('summary-mode').value=config.summary.mode; $('max-chars').value=config.summary.max_chars;
   $('max-input').value=config.summary.max_input_chars; $('model').value=config.summary.model;
   $('ai-consent').checked=config.summary.ai_consent || false;
@@ -93,7 +93,7 @@ async function saveSettings(includeRules = false) {
     next.gmail_filter=readGmailFilter();
     if(next.gmail_filter.pdf_only)next.gmail_pdf=true;
     next.source=$('source').value; next.gmail_query=$('gmail-query').value.trim(); next.interval_seconds=minutes*60;
-    next.timezone=$('timezone').value.trim(); next.schedule_enabled=$('schedule').checked;
+    next.timezone=$('timezone').value.trim(); next.schedule_enabled=$('schedule').checked;next.folder_inbox_enabled=$('folder-inbox-enabled').checked;
     next.classification_mode=$('summary-mode').value==='openai'?'ai':'rules';
     next.gmail_pdf=$('gmail-pdf').checked || (next.gmail_filter.period!=='advanced' && next.gmail_filter.pdf_only);next.pdf_ocr=$('pdf-ocr').checked;
     next.summary={provider:$('provider').value,mode:$('summary-mode').value,max_chars:Number($('max-chars').value),max_input_chars:Number($('max-input').value),model:$('model').value.trim(),pricing:{input_per_million:priceValue('price-input'),cached_input_per_million:priceValue('price-cache'),output_per_million:priceValue('price-output')},ai_consent:$('ai-consent').checked};
@@ -111,14 +111,16 @@ function dateText(value) {
 }
 async function refreshStatus() {
   const status=await api('/api/status?provider='+encodeURIComponent($('provider').value || 'deepseek'));
+  const folder=status.folder_inbox||{},busy=status.running||folder.running;
   $('stop-app').hidden=!status.desktop_mode;
-  $('run-state').textContent=status.running?'Đang xử lý':status.error?'Cần kiểm tra':'Sẵn sàng';
+  $('run-state').textContent=busy?'Đang xử lý':status.error?'Cần kiểm tra':'Sẵn sàng';
   $('run-detail').textContent=status.last_finished?'Hoàn tất: '+dateText(status.last_finished):'Chưa có lượt xử lý';
   $('added-count').textContent=status.last_added ?? '—';
   $('last-source').textContent=status.last_source==='gmail'?'Nguồn Gmail':status.last_source==='demo'?'Nguồn dữ liệu mẫu':'Chưa có dữ liệu';
   $('schedule-state').textContent=status.schedule_enabled?'Đang bật':'Đang tắt';
   $('next-run').textContent=status.schedule_enabled?(status.running?'Chờ lượt hiện tại hoàn tất':status.next_run?'Lần tới: '+dateText(status.next_run):'Đang chuẩn bị lịch'):'Bạn có thể chạy thủ công';
-  $('run-now').disabled=status.running; $('demo-run').disabled=status.running;
+  const folderErrors=(folder.errors||[]).slice(0,5).map(item=>`\n• ${item.file}: ${item.error}`).join('');$('folder-inbox-status').textContent=folder.running?'Đang đọc PDF...':folder.last_finished?`Lần cuối: ${dateText(folder.last_finished)} · ${folder.last_processed||0} tệp · ${folder.last_added||0} ghi chép mới${folder.error?' · '+folder.error:''}${folderErrors}`:'Chưa quét thư mục.';
+  $('run-now').disabled=busy; $('demo-run').disabled=busy;$('run-folder-inbox').disabled=busy;
   $('run-error').hidden=!status.error; $('run-error').textContent=status.error || '';
   $('source-name').textContent=config.source==='gmail'?'Gmail':'Dữ liệu mẫu';
   $('source-badge').textContent=config.source==='gmail'?(status.gmail_connected?'Đã lưu kết nối':'Cần kết nối'):'Sẵn sàng thử';
@@ -160,7 +162,7 @@ async function loadNotes() {
     const edit=document.createElement('button');edit.className='secondary edit-button';edit.textContent='Sửa nhóm';edit.addEventListener('click',()=>openGroupEditor(note));categories.append(edit);
     const content=document.createElement('td');const summary=document.createElement('div');summary.className='summary-text';summary.textContent=note.summary;content.append(summary);if(note.review_reason){const warning=document.createElement('div');warning.className='review-note';warning.textContent=note.review_reason;content.append(warning);}
     const source=document.createElement('td');
-    if(note.source==='gmail') {const link=document.createElement('a');link.textContent='Mở email';link.href='https://mail.google.com/mail/u/0/#all/'+encodeURIComponent(note.origin_id || note.id.split(':').slice(1).join(':'));link.target='_blank';link.rel='noopener noreferrer';source.append(link);} else source.textContent=note.source==='ai'?'AI thao tác':note.source==='pdf'?'PDF tải lên':'Dữ liệu mẫu';
+    if(note.source==='gmail') {const link=document.createElement('a');link.textContent='Mở email';link.href='https://mail.google.com/mail/u/0/#all/'+encodeURIComponent(note.origin_id || note.id.split(':').slice(1).join(':'));link.target='_blank';link.rel='noopener noreferrer';source.append(link);} else source.textContent=({ai:'AI thao tác',pdf:'PDF tải lên',folder:'Thư mục nhận PDF',demo:'Dữ liệu mẫu'}[note.source] || note.source);
     if(note.file_hash){const pdf=document.createElement('a');pdf.textContent='Tải PDF';pdf.href='/api/document?'+new URLSearchParams({source:note.source,id:note.id});source.append(document.createElement('br'),pdf);const md=document.createElement('a');md.textContent='Tải Markdown';md.href='/api/document?'+new URLSearchParams({source:note.source,id:note.id,format:'markdown'});source.append(document.createElement('br'),md);const again=document.createElement('button');again.className='secondary edit-button';again.textContent='Đọc lại PDF';again.addEventListener('click',async()=>{if(!confirm('Đọc lại PDF theo cấu hình hiện tại? Có thể tốn phí AI và thay nhóm/tóm tắt đã chỉnh tay.'))return;again.disabled=true;try{await post('/api/notes/reprocess',{source:note.source,id:note.id});notice('Đã đọc lại PDF và cập nhật sổ.');await loadNotes();}catch(error){notice(error.message,true);}finally{again.disabled=false;}});source.append(document.createElement('br'),again);}
     const files=document.createElement('td');
     for(const item of note.local_pdf_paths||[]){const entry=document.createElement('div');entry.className='local-file';const group=document.createElement('small');group.textContent=item.category;const path=document.createElement('code');path.textContent=item.path;entry.append(group,path);files.append(entry);}
@@ -188,7 +190,9 @@ async function boot() {
     $('password').minLength=info.needs_setup?12:1;$('password').autocomplete=info.needs_setup?'new-password':'current-password';
     $('auth-form').dataset.setup=info.needs_setup?'yes':'no';return;
   }
+  for(const id of ['notes-source','dashboard-source']){const select=$(id);if(select&&!select.querySelector('option[value="folder"]')){const option=document.createElement('option');option.value='folder';option.textContent='Thư mục nhận PDF';select.append(option);}}
   config=await api('/api/settings'); populateSettings();
+  const inbox=await api('/api/folder-inbox');$('folder-inbox-path').textContent=inbox.path;$('open-folder-inbox').disabled=!inbox.can_open;
   $('notes-source').value=config.source;$('dashboard-source').value=config.source;
   const gmail=await api('/api/gmail/info');$('callback').value=gmail.callback;
   await refreshStatus();setTab(activeTab);
@@ -205,6 +209,8 @@ action('stop-app',async()=>{if(!confirm('Tắt tool và dừng lịch tự độ
 action('logout',async()=>{await post('/api/logout');await boot();});
 action('run-now',()=>run());action('demo-run',()=>run('demo'));
 action('open-archive',async()=>{await post('/api/archive?'+new URLSearchParams({source:$('notes-source').value}));notice('Đã yêu cầu mở thư mục tài liệu trên máy chạy tool.');});
+action('open-folder-inbox',async()=>{await post('/api/folder-inbox',{action:'open'});notice('Đã mở thư mục nhận PDF.');});
+action('run-folder-inbox',async()=>{await post('/api/folder-inbox',{action:'run'});notice('Đang quét thư mục nhận PDF.');await refreshStatus();});
 action('save-settings',()=>saveSettings());action('save-rules',()=>saveSettings(true));
 action('pair-extension',async()=>{const data=await post('/api/extension/pair');$('extension-token').value=data.token;notice('Đã tạo mã ghép nối mới. Dán mã vào tiện ích Chrome; mã cũ đã hết hiệu lực. Không gửi mã vào chat.');});
 action('add-preset-groups',async()=>{
@@ -267,7 +273,7 @@ async function loadOverview(){
  $('dashboard-cost-detail').textContent=(today.unpriced_calls?today.unpriced_calls+' lượt chưa tính được tiền. ':'')+'Tổng đã biết: '+money(total.estimated_usd)+(total.unpriced_calls?' · chưa đầy đủ':'')+' · tất cả nguồn';
  $('dashboard-tokens').textContent=number(today.total_tokens);
  $('dashboard-token-detail').textContent=number(today.api_calls)+' lượt API hôm nay'+(today.unknown_usage_calls?' · '+today.unknown_usage_calls+' lượt thiếu usage':'')+' · tất cả nguồn';
- $('dashboard-today').textContent=number(data.received_today);$('dashboard-total').textContent='Đã lưu '+number(data.total_notes)+' tài liệu · '+({gmail:'Gmail',pdf:'PDF tải lên',demo:'Dữ liệu mẫu'}[data.source]);
+ $('dashboard-today').textContent=number(data.received_today);$('dashboard-total').textContent='Đã lưu '+number(data.total_notes)+' tài liệu · '+({gmail:'Gmail',pdf:'PDF tải lên',ai:'AI thao tác',folder:'Thư mục nhận PDF',demo:'Dữ liệu mẫu'}[data.source]);
  $('dashboard-review').textContent=number(data.needs_review);
  $('dashboard-groups').replaceChildren();$('dashboard-groups-empty').hidden=data.groups.length>0;
  for(const group of data.groups.slice(0,6)){const row=document.createElement('div');row.className='group-count';const name=document.createElement('button');name.textContent=group.name;name.addEventListener('click',()=>openNotebook(data.source,group.name));const count=document.createElement('strong');count.textContent=number(group.count);row.append(name,count);$('dashboard-groups').append(row);}

@@ -102,7 +102,11 @@ def validate_settings(value):
     enabled = value.get('schedule_enabled', False)
     if not isinstance(enabled, bool):
         raise ValueError('Trạng thái lịch chạy không hợp lệ.')
+    folder_enabled = value.get('folder_inbox_enabled', False)
+    if not isinstance(folder_enabled, bool):
+        raise ValueError('Trạng thái thư mục nhận không hợp lệ.')
     return {'source': source, 'schedule_enabled': enabled, 'classification_mode': classification,
+            'folder_inbox_enabled': folder_enabled,
             'gmail_pdf': value.get('gmail_pdf', True) is True or (gmail_filter['period'] != 'advanced' and gmail_filter['pdf_only']), 'pdf_ocr': False,
             'gmail_query': text('Bộ lọc Gmail', value.get('gmail_query', ''), 1000, empty=gmail_filter['period'] != 'advanced'),
             'gmail_filter': gmail_filter,
@@ -197,6 +201,11 @@ class Admin:
         self.run_lock = threading.Lock()
         self.stop = threading.Event()
         self.next_due = None
+        self.folder_next_due = None
+        self.folder_state = read_json(self.private / 'folder-inbox-status.json', {'running':False,'last_started':None,'last_finished':None,'last_added':None,'error':None,'errors':[]})
+        if self.folder_state.get('running'):
+            self.folder_state.update(error='Lượt quét thư mục trước bị gián đoạn; các tệp chưa chuyển sẽ được thử lại.', last_added=None)
+        self.folder_state['running'] = False
         self.state = read_json(self.private / 'status.json', {'last_started': None, 'last_finished': None, 'last_added': None, 'last_source': None, 'error': None})
         if self.state.get('running'):
             self.state.update(error='Lượt trước bị gián đoạn khi máy chủ dừng. Chạy lại để tiếp tục.', last_added=None)
@@ -210,22 +219,26 @@ class Admin:
     def save_settings(self, value):
         clean = validate_settings(value)
         with self.lock:
+            folder_was_enabled = self.settings['folder_inbox_enabled']
             private_json(self.settings_path, clean)
             self.settings = clean
             self.next_due = time.time() + clean['interval_seconds'] if clean['schedule_enabled'] else None
+            self.folder_next_due = (time.time() if not folder_was_enabled else time.time() + clean['interval_seconds']) if clean['folder_inbox_enabled'] else None
         return clean
 
     def status(self):
         with self.lock:
             return {**self.state, 'next_run': self.next_due if self.settings['schedule_enabled'] else None,
                     'schedule_enabled': self.settings['schedule_enabled'],
+                    'folder_inbox_enabled':self.settings['folder_inbox_enabled'], 'folder_next_run':self.folder_next_due if self.settings['folder_inbox_enabled'] else None,
+                    'folder_inbox':copy.deepcopy(self.folder_state),
                     'gmail_connected': self.token.exists(), 'gmail_client_configured': self.credentials.exists(),
                     'ai_key_configured': self.has_key(self.settings['summary']['provider']),
                     'ai_provider': self.settings['summary']['provider']}
 
     def usage(self, now=None):
         rows = []
-        for source in ('gmail', 'pdf', 'ai', 'demo'):
+        for source in ('gmail', 'pdf', 'ai', 'folder', 'demo'):
             database = self.root / source / 'notes.sqlite3'
             if not database.exists():
                 continue
@@ -304,32 +317,36 @@ class Admin:
             config['summary']['mode'] = 'extractive'
         return config
 
-    def process_pdf(self, data, filename, reprocess=False, source='pdf'):
-        if source not in ('pdf', 'ai'):
+    def _process_pdf_locked(self, data, filename, reprocess=False, source='pdf'):
+        if source not in ('pdf', 'ai', 'folder'):
             raise ValueError('Nguồn PDF không hợp lệ.')
         from .documents import pdf_message
+        config = self.runtime_config(source)
+        from hashlib import sha256
+        identifier = source + ':' + sha256(data).hexdigest()
+        database = Path(config['data_dir']) / 'notes.sqlite3'
+        if not reprocess and database.exists():
+            with connect(database) as connection:
+                ensure_schema(connection)
+                if connection.execute('SELECT 1 FROM notes WHERE id=?', (identifier,)).fetchone():
+                    return 0
+        if reprocess:
+            config['_reprocess_id'] = identifier
+        senders={'ai':'AI thao tác','folder':'Thư mục nhận PDF','pdf':'PDF tải lên'}
+        document = pdf_message(data, filename, config, id=sha256(data).hexdigest(), sender=senders[source], received_at=datetime.now(timezone.utc).isoformat())
+        return process([document], config, source)
+
+    def process_pdf(self, data, filename, reprocess=False, source='pdf'):
         if not self.run_lock.acquire(blocking=False):
             raise ValueError('Đang có lượt xử lý. Chờ hoàn tất rồi tải PDF.')
         try:
-            config = self.runtime_config(source)
-            from hashlib import sha256
-            identifier = source + ':' + sha256(data).hexdigest()
-            database = Path(config['data_dir']) / 'notes.sqlite3'
-            if not reprocess and database.exists():
-                with connect(database) as connection:
-                    ensure_schema(connection)
-                    if connection.execute('SELECT 1 FROM notes WHERE id=?', (identifier,)).fetchone():
-                        return 0
-            if reprocess:
-                config['_reprocess_id'] = identifier
-            document = pdf_message(data, filename, config, id=sha256(data).hexdigest(), sender='AI thao tác' if source == 'ai' else 'PDF tải lên', received_at=datetime.now(timezone.utc).isoformat())
-            return process([document], config, source)
+            return self._process_pdf_locked(data, filename, reprocess, source)
         finally:
             self.run_lock.release()
 
     def reprocess_note(self, source, identifier):
         from .documents import pdf_message
-        if source not in ('gmail', 'pdf', 'ai'):
+        if source not in ('gmail', 'pdf', 'ai', 'folder'):
             raise ValueError('Chỉ xử lý lại ghi chép có PDF gốc.')
         if not self.run_lock.acquire(blocking=False):
             raise ValueError('Đang có lượt xử lý. Vui lòng chờ.')
@@ -355,7 +372,7 @@ class Admin:
             self.run_lock.release()
 
     def edit_categories(self, source, identifier, categories):
-        if source not in ('demo', 'gmail', 'pdf', 'ai') or not isinstance(categories, list) or not categories:
+        if source not in ('demo', 'gmail', 'pdf', 'ai', 'folder') or not isinstance(categories, list) or not categories:
             raise ValueError('Chọn ít nhất một nhóm hợp lệ.')
         allowed = {rule['category'] for rule in self.config()['rules']} | {'Cần xem lại'}
         if self.config().get('unmatched_category'):
@@ -427,17 +444,67 @@ class Admin:
         with self.lock:
             if self.settings['schedule_enabled']:
                 self.next_due = time.time() + self.settings['interval_seconds']
+            if self.settings['folder_inbox_enabled']:
+                self.folder_next_due = time.time()
         def loop():
             while not self.stop.wait(1):
                 with self.lock:
                     due = self.settings['schedule_enabled'] and self.next_due is not None and time.time() >= self.next_due
+                    folder_due = self.settings['folder_inbox_enabled'] and self.folder_next_due is not None and time.time() >= self.folder_next_due
                 if due:
                     self.start_run()
+                if folder_due:
+                    self.start_folder_import()
         self.scheduler = threading.Thread(target=loop, daemon=True)
         self.scheduler.start()
 
+    def start_folder_import(self):
+        if not self.run_lock.acquire(blocking=False):
+            return False
+        try:
+            with self.lock:
+                self.folder_state.update(running=True, last_started=datetime.now(timezone.utc).isoformat(), error=None, errors=[])
+                private_json(self.private / 'folder-inbox-status.json', self.folder_state)
+            threading.Thread(target=self._run_folder_import, daemon=True).start()
+            return True
+        except Exception:
+            self.run_lock.release()
+            raise
+
+    def _has_document_hash(self,digest):
+        for source in ('folder','ai','pdf','gmail'):
+            database=self.root/source/'notes.sqlite3'
+            if not database.exists():continue
+            with connect(database) as connection:
+                ensure_schema(connection)
+                if connection.execute('SELECT 1 FROM notes WHERE file_hash=? LIMIT 1',(digest,)).fetchone():return True
+        return False
+
+    def _run_folder_import(self):
+        added=0;processed=0;errors=[]
+        try:
+            from .folder_inbox import archive_processed, inbox_directory, ready_pdfs
+            root=inbox_directory();candidates,errors=ready_pdfs(root)
+            for path,data,digest in candidates:
+                try:
+                    if not self._has_document_hash(digest):added += self._process_pdf_locked(data,path.name,False,'folder')
+                    archive_processed(path,digest,root);processed += 1
+                except Exception as error:
+                    errors.append({'file':path.name,'error':error_message(error)})
+            with self.lock:
+                self.folder_state.update(last_added=added,last_processed=processed,error=None if not errors else f'{len(errors)} tệp cần thử lại.',errors=errors[-20:])
+        except Exception as error:
+            with self.lock:self.folder_state.update(last_added=None,error=error_message(error))
+        finally:
+            try:
+                with self.lock:
+                    self.folder_state.update(running=False,last_finished=datetime.now(timezone.utc).isoformat())
+                    self.folder_next_due=time.time()+self.settings['interval_seconds'] if self.settings['folder_inbox_enabled'] else None
+                    private_json(self.private/'folder-inbox-status.json',self.folder_state)
+            finally:self.run_lock.release()
+
     def notes(self, source, day='', search='', category=''):
-        if source not in ('demo', 'gmail', 'pdf', 'ai'):
+        if source not in ('demo', 'gmail', 'pdf', 'ai', 'folder'):
             raise ValueError('Nguồn không hợp lệ.')
         database = self.root / source / 'notes.sqlite3'
         if not database.exists():

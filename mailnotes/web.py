@@ -407,7 +407,7 @@ def create_app(base=None, data_root=None, public_url=None):
     @app.get('/api/export')
     def export():
         source, day = request.args.get('source', 'demo'), request.args.get('day', '')
-        if source not in ('demo', 'gmail', 'pdf', 'ai') or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
+        if source not in ('demo', 'gmail', 'pdf', 'ai', 'folder') or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
             raise ValueError('Chọn nguồn và ngày hợp lệ để tải sổ.')
         path = admin.root / source / 'notebooks' / (day + '.md')
         if not path.exists():
@@ -451,7 +451,7 @@ def create_app(base=None, data_root=None, public_url=None):
     @app.get('/api/document')
     def document():
         source = request.args.get('source')
-        if source not in ('gmail', 'pdf', 'ai'):
+        if source not in ('gmail', 'pdf', 'ai', 'folder'):
             raise ValueError('Nguồn không hợp lệ.')
         database = admin.root / source / 'notes.sqlite3'
         if not database.exists():
@@ -472,7 +472,7 @@ def create_app(base=None, data_root=None, public_url=None):
         import subprocess
         import sys
         source = request.args.get('source')
-        if source not in ('gmail', 'pdf', 'ai'):
+        if source not in ('gmail', 'pdf', 'ai', 'folder'):
             raise ValueError('Chọn nguồn Gmail, PDF tải lên hoặc AI thao tác.')
         root = admin.root / source
         local = parsed.hostname in ('localhost', '127.0.0.1') and request.remote_addr in ('127.0.0.1', '::1')
@@ -487,6 +487,31 @@ def create_app(base=None, data_root=None, public_url=None):
             except OSError:
                 raise ValueError('Chưa mở được trình quản lý file. Hãy sao chép đường dẫn bên dưới để mở thủ công.') from None
         return jsonify(path=str(root), can_open=can_open)
+
+    @app.route('/api/folder-inbox', methods=['GET', 'POST'])
+    def folder_inbox():
+        import subprocess
+        import sys
+        from .folder_inbox import inbox_directory
+        root = inbox_directory();root.mkdir(parents=True,exist_ok=True,mode=0o700)
+        local = parsed.hostname in ('localhost', '127.0.0.1') and request.remote_addr in ('127.0.0.1', '::1')
+        can_open = local and sys.platform in ('linux', 'darwin')
+        if request.method == 'GET':
+            return jsonify(path=str(root),can_open=can_open)
+        action = payload().get('action')
+        if action == 'run':
+            if not admin.start_folder_import():
+                return jsonify(error='Đang có lượt xử lý khác. Vui lòng chờ.'),409
+            return jsonify(ok=True),202
+        if action == 'open':
+            if not can_open:
+                raise ValueError('Chỉ mở thư mục trực tiếp khi tool chạy trên cùng máy.')
+            try:
+                subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open',str(root)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            except OSError:
+                raise ValueError('Chưa mở được thư mục. Hãy sao chép đường dẫn hiển thị.') from None
+            return jsonify(ok=True)
+        raise ValueError('Thao tác thư mục nhận không hợp lệ.')
 
     @app.post('/api/gmail/client')
     def gmail_client():

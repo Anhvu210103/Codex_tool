@@ -25,10 +25,14 @@ Gmail API vẫn là nguồn riêng có thể kiểm tra theo lịch đã lưu tr
 | Mở thư mục | Trình quản lý file mặc định qua xdg-open | Finder qua open |
 | Mã nguồn đã cài .venv | Mo-So-Ghi-Chep.sh | Mo-So-Ghi-Chep.command |
 
-Bản mã nguồn dùng `.local/` trong thư mục repository trên cả hai hệ điều hành. Mọi nguồn có cấu trúc giống nhau: `ai/`, `gmail/`, `pdf/`; bên trong có `files/`, `Markdown/`, `Theo-nhom/`, `Can-xem-lai/` và SQLite. Thay app không thay dữ liệu. Mã ghép nối và địa chỉ/cổng được cấu hình riêng cho từng máy. Dùng Chrome cho tiện ích; Safari/Firefox chưa được hỗ trợ.
+Bản mã nguồn dùng `.local/` trong thư mục repository trên cả hai hệ điều hành. Mọi nguồn có cấu trúc giống nhau: `ai/`, `gmail/`, `pdf/`, `folder/`; bên trong có `files/`, `Markdown/`, `Theo-nhom/`, `Can-xem-lai/` và SQLite. Thay app không thay dữ liệu. Mã ghép nối và địa chỉ/cổng được cấu hình riêng cho từng máy. Dùng Chrome cho tiện ích; Safari/Firefox chưa được hỗ trợ.
 
 Mac app thử nghiệm chưa ký Developer ID/notarize nên có thể cần người dùng xác nhận trong Privacy & Security theo cơ chế của macOS. Không tắt Gatekeeper. Phải chọn bản theo chip và kiểm tra trên phiên bản macOS thực tế của khách.
 
 ## Xác nhận tính đồng nhất
 
 CI dùng cùng bộ kiểm thử trên Ubuntu, Mac Intel và Apple Silicon. Sau khi build, mỗi job khởi động chính app đã đóng gói với dữ liệu tạm, kiểm tra đăng nhập, PDF chữ → Markdown/nhóm, PDF scan → Cần xem lại và ZIP tiện ích. Phép thử không gọi DeepSeek thật, không đăng nhập Gmail khách và không mở Finder/file manager. Các bước đó vẫn cần kiểm chứng trên máy khách với quyền truy cập hợp lệ. Không coi cấu hình CI là kết quả CI đã thành công.
+
+## Phương án tải PDF thủ công
+
+Trên cả Linux và macOS, trang **Cài đặt → Thư mục nhận PDF thủ công** hiển thị đường dẫn `Downloads/So-Ghi-Chep-Inbox` của người dùng đang chạy tool. Khách tải PDF vào đây khi connector website không hoạt động. Có thể quét ngay hoặc bật quét theo chu kỳ. Giữ Chrome tải file hoàn tất trước khi quét; các file `.crdownload`, symlink, PDF đang thay đổi, quá dung lượng hoặc sai định dạng không được nhập. PDF đã xử lý được chuyển vào thư mục con `Da-xu-ly`.

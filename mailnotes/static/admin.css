@@ -259,3 +259,4 @@ dialog::backdrop { background: #112d2780; }
 .dashboard-recent td button { white-space: nowrap; }
 .table-scroll:focus-visible { outline: 3px solid var(--green); outline-offset: -3px; }
 @media (max-width: 760px) { .nav-item span { display: none; } .table-scroll::before { content: "Vuốt sang ngang để xem đầy đủ bảng"; display: block; position: sticky; left: 0; padding: 12px 18px; color: var(--muted); background: #f0f5f1; font-size: .83rem; } }
+#folder-inbox-status{white-space:pre-wrap}
