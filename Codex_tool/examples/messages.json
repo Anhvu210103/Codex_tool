@@ -1,0 +1,4 @@
+[
+  {"id":"demo-001","sender":"Văn phòng <vanphong@example.com>","subject":"Yêu cầu báo cáo tháng","received_at":"2026-10-13T08:00:00+07:00","body":"Kính gửi các đơn vị,\nYêu cầu gửi báo cáo tình hình xử lý hồ sơ trước ngày 20/10/2026.\nBáo cáo cần nêu số hồ sơ tiếp nhận, đã giải quyết và còn tồn đọng.\nTrân trọng,\nVăn phòng"},
+  {"id":"demo-002","sender":"Thông tin <thongtin@example.com>","subject":"Thông tư mới về quản lý hồ sơ","received_at":"2026-10-13T09:00:00+07:00","body":"Thông tư mẫu quy định việc lưu trữ hồ sơ điện tử.\nCác đơn vị cần rà soát quy trình và phân quyền truy cập.\nĐây là dữ liệu giả lập để kiểm thử, không phải văn bản pháp luật thực tế."}
+]

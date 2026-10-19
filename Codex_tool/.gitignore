@@ -1,0 +1,12 @@
+__pycache__/
+.venv/
+.local/
+credentials.json
+token.json
+
+.env
+*.egg-info/
+build/
+dist/
+
+*.spec

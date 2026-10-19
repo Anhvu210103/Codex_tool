@@ -1,0 +1,23 @@
+[Unit]
+Description=Mailnotes web administration and scheduler
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mailnotes
+Group=mailnotes
+WorkingDirectory=/opt/mailnotes
+EnvironmentFile=/etc/mailnotes.env
+ExecStart=/opt/mailnotes/.venv/bin/python -m mailnotes.web --host 127.0.0.1 --port 8080
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/mailnotes/.local
+
+[Install]
+WantedBy=multi-user.target

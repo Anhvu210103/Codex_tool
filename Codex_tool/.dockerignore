@@ -1,0 +1,12 @@
+.local/
+.venv/
+.git/
+.github/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.env
+credentials.json
+token.json

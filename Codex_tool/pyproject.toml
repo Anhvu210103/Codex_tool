@@ -1,0 +1,21 @@
+[project]
+name = "mailnotes"
+version = "0.1.0"
+description = "Rule-based Gmail document notebook"
+requires-python = ">=3.11"
+dependencies = ["pypdf==6.1.1"]
+
+[project.optional-dependencies]
+web = ["Flask==3.1.2", "waitress==3.0.2"]
+
+[project.scripts]
+mailnotes = "mailnotes.cli:main"
+mailnotes-web = "mailnotes.web:main"
+mailnotes-app = "mailnotes.desktop:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-data]
+mailnotes = ["templates/*.html", "static/*.css", "static/*.js"]

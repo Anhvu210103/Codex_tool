@@ -1,0 +1,156 @@
+{
+  "gmail_query": "label:codex-demo",
+  "interval_seconds": 1800,
+  "data_dir": ".local",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "summary": {
+    "mode": "extractive",
+    "max_chars": 1200,
+    "provider": "deepseek",
+    "model": "deepseek-chat"
+  },
+  "rules": [
+    {
+      "category": "Văn bản pháp luật",
+      "keywords": [
+        "nghị định",
+        "thông tư",
+        "quyết định"
+      ],
+      "description": "Thông tư, nghị định, quyết định và các quy định pháp luật."
+    },
+    {
+      "category": "Công việc cần xử lý",
+      "keywords": [
+        "hạn chót",
+        "yêu cầu",
+        "báo cáo"
+      ],
+      "description": "Yêu cầu thực hiện, gửi báo cáo hoặc công việc có thời hạn."
+    },
+    {
+      "category": "Công văn chỉ đạo",
+      "keywords": [
+        "công văn",
+        "chỉ đạo",
+        "triển khai"
+      ],
+      "description": "Công văn giao nhiệm vụ, chỉ đạo điều hành, hướng dẫn triển khai; chú ý đơn vị nhận và việc phải thực hiện."
+    },
+    {
+      "category": "Thủ tục hành chính",
+      "keywords": [
+        "thủ tục hành chính",
+        "dịch vụ công",
+        "biểu mẫu"
+      ],
+      "description": "Quy trình tiếp nhận, xử lý hồ sơ, dịch vụ công, biểu mẫu và thời hạn giải quyết cho người dân hoặc doanh nghiệp."
+    },
+    {
+      "category": "Kinh tế và đầu tư",
+      "keywords": [
+        "phát triển kinh tế",
+        "đầu tư",
+        "dự án đầu tư"
+      ],
+      "description": "Chính sách phát triển kinh tế, kế hoạch đầu tư, dự án đầu tư và môi trường kinh doanh."
+    },
+    {
+      "category": "Tài chính và ngân sách",
+      "keywords": [
+        "ngân sách",
+        "dự toán",
+        "quyết toán"
+      ],
+      "description": "Dự toán, phân bổ, sử dụng, quyết toán kinh phí và ngân sách nhà nước."
+    },
+    {
+      "category": "Thuế, phí và lệ phí",
+      "keywords": [
+        "thuế",
+        "lệ phí",
+        "miễn giảm phí"
+      ],
+      "description": "Chính sách thuế, miễn giảm thuế, phí hoặc lệ phí và hướng dẫn thực hiện nghĩa vụ tài chính."
+    },
+    {
+      "category": "Đấu thầu và mua sắm công",
+      "keywords": [
+        "đấu thầu",
+        "mua sắm công",
+        "nhà thầu"
+      ],
+      "description": "Kế hoạch lựa chọn nhà thầu, hồ sơ mời thầu, kết quả đấu thầu và mua sắm tài sản công."
+    },
+    {
+      "category": "Doanh nghiệp và thương mại",
+      "keywords": [
+        "doanh nghiệp",
+        "đăng ký kinh doanh",
+        "thương mại"
+      ],
+      "description": "Đăng ký kinh doanh, hỗ trợ doanh nghiệp, hoạt động thương mại, xuất nhập khẩu."
+    },
+    {
+      "category": "Đất đai, xây dựng và hạ tầng",
+      "keywords": [
+        "đất đai",
+        "quy hoạch",
+        "xây dựng",
+        "hạ tầng"
+      ],
+      "description": "Quy hoạch, quản lý đất đai, cấp phép xây dựng, đầu tư hạ tầng và công trình."
+    },
+    {
+      "category": "Lao động, bảo hiểm và an sinh",
+      "keywords": [
+        "lao động",
+        "bảo hiểm",
+        "an sinh",
+        "việc làm"
+      ],
+      "description": "Chính sách lao động, việc làm, bảo hiểm xã hội, trợ cấp và an sinh xã hội."
+    },
+    {
+      "category": "Báo cáo và thống kê",
+      "keywords": [
+        "báo cáo",
+        "thống kê",
+        "số liệu"
+      ],
+      "description": "Báo cáo định kỳ hoặc đột xuất, biểu số liệu và thống kê phục vụ quản lý."
+    },
+    {
+      "category": "Nhân sự và công tác nội bộ",
+      "keywords": [
+        "nhân sự",
+        "tuyển dụng",
+        "điều động",
+        "kế hoạch công tác"
+      ],
+      "description": "Tổ chức cán bộ, tuyển dụng, điều động, cuộc họp và kế hoạch công tác trong cơ quan."
+    },
+    {
+      "category": "Thanh tra, kiểm tra và xử phạt",
+      "keywords": [
+        "thanh tra",
+        "kiểm tra",
+        "xử phạt"
+      ],
+      "description": "Kế hoạch hoặc kết luận thanh tra, kiểm tra, xử lý vi phạm và quyết định xử phạt."
+    }
+  ],
+  "unmatched_category": "Khác",
+  "classification_mode": "rules",
+  "gmail_pdf": true,
+  "pdf_ocr": false,
+  "gmail_filter": {
+    "period": "today",
+    "start_date": "",
+    "end_date": "",
+    "senders": [],
+    "label": "",
+    "pdf_only": false,
+    "include_spam_trash": false
+  }
+}
