@@ -1,10 +1,10 @@
 """Probe whether DeepSeek chat accepts a base64 image and can read its text.
 
-Usage: DEEPSEEK_API_KEY=... python scripts/probe_deepseek_vision.py [image.png]
+Usage: python scripts/probe_deepseek_vision.py [image.png]
 The default image contains a short test code. No customer document is sent.
 """
 import base64
-import io
+import getpass
 import json
 import os
 import sys
@@ -13,23 +13,8 @@ import urllib.request
 from pathlib import Path
 
 
-def test_image():
-    from PIL import Image, ImageDraw, ImageFont
-
-    image = Image.new('RGB', (900, 260), 'white')
-    draw = ImageDraw.Draw(image)
-    try:
-        font = ImageFont.truetype('DejaVuSans.ttf', 78)
-    except OSError:
-        font = ImageFont.load_default()
-    draw.text((35, 70), 'OCR TEST 4826', fill='black', font=font)
-    output = io.BytesIO()
-    image.save(output, format='PNG')
-    return output.getvalue(), 'image/png'
-
-
 def main():
-    key = os.environ.get('DEEPSEEK_API_KEY')
+    key = os.environ.get('DEEPSEEK_API_KEY') or getpass.getpass('DeepSeek API key (không hiện trên màn hình): ')
     if not key:
         print('Thiếu DEEPSEEK_API_KEY trong môi trường.', file=sys.stderr)
         return 2
@@ -40,7 +25,7 @@ def main():
             return 2
         image, mime = path.read_bytes(), 'image/png' if path.suffix.lower() == '.png' else 'image/jpeg'
     else:
-        image, mime = test_image()
+        image, mime = (Path(__file__).with_name('ocr-test-4826.png').read_bytes(), 'image/png')
     payload = {
         'model': 'deepseek-chat',
         'max_tokens': 100,
