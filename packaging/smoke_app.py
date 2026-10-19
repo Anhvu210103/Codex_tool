@@ -17,8 +17,9 @@ from pypdf.generic import DictionaryObject, NameObject, DecodedStreamObject
 
 
 ROOT = Path(__file__).resolve().parent.parent
-APP = (ROOT / 'dist' / 'SoGhiChep.app' / 'Contents' / 'MacOS' / 'SoGhiChep'
-       if sys.platform == 'darwin' else ROOT / 'dist' / 'SoGhiChep')
+APP = Path(os.environ['MAILNOTES_SMOKE_APP']) if os.environ.get('MAILNOTES_SMOKE_APP') else (
+    ROOT / 'dist' / 'SoGhiChep.app' / 'Contents' / 'MacOS' / 'SoGhiChep'
+    if sys.platform == 'darwin' else ROOT / 'dist' / 'SoGhiChep')
 
 
 def verify_workflow(opener, base, session, data):

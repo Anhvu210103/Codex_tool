@@ -8,15 +8,17 @@ Hai hệ điều hành dùng cùng quy trình nghiệp vụ và cấu trúc tài
 
 Trong repository → **Actions → Build desktop apps**, mở một lượt chạy thành công, kéo xuống **Artifacts** và tải bản đúng máy:
 
-- **SoGhiChep-Linux-x86_64**: cho Linux Intel/AMD 64-bit. Giải nén ZIP tải từ GitHub, rồi giải nén `SoGhiChep-Linux.tar.gz`. Bấm file `SoGhiChep` bên trong. Nếu hệ thống hỏi quyền chạy: Properties → Permissions → Allow executing file as program. Lần đầu app tự thêm mục **Sổ ghi chép** vào danh sách ứng dụng; lần sau tìm theo tên để mở. Giữ file app ở vị trí cố định, đừng xóa sau khi thêm vào menu.
+- **SoGhiChep-Linux-x86_64**: cho Linux Intel/AMD 64-bit. Giải nén artifact, cấp quyền chạy cho `SoGhiChep-x86_64.AppImage` rồi bấm mở. Có `SoGhiChep-Linux.tar.gz` làm phương án dự phòng cho máy không chạy được AppImage.
 - **SoGhiChep-macOS-AppleSilicon**: cho Mac M1/M2/M3/M4 và chip Apple Silicon tương thích.
 - **SoGhiChep-macOS-Intel**: cho Mac dùng CPU Intel.
 
-Mac: giải nén ZIP artifact rồi ZIP chứa app, kéo `SoGhiChep.app` vào Applications và mở. Bản build thử chưa có chứng chỉ Developer ID/notarization. macOS có thể yêu cầu mở bằng menu chuột phải/Open hoặc cho phép trong System Settings → Privacy & Security; chỉ làm với bản do bạn tự build/tải từ repository tin cậy. Không tắt Gatekeeper hoặc xác minh hệ thống. Ký và notarize bằng tài khoản Apple Developer là bước riêng trước khi phát hành chính thức cho khách.
+Mac: giải nén artifact, mở `SoGhiChep.dmg`, kéo `SoGhiChep.app` vào Applications rồi mở. Khi CI chưa được cấp Apple secrets, DMG chỉ ký ad-hoc để kiểm thử và macOS có thể yêu cầu xác nhận trong System Settings → Privacy & Security. Khi có Developer ID và thông tin notarization, cùng workflow tự ký hardened runtime, gửi Apple kiểm tra và staple vé vào DMG. Không tắt Gatekeeper.
 
 GitHub yêu cầu đăng nhập và quyền đọc repository để tải artifact. Có thể cần bật Actions cho repository nếu đang bị tắt. Quy trình build tự chạy khi nhánh codex/admin-web thay đổi các file app, hoặc chủ repository chọn Run workflow. Artifact chỉ có sau khi job tương ứng thành công; chưa coi bản Mac đã chạy được nếu chưa test trên Mac thật.
 
-CI chạy kiểm thử ứng dụng, đóng gói trên từng hệ điều hành, rồi khởi động bản vừa đóng gói và kiểm tra đăng nhập, PDF chữ → Markdown/nhóm, PDF scan → Cần xem lại và tải ZIP tiện ích trước khi tải artifact lên. Đây là phép thử tự động trên máy Mac của GitHub; vẫn cần thử trên iMac của khách để xác nhận phiên bản macOS, chip và quyền mở ứng dụng.
+CI chạy kiểm thử ứng dụng, đóng gói trên từng hệ điều hành, rồi khởi động bản vừa đóng gói và kiểm tra đăng nhập, PDF chữ → Markdown/nhóm, PDF scan → Cần xem lại và tải ZIP tiện ích trước khi tải artifact lên. Linux còn khởi động và kiểm tra chính AppImage. Đây là phép thử tự động trên máy Mac của GitHub; vẫn cần thử trên iMac của khách để xác nhận phiên bản macOS, chip và quyền mở ứng dụng.
+
+Để phát hành Mac không có cảnh báo, đặt các GitHub Actions secrets: `MACOS_CERTIFICATE_BASE64` (Developer ID Application `.p12` dạng base64), `MACOS_CERTIFICATE_PASSWORD`, `MACOS_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD`. Không ghi các giá trị này vào repository hoặc gửi trong chat.
 
 ## Dùng bản mã nguồn đã cài trên máy bạn
 
@@ -57,4 +59,6 @@ python3 -m venv .venv
 .venv/bin/python packaging/smoke_app.py
 ```
 
-Linux tạo `dist/SoGhiChep`; macOS tạo `dist/SoGhiChep.app`. Không cross-build Mac từ Linux. CI dùng Ubuntu 22.04 để có nền glibc cũ hơn; bản Linux build tại môi trường cloud hiện tại chỉ được kiểm chứng trên chính môi trường đó, không cam kết chạy mọi distro/CPU. OAuth Gmail thật, DeepSeek thật và bản macOS vẫn cần kiểm thử trên máy đích có credentials hợp lệ.
+Linux tạo `dist/SoGhiChep`, sau đó `packaging/package_linux.py` tạo AppImage bằng appimagetool và runtime đều đã kiểm tra SHA-256. macOS tạo `dist/SoGhiChep.app`, sau đó `packaging/package_macos.py` tạo và kiểm tra `dist/SoGhiChep.dmg`. Không cross-build Mac từ Linux. CI dùng Ubuntu 22.04 để có nền glibc cũ hơn; bản Linux build tại môi trường cloud hiện tại chỉ được kiểm chứng trên chính môi trường đó, không cam kết chạy mọi distro/CPU. OAuth Gmail thật, DeepSeek thật và bản macOS vẫn cần kiểm thử trên máy đích có credentials hợp lệ.
+
+Triển khai máy chủ bằng Docker là lựa chọn riêng, xem [hướng dẫn Docker](../deploy/docker.md). Docker không thay thế DMG trên máy khách vì không mở trực tiếp Finder và cần Docker Desktop.

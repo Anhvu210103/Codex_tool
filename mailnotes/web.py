@@ -26,7 +26,7 @@ from .gmail import SCOPE, form_request, save_token
 
 def create_app(base=None, data_root=None, public_url=None):
     base = Path(base or Path(__file__).resolve().parent.parent)
-    admin = Admin(base, data_root)
+    admin = Admin(base, data_root if data_root is not None else os.environ.get('MAILNOTES_DATA_DIR'))
     app = Flask(__name__)
     app.extensions['admin'] = admin
     secret_path = admin.private / 'session.json'

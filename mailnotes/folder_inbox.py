@@ -9,7 +9,8 @@ from .documents import MAX_PDF_BYTES
 
 
 def inbox_directory():
-    return (Path.home() / 'Downloads' / 'So-Ghi-Chep-Inbox').resolve()
+    configured = os.environ.get('MAILNOTES_INBOX_DIR')
+    return Path(configured).expanduser().resolve() if configured else (Path.home() / 'Downloads' / 'So-Ghi-Chep-Inbox').resolve()
 
 
 def ready_pdfs(root=None, minimum_age=3, now=None):

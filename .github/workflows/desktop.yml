@@ -11,6 +11,10 @@ on:
       - 'config.json'
       - 'examples/**'
       - 'requirements*.txt'
+      - 'Dockerfile'
+      - 'compose.yaml'
+      - '.dockerignore'
+      - 'deploy/docker.md'
       - '.github/workflows/desktop.yml'
     tags: ['desktop-v*']
 permissions:
@@ -38,16 +42,59 @@ jobs:
       - run: node tests/extension_download.cjs
       - run: python packaging/build.py
       - run: python packaging/smoke_app.py
-      - name: Archive Linux app
+      - name: Build Linux AppImage
         if: runner.os == 'Linux'
-        run: tar -C dist -czf SoGhiChep-Linux.tar.gz SoGhiChep
-      - name: Archive macOS app
+        env:
+          APPIMAGETOOL_SHA256: 95cbe7cce9717fce90c484e34052ee7c7f1d7635b33c12525b4776826a7d29b6
+          APPIMAGE_RUNTIME_SHA256: 156f4bdbde9c52d01814600013e0a273f0118dc2de98975f3c8c63427ec79074
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/appimagetool" https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/runtime-x86_64" https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64
+          echo "$APPIMAGETOOL_SHA256  $RUNNER_TEMP/appimagetool" | sha256sum --check --strict
+          echo "$APPIMAGE_RUNTIME_SHA256  $RUNNER_TEMP/runtime-x86_64" | sha256sum --check --strict
+          chmod +x "$RUNNER_TEMP/appimagetool"
+          python packaging/package_linux.py --appimagetool "$RUNNER_TEMP/appimagetool" --runtime "$RUNNER_TEMP/runtime-x86_64"
+          APPIMAGE_EXTRACT_AND_RUN=1 MAILNOTES_SMOKE_APP=dist/SoGhiChep-x86_64.AppImage python packaging/smoke_app.py
+          tar -C dist -czf SoGhiChep-Linux.tar.gz SoGhiChep
+      - name: Import Apple signing certificate when configured
         if: runner.os == 'macOS'
-        run: ditto -c -k --sequesterRsrc --keepParent dist/SoGhiChep.app SoGhiChep-macOS.zip
+        env:
+          MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGNING_IDENTITY_SECRET: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          if [ -z "$MACOS_CERTIFICATE_BASE64" ]; then
+            echo "Không có chứng thư Apple; tạo DMG ký ad-hoc để kiểm thử."
+            exit 0
+          fi
+          python -c 'import base64,os,pathlib; pathlib.Path(os.environ["RUNNER_TEMP"],"certificate.p12").write_bytes(base64.b64decode(os.environ["MACOS_CERTIFICATE_BASE64"],validate=True))'
+          KEYCHAIN="$RUNNER_TEMP/so-ghi-chep.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$KEYCHAIN" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN"
+          echo "MACOS_SIGNING_IDENTITY=$MACOS_SIGNING_IDENTITY_SECRET" >> "$GITHUB_ENV"
+          echo "MACOS_BUILD_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+      - name: Build macOS DMG and notarize when configured
+        if: runner.os == 'macOS'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: python packaging/package_macos.py
+      - name: Remove temporary Apple keychain
+        if: runner.os == 'macOS' && always()
+        run: |
+          if [ -n "${MACOS_BUILD_KEYCHAIN:-}" ]; then security delete-keychain "$MACOS_BUILD_KEYCHAIN"; fi
+          rm -f "$RUNNER_TEMP/certificate.p12"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: |
             SoGhiChep-Linux.tar.gz
-            SoGhiChep-macOS.zip
+            dist/SoGhiChep-x86_64.AppImage
+            dist/SoGhiChep.dmg
           if-no-files-found: error

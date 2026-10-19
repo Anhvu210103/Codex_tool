@@ -8,7 +8,7 @@ Linux và macOS dùng cùng luồng PDF → Markdown → DeepSeek → thư mục
 
 Có launcher **Mo-So-Ghi-Chep.sh** cho bản mã nguồn Linux đã cài và gói app tự chứa Python/thư viện cho Linux/macOS. Bấm app để tự chạy nền và mở trang quản trị. Lần bấm tiếp theo mở lại phiên đang chạy. Đăng nhập rồi dùng nút **Tắt tool** để dừng hẳn; đóng tab chỉ đóng giao diện.
 
-Xem [cách tải app, cài và giữ dữ liệu](packaging/README.md). Bản Linux đã build và kiểm chứng chạy độc lập tại môi trường phát triển; bản Mac có quy trình build GitHub Actions riêng cho Apple Silicon/Intel, chưa khẳng định hoạt động trên máy khách trước khi có kết quả build và kiểm thử. App Mac thử nghiệm chưa ký/notarize. Dữ liệu riêng được giữ ngoài app để không mất khi cập nhật.
+Xem [cách tải app, cài và giữ dữ liệu](packaging/README.md). Khách Mac dùng DMG, khách Linux dùng AppImage; mỗi bản được build trên đúng hệ điều hành và kiến trúc. Nếu chưa cấu hình chứng thư Apple thì DMG vẫn là bản thử ký ad-hoc. Dữ liệu riêng được giữ ngoài app để không mất khi cập nhật. Docker chỉ dành cho [máy chủ hoặc người quản trị kỹ thuật](deploy/docker.md).
 
 ## Tiện ích Chrome — thử trên Gmail đã đăng nhập
 

@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+.local
+build
+dist
+__pycache__
+*.pyc
+*.spec
+.env
+credentials.json
+token.json

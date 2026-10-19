@@ -9,7 +9,7 @@ from unittest.mock import patch
 from pypdf import PdfWriter
 
 from mailnotes.admin import Admin
-from mailnotes.folder_inbox import archive_processed, ready_pdfs
+from mailnotes.folder_inbox import archive_processed, inbox_directory, ready_pdfs
 from mailnotes.web import create_app
 
 
@@ -35,6 +35,10 @@ class FolderInboxTests(unittest.TestCase):
             self.assertTrue(moved.is_file());self.assertFalse(valid.exists())
             self.assertEqual(ready_pdfs(root,now=time.time())[0],[])
             outside.unlink()
+
+    def test_managed_install_can_override_inbox_directory(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'MAILNOTES_INBOX_DIR':directory}):
+            self.assertEqual(inbox_directory(), Path(directory).resolve())
 
     def test_admin_imports_folder_pdf_moves_it_and_skips_cross_source_duplicate(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -1,0 +1,27 @@
+services:
+  so-ghi-chep:
+    build: .
+    image: so-ghi-chep:local
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      MAILNOTES_ADMIN_PASSWORD: "${MAILNOTES_ADMIN_PASSWORD:?Đặt mật khẩu quản trị từ 12 ký tự trong file .env}"
+      MAILNOTES_PUBLIC_URL: "http://localhost:8080"
+      MAILNOTES_DATA_DIR: "/data"
+      MAILNOTES_INBOX_DIR: "/inbox"
+      TZ: "${TZ:-Asia/Ho_Chi_Minh}"
+    volumes:
+      - so-ghi-chep-data:/data
+      - "${HOME}/Downloads/So-Ghi-Chep-Inbox:/inbox"
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  so-ghi-chep-data:
