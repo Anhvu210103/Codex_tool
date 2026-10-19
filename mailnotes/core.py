@@ -138,7 +138,7 @@ def process(messages, config, source):
                 continue
             reason = message.get('review_reason', '')
             if reason and not message['body'].strip():
-                categories, summary = ['Cần xem lại'], 'Chưa đọc được nội dung PDF. Cần kiểm tra bản gốc.'
+                categories, summary = ['Cần xem lại'], reason
             elif config.get('classification_mode', 'rules') == 'ai' or config.get('summary', {}).get('mode') == 'openai':
                 from .ai import analyze
                 categories, summary, reason = analyze(message, config, connection)

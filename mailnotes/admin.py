@@ -107,7 +107,7 @@ def validate_settings(value):
         raise ValueError('Trạng thái thư mục nhận không hợp lệ.')
     return {'source': source, 'schedule_enabled': enabled, 'classification_mode': classification,
             'folder_inbox_enabled': folder_enabled,
-            'gmail_pdf': value.get('gmail_pdf', True) is True or (gmail_filter['period'] != 'advanced' and gmail_filter['pdf_only']), 'pdf_ocr': False,
+            'gmail_pdf': value.get('gmail_pdf', True) is True or (gmail_filter['period'] != 'advanced' and gmail_filter['pdf_only']),
             'gmail_query': text('Bộ lọc Gmail', value.get('gmail_query', ''), 1000, empty=gmail_filter['period'] != 'advanced'),
             'gmail_filter': gmail_filter,
             'interval_seconds': integer('Chu kỳ (giây)', value.get('interval_seconds'), 60, 604800),

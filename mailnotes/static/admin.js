@@ -73,7 +73,7 @@ function populateSettings() {
   $('provider').value=config.summary.provider || 'deepseek';
   const prices=config.summary.pricing || {};
   $('price-input').value=prices.input_per_million ?? ''; $('price-cache').value=prices.cached_input_per_million ?? ''; $('price-output').value=prices.output_per_million ?? '';
-  $('gmail-pdf').checked=config.gmail_pdf; $('pdf-ocr').checked=config.pdf_ocr;
+  $('gmail-pdf').checked=config.gmail_pdf;
   $('ai-options').hidden=config.summary.mode !== 'openai';updateProviderUI();
   $('keep-unmatched').checked=!!config.unmatched_category; $('unmatched').value=config.unmatched_category || 'Khác';
   $('unmatched').disabled=!$('keep-unmatched').checked;
@@ -95,7 +95,7 @@ async function saveSettings(includeRules = false) {
     next.source=$('source').value; next.gmail_query=$('gmail-query').value.trim(); next.interval_seconds=minutes*60;
     next.timezone=$('timezone').value.trim(); next.schedule_enabled=$('schedule').checked;next.folder_inbox_enabled=$('folder-inbox-enabled').checked;
     next.classification_mode=$('summary-mode').value==='openai'?'ai':'rules';
-    next.gmail_pdf=$('gmail-pdf').checked || (next.gmail_filter.period!=='advanced' && next.gmail_filter.pdf_only);next.pdf_ocr=$('pdf-ocr').checked;
+    next.gmail_pdf=$('gmail-pdf').checked || (next.gmail_filter.period!=='advanced' && next.gmail_filter.pdf_only);
     next.summary={provider:$('provider').value,mode:$('summary-mode').value,max_chars:Number($('max-chars').value),max_input_chars:Number($('max-input').value),model:$('model').value.trim(),pricing:{input_per_million:priceValue('price-input'),cached_input_per_million:priceValue('price-cache'),output_per_million:priceValue('price-output')},ai_consent:$('ai-consent').checked};
     if (next.summary.mode==='openai' && !next.summary.ai_consent) throw new Error('Hãy xác nhận đồng ý xử lý nội dung qua nhà cung cấp đã chọn trước khi bật AI.');
   }
@@ -132,7 +132,7 @@ async function refreshStatus() {
   $('ai-key-state').textContent=status.ai_key_configured?'Đã có key. Giá trị không hiển thị lại.':'Chưa có API key';
   $('connect-gmail').disabled=!status.gmail_client_configured || status.running;
   $('dashboard-pdf-state').textContent=config.gmail_pdf?'Tự tải và đọc nội dung':'Chưa bật';
-  if($('pdf-processing-description'))$('pdf-processing-description').textContent='PDF có chữ được chuyển sang Markdown rồi gửi chữ cho DeepSeek. PDF scan được giữ trong Cần xem lại; không chạy OCR.';
+  if($('pdf-processing-description'))$('pdf-processing-description').textContent='PDF có lớp chữ được chuyển sang Markdown rồi tự gửi DeepSeek. PDF scan không có lớp chữ sẽ vào Cần xem lại vì DeepSeek API không OCR ảnh PDF.';
   if (activeTab==='overview') await loadOverview();
   if (activeTab==='notebook') await loadNotes();
   if (activeTab==='usage') await loadUsage();
@@ -324,10 +324,9 @@ $('edit-groups-form').addEventListener('submit',async event=>{
   catch(error){$('edit-error').textContent=error.message;}finally{button.disabled=false;}
 });
 function updateProviderUI(){
- if($('local-ocr-label'))$('local-ocr-label').hidden=true;$('pdf-ocr').disabled=true;$('pdf-ocr').checked=false;
- if($('pdf-reader-help'))$('pdf-reader-help').textContent='PDF có chữ → Markdown → DeepSeek → thư mục nhóm. PDF scan vào Cần xem lại, không chạy OCR.';
+ if($('pdf-reader-help'))$('pdf-reader-help').textContent='PDF có lớp chữ → Markdown → DeepSeek → thư mục nhóm. PDF scan không có lớp chữ sẽ vào Cần xem lại vì DeepSeek API không OCR ảnh PDF.';
 }
-action('setup-deepseek',()=>{setTab('settings');$('summary-mode').value='openai';$('ai-options').hidden=false;updateProviderUI();notice('Nhập DeepSeek API key, bấm Lưu key riêng, xác nhận đồng ý gửi chữ tài liệu rồi Lưu cài đặt. PDF scan sẽ vào Cần xem lại.');$('ai-key').scrollIntoView({behavior:'smooth',block:'center'});$('ai-key').focus();});
+action('setup-deepseek',()=>{setTab('settings');$('summary-mode').value='openai';$('ai-options').hidden=false;updateProviderUI();notice('Nhập DeepSeek API key, bấm Lưu key riêng, xác nhận đồng ý gửi chữ tài liệu rồi Lưu cài đặt. PDF có lớp chữ sẽ tự gửi DeepSeek; PDF scan sẽ vào Cần xem lại.');$('ai-key').scrollIntoView({behavior:'smooth',block:'center'});$('ai-key').focus();});
 action('upload-pdf',async()=>{
   const file=$('pdf-file').files[0];if(!file)throw new Error('Chọn file PDF trước.');
   if(file.size>20*1024*1024)throw new Error('PDF tối đa 20 MB.');

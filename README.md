@@ -28,7 +28,7 @@ Trước khi chạy, trong Cài đặt bật DeepSeek AI, lưu key và đồng �
 
 ## PDF → Markdown → nhóm trên máy
 
-PDF có lớp chữ được chuyển bằng pypdf thành Markdown trước khi gửi chữ cho DeepSeek. Không chạy OCR, không yêu cầu Tesseract trên Linux/Mac. Bản scan không có chữ được giữ nguyên PDF và tạo ghi chú Cần xem lại, không gọi AI để đoán nội dung. PDF vừa có chữ vừa có trang scan/trắng sẽ có cảnh báo phần chưa đọc. Chuyển Markdown là trích chữ, không cam kết giữ đúng bảng, cột và bố cục của PDF. PDF gốc giữ trong `files/`; mỗi nhóm có bản PDF và ghi chú Markdown riêng trong `Theo-nhom/<nhóm>/` hoặc `Can-xem-lai/`. Sổ ghi chép web và Markdown theo ngày hiển thị đường dẫn PDF trên máy.
+PDF có lớp chữ được chuyển bằng pypdf thành Markdown rồi tự gửi cho DeepSeek. DeepSeek API chỉ nhận văn bản, không OCR ảnh PDF; bản scan không có lớp chữ được giữ nguyên và tạo ghi chú Cần xem lại với lý do rõ ràng. PDF vừa có chữ vừa có trang scan/trắng sẽ có cảnh báo phần chưa đọc. Chuyển Markdown là trích chữ, không cam kết giữ đúng bảng, cột và bố cục của PDF. PDF gốc giữ trong `files/`; mỗi nhóm có bản PDF và ghi chú Markdown riêng trong `Theo-nhom/<nhóm>/` hoặc `Can-xem-lai/`. Sổ ghi chép web và Markdown theo ngày hiển thị đường dẫn PDF trên máy.
 
 Mỗi nguồn Gmail, PDF tải lên và AI thao tác có kho riêng trong thư mục dữ liệu. `files/` giữ PDF gốc, `Markdown/` giữ bản chữ, `Theo-nhom/<tên nhóm>/` chứa bản Markdown gồm tóm tắt và toàn bộ chữ trích được, `Can-xem-lai/` giữ ghi chú cần kiểm tra. Một tài liệu có nhiều nhóm có nhiều bản Markdown, dùng chung PDF gốc. Tên file/thư mục có mã ngắn để tránh trùng hoặc thoát đường dẫn. Khi sửa nhóm trong sổ, bản Markdown theo nhóm được cập nhật mà không gọi AI.
 
@@ -48,7 +48,7 @@ Bản đã cài giữ nguyên nhóm người dùng đã lưu. Muốn bổ sung n
 4. Vào **Sổ ghi chép**, chọn PDF và bấm **Đọc & ghi vào sổ**; hoặc bật **Đọc PDF đính kèm Gmail** rồi chạy nguồn Gmail. Một tài liệu có thể thuộc nhiều nhóm.
 5. Bấm **Sửa nhóm** tại dòng ghi chép khi cần điều chỉnh. Không gọi AI lại khi sửa nhóm. Có nút tải PDF gốc.
 
-AI được gọi một lần để trả cả nhóm và tóm tắt, có cache và chống xử lý trùng. Không chắc chắn/nhóm lạ sẽ vào **Cần xem lại**. PDF scan được giữ trong Cần xem lại; luồng hiện tại không chạy OCR và không cần cài Tesseract. PDF quá dài bị giới hạn và có cảnh báo; không coi trích đoạn hoặc tóm tắt phần đầu là đã đọc toàn bộ tài liệu. Lần tải lại PDF đã có mặc định xử lý lại theo cấu hình mới; có thể tốn phí và thay nội dung/nhóm đã chỉnh tay. Có thể bỏ dấu chọn nếu muốn giữ bản đã xử lý.
+AI được gọi một lần để trả cả nhóm và tóm tắt, có cache và chống xử lý trùng. Không chắc chắn/nhóm lạ sẽ vào **Cần xem lại**. PDF scan được giữ trong Cần xem lại vì DeepSeek API không OCR ảnh PDF; không còn lựa chọn OCR local gây lỗi thiếu Poppler/Tesseract. PDF quá dài bị giới hạn và có cảnh báo; không coi trích đoạn hoặc tóm tắt phần đầu là đã đọc toàn bộ tài liệu. Lần tải lại PDF đã có mặc định xử lý lại theo cấu hình mới; có thể tốn phí và thay nội dung/nhóm đã chỉnh tay. Có thể bỏ dấu chọn nếu muốn giữ bản đã xử lý.
 
 Đã kiểm chứng với PDF có chữ thật, AI giả lập và trình duyệt thật. DeepSeek thật chưa được gọi vì chưa có API key; chất lượng phân nhóm/tóm tắt cần đối chiếu tài liệu của khách. Chế độ mẫu luôn dùng rules và trích đoạn miễn phí, không giả vờ là kết quả AI.
 

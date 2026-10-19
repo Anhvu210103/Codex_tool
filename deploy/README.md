@@ -60,7 +60,7 @@ Một request AI trả JSON nhóm + tóm tắt. Nhóm ngoài danh sách, confide
 
 DeepSeek dùng endpoint cố định `https://api.deepseek.com/chat/completions`, model mặc định `deepseek-chat`; không cho nhập endpoint tùy ý. Cho phép domain `api.deepseek.com` trong mạng máy chủ. Key nhập qua web hoặc `DEEPSEEK_API_KEY`. Không có key thật trong repo. Giá và quota phụ thuộc tài khoản nhà cung cấp; chưa xác nhận chi phí hay độ chính xác trên tài liệu khách.
 
-Luồng hiện tại chỉ chuyển PDF có lớp chữ thành Markdown bằng pypdf. Không cài Tesseract/Poppler và không chạy OCR. Bản scan vào Cần xem lại, không gửi chữ rỗng đến DeepSeek. Sao lưu các thư mục files/, Markdown/, Theo-nhom/, Can-xem-lai/, exports/ cùng SQLite. Sửa nhóm trong sổ sẽ đồng bộ các bản Markdown theo nhóm.
+Luồng hiện tại chuyển PDF có lớp chữ thành Markdown bằng pypdf rồi tự gửi chữ cho DeepSeek. DeepSeek API text không OCR ảnh PDF; bản scan vào Cần xem lại với lý do này, không gửi chữ rỗng đến DeepSeek và không yêu cầu khách cài Tesseract/Poppler. Sao lưu các thư mục files/, Markdown/, Theo-nhom/, Can-xem-lai/, exports/ cùng SQLite. Sửa nhóm trong sổ sẽ đồng bộ các bản Markdown theo nhóm.
 
 ## Usage và đơn giá
 
