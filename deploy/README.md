@@ -60,7 +60,9 @@ Một request AI trả JSON nhóm + tóm tắt. Nhóm ngoài danh sách, confide
 
 DeepSeek dùng endpoint cố định `https://api.deepseek.com/chat/completions`, model mặc định `deepseek-chat`; không cho nhập endpoint tùy ý. Cho phép domain `api.deepseek.com` trong mạng máy chủ. Key nhập qua web hoặc `DEEPSEEK_API_KEY`. Không có key thật trong repo. Giá và quota phụ thuộc tài khoản nhà cung cấp; chưa xác nhận chi phí hay độ chính xác trên tài liệu khách.
 
-Luồng hiện tại chuyển PDF có lớp chữ thành Markdown bằng pypdf rồi tự gửi chữ cho DeepSeek. DeepSeek API text không OCR ảnh PDF; bản scan vào Cần xem lại với lý do này, không gửi chữ rỗng đến DeepSeek và không yêu cầu khách cài Tesseract/Poppler. Sao lưu các thư mục files/, Markdown/, Theo-nhom/, Can-xem-lai/, exports/ cùng SQLite. Sửa nhóm trong sổ sẽ đồng bộ các bản Markdown theo nhóm.
+Luồng hiện tại chuyển PDF có lớp chữ thành Markdown bằng pypdf rồi tự gửi chữ cho DeepSeek. PDF scan được OCR bằng Google Document AI cloud khi đã cấu hình processor và service account trong Cài đặt; nếu chưa cấu hình hoặc OCR thất bại thì vào Cần xem lại, không gửi chữ rỗng đến DeepSeek và không yêu cầu khách cài Tesseract/Poppler. Sao lưu các thư mục files/, Markdown/, Theo-nhom/, Can-xem-lai/, exports/ cùng SQLite. Sửa nhóm trong sổ sẽ đồng bộ các bản Markdown theo nhóm.
+
+Để đọc PDF scan, vào **Cài đặt → OCR cloud cho PDF scan**, tạo processor Google Document AI loại Document OCR, nhập processor resource name và tải service account JSON. Credential chỉ lưu trong thư mục private của tool. Khi đã cấu hình, tool tự OCR cloud các PDF không có lớp chữ rồi gửi văn bản nhận được cho DeepSeek; PDF có lớp chữ không gọi OCR. Cần bật Document AI API và cấp quyền `Document AI API User` cho service account. OCR cloud có thể phát sinh phí riêng theo số trang.
 
 ## Usage và đơn giá
 

@@ -7,7 +7,7 @@ from pathlib import Path
 MAX_PDF_BYTES = 20 * 1024 * 1024
 
 
-def pdf_text(data):
+def pdf_text(data, ocr=None):
     from pypdf import PdfReader
     if len(data) > MAX_PDF_BYTES:
         return '', 'PDF vượt giới hạn 20 MB; cần xử lý riêng.'
@@ -29,7 +29,13 @@ def pdf_text(data):
         if len(text) > 100000:
             warnings.append('Nội dung vượt 100.000 ký tự; đã giới hạn phần đọc.')
         return text[:100000], ' '.join(warnings)
-    return '', 'PDF scan không có lớp chữ. DeepSeek API chỉ nhận văn bản nên không thể OCR ảnh PDF; hãy dùng bản PDF đã OCR hoặc có lớp chữ để tool tự phân loại và tóm tắt.'
+    if ocr:
+        try:
+            text = ocr.extract(data)
+            return text, 'Đã đọc PDF scan bằng Google Document AI OCR cloud; cần đối chiếu bản gốc.'
+        except Exception as error:
+            return '', str(error)
+    return '', 'PDF scan không có lớp chữ. OCR cloud chưa được cấu hình; DeepSeek API chỉ nhận văn bản nên không thể OCR ảnh PDF.'
 
 
 def save_pdf(data, root):
@@ -47,7 +53,7 @@ def save_pdf(data, root):
 def pdf_message(data, filename, config, **metadata):
     if len(data) > MAX_PDF_BYTES or not data.startswith(b'%PDF-'):
         raise ValueError('Chọn file PDF hợp lệ, tối đa 20 MB.')
-    text, warning = pdf_text(data)
+    text, warning = pdf_text(data, config.get('_ocr_client'))
     digest = save_pdf(data, config['data_dir'])
     from .archive import save_markdown
     markdown = save_markdown(config['data_dir'], digest, text)

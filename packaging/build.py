@@ -9,6 +9,7 @@ name = 'SoGhiChep'
 args = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--name', name,
         '--exclude-module', 'playwright',
         '--onefile', '--windowed', '--collect-data', 'certifi', '--paths', str(root), '--collect-all', 'pypdf', '--collect-all', 'waitress',
+        '--collect-submodules', 'google.auth', '--collect-submodules', 'google.oauth2',
         '--add-data', str(root/'config.json') + ':.' ,
         '--add-data', str(root/'examples') + ':examples',
         '--add-data', str(root/'chrome-extension') + ':chrome-extension',

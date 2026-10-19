@@ -184,6 +184,8 @@ class Admin:
         self.settings_path = self.private / 'settings.json'
         self.credentials = self.private / 'gmail-client.json'
         self.token = self.private / 'gmail-token.json'
+        self.ocr_settings_path = self.private / 'document-ai.json'
+        self.ocr_credentials_path = self.private / 'document-ai-service-account.json'
         defaults = read_json(self.base / 'config.json', {})
         defaults.update(source='demo', schedule_enabled=False)
         saved = read_json(self.settings_path, defaults)
@@ -228,10 +230,13 @@ class Admin:
 
     def status(self):
         with self.lock:
+            ocr = read_json(self.ocr_settings_path, {})
             return {**self.state, 'next_run': self.next_due if self.settings['schedule_enabled'] else None,
                     'schedule_enabled': self.settings['schedule_enabled'],
                     'folder_inbox_enabled':self.settings['folder_inbox_enabled'], 'folder_next_run':self.folder_next_due if self.settings['folder_inbox_enabled'] else None,
                     'folder_inbox':copy.deepcopy(self.folder_state),
+                    'ocr_configured': bool(ocr.get('processor') and self.ocr_credentials_path.exists()),
+                    'ocr_processor': ocr.get('processor', ''),
                     'gmail_connected': self.token.exists(), 'gmail_client_configured': self.credentials.exists(),
                     'ai_key_configured': self.has_key(self.settings['summary']['provider']),
                     'ai_provider': self.settings['summary']['provider']}
@@ -312,10 +317,27 @@ class Admin:
         config['data_dir'] = str(self.root / source)
         key = read_json(self.key_path(config['summary']['provider']), {}).get('key')
         config['_api_key'] = key
+        self.attach_ocr(config)
         if source == 'demo':
             config['classification_mode'] = 'rules'
             config['summary']['mode'] = 'extractive'
         return config
+
+    def attach_ocr(self, config):
+        settings = read_json(self.ocr_settings_path, {})
+        if settings.get('processor') and self.ocr_credentials_path.exists():
+            from .ocr import DocumentAIOCR
+            config['_ocr_client'] = DocumentAIOCR(settings['processor'], read_json(self.ocr_credentials_path, {}))
+        return config
+
+    def save_ocr(self, processor, credentials):
+        if not isinstance(processor, str) or len(processor) > 500 or not processor.strip().startswith('projects/'):
+            raise ValueError('Processor Google Document AI không hợp lệ.')
+        if not isinstance(credentials, dict) or credentials.get('type') != 'service_account' or not credentials.get('client_email') or not credentials.get('private_key'):
+            raise ValueError('File service account Google không hợp lệ.')
+        private_json(self.ocr_settings_path, {'processor': processor.strip()})
+        private_json(self.ocr_credentials_path, credentials)
+        return {'configured': True, 'processor': processor.strip()}
 
     def _process_pdf_locked(self, data, filename, reprocess=False, source='pdf'):
         if source not in ('pdf', 'ai', 'folder'):
@@ -398,6 +420,7 @@ class Admin:
             return False
         try:
             config = self.config()
+            self.attach_ocr(config)
             source = source or config['source']
             if source not in ('demo', 'gmail'):
                 raise ValueError('Nguồn không hợp lệ.')

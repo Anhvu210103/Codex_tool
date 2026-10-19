@@ -1,6 +1,6 @@
 # Chốt luồng Linux trước khi bàn giao
 
-Phạm vi: chạy tay tối đa 20 thư/lượt; lịch tiện ích quét Gmail hôm nay mỗi 30 phút, tối đa 100 thư/trang và 20 trang/lượt. Mọi PDF trong một thư được xử lý. Tool tạo Markdown, dùng DeepSeek phân nhóm/tóm tắt, lưu vào nguồn AI thao tác và xuất thư mục nhóm. Bản scan vào Cần xem lại vì DeepSeek API không OCR ảnh PDF. Gmail API là bộ kết nối theo lịch riêng, không phải lịch tự thao tác của tiện ích.
+Phạm vi: chạy tay tối đa 20 thư/lượt; lịch tiện ích quét Gmail hôm nay mỗi 30 phút, tối đa 100 thư/trang và 20 trang/lượt. Mọi PDF trong một thư được xử lý. Tool tạo Markdown, dùng DeepSeek phân nhóm/tóm tắt, lưu vào nguồn AI thao tác và xuất thư mục nhóm. Bản scan dùng Google Document AI OCR cloud nếu đã cấu hình, nếu không thì vào Cần xem lại. Gmail API là bộ kết nối theo lịch riêng, không phải lịch tự thao tác của tiện ích.
 
 1. Mở tool và Chrome bình thường. Lưu DeepSeek key trong tool, bật AI và lưu nhóm mẫu. Ghép nối tiện ích phiên bản 0.5.0 với đúng địa chỉ/cổng tool. Sau cập nhật, bấm Reload tại `chrome://extensions` rồi tải lại Gmail.
 2. Trong Gmail tìm một email mẫu có PDF bôi đen/copy chữ được. Bấm Thử 1 thư, để tiện ích tự thao tác và không bấm tải hộ. Báo cáo phải có `tim-nut-tai`, `da-bam-tai`, `chrome-bat-dau`, `chrome-xong`, `dong-pdf`. Nếu thiếu `da-bam-tai`, Gmail chưa nhận click; nếu thiếu `chrome-bat-dau`, Chrome chưa tạo lượt tải. Tiện ích thử Esc khi nút Đóng không hoạt động. Kiểm tra Ctrl+J và sao chép Báo cáo lần chạy nếu còn lỗi.

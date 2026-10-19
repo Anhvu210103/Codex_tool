@@ -100,6 +100,17 @@ class DocumentAITests(unittest.TestCase):
             self.assertEqual(process([scan],self.config,'pdf'),1)
         self.assertTrue((self.root/'files'/ (document['file_hash']+'.pdf')).exists())
 
+    def test_scan_uses_cloud_ocr_before_deepseek(self):
+        config=dict(self.config)
+        class FakeOCR:
+            def extract(self, data):
+                return 'Nội dung OCR từ công văn scan.'
+        config['_ocr_client']=FakeOCR()
+        writer=PdfWriter();writer.add_blank_page(width=600,height=800);output=io.BytesIO();writer.write(output)
+        document=pdf_message(output.getvalue(),'scan-ocr.pdf',config,id='scan-ocr',sender='Upload',received_at=self.mail['received_at'])
+        self.assertIn('Nội dung OCR',document['body'])
+        self.assertIn('Google Document AI',document['review_reason'])
+
     def test_gmail_pdf_attachment_and_skip_download_after_processing(self):
         data=sample_pdf();encoded=base64.urlsafe_b64encode(data).decode().rstrip('=')
         detail={'id':'email1','internalDate':'1791939600000','payload':{'headers':[{'name':'From','value':'office@example.com'}], 'parts':[{'mimeType':'application/pdf','filename':'report.pdf','body':{'attachmentId':'attachment1','size':len(data)}}]}}
