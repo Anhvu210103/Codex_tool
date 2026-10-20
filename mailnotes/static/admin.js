@@ -154,7 +154,7 @@ async function refreshStatus() {
   $('ai-key-state').textContent=status.ai_key_configured?'Đã có key. Giá trị không hiển thị lại.':'Chưa có API key';
   $('connect-gmail').disabled=!status.gmail_client_configured || status.running;
   $('dashboard-pdf-state').textContent=config.gmail_pdf?'Tự tải và đọc nội dung':'Chưa bật';
-  if($('pdf-processing-description'))$('pdf-processing-description').textContent='PDF có lớp chữ được chuyển sang Markdown rồi tự gửi DeepSeek. PDF scan không có lớp chữ sẽ vào Cần xem lại vì DeepSeek API không OCR ảnh PDF.';
+  if($('pdf-processing-description'))$('pdf-processing-description').textContent='PDF có chữ được chuyển sang Markdown rồi gửi DeepSeek. PDF scan được thử OCR qua DeepSeek; nếu API không nhận ảnh, tài liệu vào Cần xem lại.';
   if (activeTab==='overview') await loadOverview();
   if (activeTab==='notebook') await loadNotes();
   if (activeTab==='usage') await loadUsage();
@@ -213,7 +213,7 @@ async function boot() {
     $('auth-form').dataset.setup=info.needs_setup?'yes':'no';return;
   }
   for(const id of ['notes-source','dashboard-source']){const select=$(id);if(select&&!select.querySelector('option[value="folder"]')){const option=document.createElement('option');option.value='folder';option.textContent='Thư mục nhận PDF';select.append(option);}}
-  config=await api('/api/settings'); populateSettings(); ensureOcrCard(); simplifySettings(); await loadOcrSettings();
+  config=await api('/api/settings'); populateSettings(); simplifySettings();
   const inbox=await api('/api/folder-inbox');$('folder-inbox-path').textContent=inbox.path;$('open-folder-inbox').disabled=!inbox.can_open;$('overview-folder').disabled=!inbox.can_open;
   const selectedSource=initialSource();
   $('notes-source').value=selectedSource;$('dashboard-source').value=selectedSource;
@@ -349,18 +349,9 @@ $('edit-groups-form').addEventListener('submit',async event=>{
   catch(error){$('edit-error').textContent=error.message;}finally{button.disabled=false;}
 });
 function updateProviderUI(){
- if($('pdf-reader-help'))$('pdf-reader-help').textContent='PDF có lớp chữ → Markdown → DeepSeek → thư mục nhóm. PDF scan sẽ qua OCR cloud nếu đã cấu hình Google Document AI; nếu chưa cấu hình sẽ vào Cần xem lại.';
+ if($('pdf-reader-help'))$('pdf-reader-help').textContent='PDF có chữ → Markdown → DeepSeek. PDF scan được thử OCR bằng DeepSeek; nếu API không nhận ảnh, file vào Cần xem lại.';
 }
-function ensureOcrCard(){
- if($('document-ai-card'))return;
- const card=document.createElement('article');card.id='document-ai-card';card.className='card wide';
- card.innerHTML='<div class="section-heading"><div><h2>OCR cloud cho PDF scan</h2><p>Tự dùng Google Document AI khi PDF không có lớp chữ.</p></div><span id="document-ai-badge" class="badge">Chưa cấu hình</span></div><p>DeepSeek vẫn phân loại và tóm tắt. Google Document AI chỉ chuyển ảnh PDF thành chữ; credential được lưu riêng trên máy này.</p><label>Processor resource name<input id="document-ai-processor" placeholder="projects/…/locations/us/processors/…"></label><label>Service account JSON<input id="document-ai-file" type="file" accept="application/json,.json"></label><div class="card-actions"><button id="save-document-ai" class="primary">Lưu cấu hình OCR</button><button id="delete-document-ai" class="quiet danger">Xóa OCR cloud</button></div><p id="document-ai-status" class="field-help" role="status">Chưa cấu hình.</p>';
- $('settings').querySelector('.settings-grid').after(card);
- action('save-document-ai',async()=>{const file=$('document-ai-file').files[0];const processor=$('document-ai-processor').value.trim();if(!processor||!file)throw new Error('Nhập processor và chọn service account JSON.');let credentials;try{credentials=JSON.parse(await file.text());}catch(error){throw new Error('Service account JSON không hợp lệ.');}await post('/api/ocr',{processor,credentials});notice('Đã lưu OCR cloud. PDF scan mới sẽ tự OCR trước khi gửi DeepSeek.');await loadOcrSettings();});
- action('delete-document-ai',async()=>{if(!confirm('Xóa cấu hình OCR cloud trên máy này?'))return;await fetch('/api/ocr',{method:'DELETE',credentials:'same-origin',headers:{'X-CSRF-Token':csrf}});notice('Đã xóa cấu hình OCR cloud.');await loadOcrSettings();});
-}
-async function loadOcrSettings(){const value=await api('/api/ocr');$('document-ai-badge').textContent=value.configured?'Đã cấu hình':'Chưa cấu hình';$('document-ai-processor').value=value.processor||'';$('document-ai-status').textContent=value.configured?'PDF scan sẽ tự OCR cloud rồi gửi DeepSeek.':'Chưa cấu hình; PDF scan sẽ vào Cần xem lại.';}
-action('setup-deepseek',()=>{setTab('settings');$('summary-mode').value='openai';$('ai-options').hidden=false;updateProviderUI();notice('Nhập DeepSeek API key, bấm Lưu key riêng, xác nhận đồng ý gửi chữ tài liệu rồi Lưu cài đặt. PDF scan cần cấu hình thêm Google Document AI ở thẻ OCR cloud.');$('ai-key').scrollIntoView({behavior:'smooth',block:'center'});$('ai-key').focus();});
+action('setup-deepseek',()=>{setTab('settings');$('summary-mode').value='openai';$('ai-options').hidden=false;updateProviderUI();notice('Nhập DeepSeek API key, bấm Lưu key riêng, xác nhận đồng ý gửi chữ tài liệu rồi Lưu cài đặt. PDF scan sẽ được thử OCR qua DeepSeek.');$('ai-key').scrollIntoView({behavior:'smooth',block:'center'});$('ai-key').focus();});
 action('upload-pdf',async()=>{
   const file=$('pdf-file').files[0];if(!file)throw new Error('Chọn file PDF trước.');
   if(file.size>20*1024*1024)throw new Error('PDF tối đa 20 MB.');

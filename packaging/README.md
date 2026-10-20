@@ -45,7 +45,7 @@ Thay file executable hoặc `.app` không xóa dữ liệu. Nếu chuyển từ 
 
 Có thể dùng MAILNOTES_DATA_DIR để chọn thư mục dữ liệu riêng khi triển khai có quản lý. Không gửi data/token/key qua chat. Nhật ký khởi động nằm ở `admin/desktop.log` trong thư mục dữ liệu; chỉ chia sẻ lỗi đã loại bỏ thông tin riêng.
 
-DeepSeek nhận chữ từ Markdown đã chuyển từ PDF. Bản scan được gửi qua Google Document AI OCR cloud nếu khách cấu hình processor và service account trong Cài đặt; nếu chưa cấu hình hoặc OCR thất bại thì vào Cần xem lại. Không cần cài Tesseract hay Poppler. PDF có chữ, phân loại và ghi sổ đã được tích hợp. Chứng chỉ CA công khai được đóng gói, giữ TLS verification; SSL_CERT_FILE do người dùng cấu hình được tôn trọng.
+DeepSeek nhận chữ từ Markdown đã chuyển từ PDF. Bản scan được chuyển thành ảnh bằng Poppler (`pdftoppm`) rồi thử OCR qua DeepSeek; cần cài Poppler trên máy nếu dùng bản app hoặc launcher. Nếu API không nhận ảnh hoặc OCR thất bại thì vào Cần xem lại. Không cần Tesseract. PDF có chữ, phân loại và ghi sổ đã được tích hợp. Chứng chỉ CA công khai được đóng gói, giữ TLS verification; SSL_CERT_FILE do người dùng cấu hình được tôn trọng.
 
 ## Build cho người phát triển
 

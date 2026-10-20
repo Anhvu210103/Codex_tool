@@ -69,7 +69,7 @@ class MarkdownArchiveTests(unittest.TestCase):
             self.assertEqual(len(list((self.root/'ai/files').glob('*.pdf'))),1)
 
     def test_scan_is_saved_for_review_without_ocr_or_ai(self):
-        config=self.admin.runtime_config('ai')
+        config=self.admin.runtime_config('ai');config['pdf_ocr']=False
         with patch('mailnotes.core.request_json') as api:
             document=pdf_message(pdf(),'scan.pdf',config,id='scan1',sender='AI',received_at='2026-10-16T08:00:00+07:00')
             self.assertEqual(process([document],config,'ai'),1)
@@ -77,7 +77,7 @@ class MarkdownArchiveTests(unittest.TestCase):
         self.assertEqual(self.admin.notes('ai')['notes'][0]['categories'],['Cần xem lại'])
         self.assertEqual(len(list((self.root/'ai/Can-xem-lai').glob('*.md'))),1)
         self.assertEqual(len(list((self.root/'ai/Can-xem-lai').glob('*.pdf'))),1)
-        self.assertIn('DeepSeek API chỉ nhận văn bản',next((self.root/'ai/Can-xem-lai').glob('*.md')).read_text())
+        self.assertIn('không chạy OCR',next((self.root/'ai/Can-xem-lai').glob('*.md')).read_text())
 
     def test_mixed_pdf_reports_unread_image_pages_and_names_cannot_escape(self):
         config=self.admin.runtime_config('pdf')

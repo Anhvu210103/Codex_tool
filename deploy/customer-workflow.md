@@ -10,7 +10,7 @@
 
 - Lưu **DeepSeek API key** và xác nhận đồng ý gửi nội dung tài liệu cho DeepSeek. AI dùng một lượt để phân nhóm và tóm tắt. Số tiền trong tool là ước tính, không phải hóa đơn.
 - Chọn chu kỳ kiểm tra ở mục **Thư mục nhận PDF thủ công**, bật tự quét nếu cần. Lịch chỉ chạy khi tool và máy đang hoạt động.
-- Với PDF scan không có lớp chữ, cấu hình **OCR cloud** nếu muốn tool đọc được ảnh. Bản này dùng Google Document AI để trích chữ rồi mới đưa chữ cho DeepSeek; không thể biến PDF scan thành chữ chỉ bằng đổi sang Markdown.
+- Với PDF scan không có lớp chữ, Tool thử gửi ảnh từng trang cho DeepSeek OCR; nếu API không nhận ảnh, tài liệu vào Cần xem lại. Cần Poppler để chuyển trang PDF thành ảnh; đổi đuôi sang Markdown không tạo ra chữ.
 - Nếu muốn tự lấy Gmail, chọn **một** trong hai cách: tiện ích Chrome thao tác trên Gmail đang đăng nhập, hoặc Gmail API qua Google OAuth. Hai cách có lịch và cách kết nối khác nhau. Thử một thư có nhiều PDF trước khi bật lịch.
 
 ## Giao diện đã tinh gọn

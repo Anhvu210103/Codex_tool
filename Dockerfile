@@ -8,7 +8,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY requirements-web.txt ./
-RUN python -m pip install --no-cache-dir --requirement requirements-web.txt \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends poppler-utils \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --no-cache-dir --requirement requirements-web.txt \
     && useradd --create-home --uid 1000 app \
     && mkdir -p /data /inbox \
     && chown app:app /data /inbox

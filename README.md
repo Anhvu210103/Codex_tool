@@ -8,7 +8,7 @@ Mở `Mo-So-Ghi-Chep.sh` trong thư mục đã cài `.venv`. Tool mở trang qu�
 
 Trong **Cài đặt**, lưu DeepSeek API key và xác nhận đồng ý gửi nội dung tài liệu. Xem lại **Nhóm tài liệu**. Để thử luồng ổn định nhất, trên **Tổng quan** bấm **Mở thư mục PDF**, chép một PDF có chữ vào đó rồi bấm **Quét thư mục**. Mở **Sổ ghi chép → Thư mục nhận PDF** để xem kết quả. Sau đó bật **Tự quét thư mục** với chu kỳ phù hợp. PDF đã xử lý được chuyển vào `Da-xu-ly`; PDF lỗi ở lại để thử lại. Có thể tải PDF trực tiếp ở Sổ ghi chép khi chỉ muốn thử một file.
 
-PDF scan cần OCR để lấy chữ trước khi DeepSeek phân loại và tóm tắt. Bản này hỗ trợ Google Document AI cho bước OCR cloud; nếu chưa cấu hình, file scan được giữ ở nhóm **Cần xem lại**. Mục **Token & chi phí** hiển thị số đo API và tiền ước tính, không thay thế hóa đơn DeepSeek.
+PDF scan cần Poppler (`pdftoppm`) trên máy để chuyển trang thành ảnh trước khi thử gửi DeepSeek OCR. Trên Ubuntu/Debian cài `sudo apt install poppler-utils`; trên Mac cài `brew install poppler`. Bản này thử OCR từng trang ảnh qua DeepSeek; nếu API không nhận ảnh hoặc OCR thất bại, file scan được giữ ở nhóm **Cần xem lại**. Mục **Token & chi phí** hiển thị số đo API và tiền ước tính, không thay thế hóa đơn DeepSeek.
 
 ## Gmail và website
 

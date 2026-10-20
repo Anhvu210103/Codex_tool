@@ -9,7 +9,7 @@ Linux, Mac Intel và Mac Apple Silicon dùng cùng mã xử lý, giao diện, ti
 | Dùng tiện ích | Tải cùng ZIP tiện ích trong Cài đặt, cài vào Chrome, ghép nối bằng địa chỉ tool và mã trên chính máy đó. |
 | Chạy AI thao tác | Mở Gmail đã đăng nhập bình thường trong Chrome, tìm thư có PDF, bấm Xử lý tối đa 20 thư đang hiện. Có nút Dừng. |
 | Xử lý tài liệu | PDF có chữ → Markdown trên máy → DeepSeek phân nhóm và tóm tắt → ghi sổ; mỗi thư mục nhóm giữ PDF và ghi chú Markdown. |
-| PDF scan | OCR bằng Google Document AI cloud nếu đã cấu hình; nếu chưa cấu hình hoặc thất bại thì giữ bản gốc và tạo ghi chú Cần xem lại. Không yêu cầu Tesseract/Poppler. |
+| PDF scan | Thử OCR qua DeepSeek; nếu API không nhận ảnh hoặc thất bại thì giữ bản gốc và tạo ghi chú Cần xem lại. Cần Poppler để chuyển PDF thành ảnh, không cần Tesseract. |
 | Xem kết quả | Sổ ghi chép → AI thao tác → xem đường dẫn PDF theo nhóm, Mở thư mục tài liệu hoặc Tải Markdown. |
 | Sửa nhóm | Sửa trong sổ, bản Markdown theo nhóm cập nhật theo, không gọi AI lại. |
 | Tắt | Bấm Tắt tool. Đóng tab không tắt dịch vụ; máy ngủ hoặc tắt thì việc xử lý ngừng. |

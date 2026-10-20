@@ -205,18 +205,6 @@ def create_app(base=None, data_root=None, public_url=None):
             return jsonify(admin.config())
         return jsonify(admin.save_settings(payload()))
 
-    @app.route('/api/ocr', methods=['GET', 'POST', 'DELETE'])
-    def ocr_settings():
-        if request.method == 'GET':
-            status = admin.status()
-            return jsonify(configured=status['ocr_configured'], processor=status['ocr_processor'])
-        if request.method == 'DELETE':
-            admin.ocr_settings_path.unlink(missing_ok=True)
-            admin.ocr_credentials_path.unlink(missing_ok=True)
-            return jsonify(configured=False, processor='')
-        data = payload()
-        return jsonify(admin.save_ocr(data.get('processor'), data.get('credentials')))
-
     @app.get('/api/group-presets')
     def group_presets():
         return jsonify(read_json(admin.base / 'config.json', {})['rules'])
