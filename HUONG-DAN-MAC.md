@@ -5,3 +5,5 @@
 Cần giữ nguyên thư mục đã giải nén. `Mo-So-Ghi-Chep-Mac.command` tự mở Docker Desktop và mở tool bằng một lần bấm; khách chỉ cần đóng tab khi dùng xong. `Dung-So-Ghi-Chep-Mac.command` chỉ dùng khi muốn dừng hẳn lịch chạy. PDF khách tự tải được đặt trong `inbox/`; sổ, cấu hình và key nằm trong `.local/`. Không gửi hai thư mục này cho người khác.
 
 Bản `.app` trong GitHub Actions là phương án thử kỹ thuật riêng, không dùng cùng thư mục dữ liệu với bản Docker. Tài liệu bàn giao khách ở đây chỉ hướng dẫn bản Docker để tránh chạy nhầm hai bản.
+
+Nếu khách dùng Codex để hỏi hoặc kiểm tra lỗi, có thể dùng [skill Sổ ghi chép cho Mac](.agents/skills/so-ghi-chep-mac/README.md). Skill chỉ hướng dẫn vận hành; tool xử lý PDF bằng DeepSeek theo cấu hình khách đã lưu.

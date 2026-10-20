@@ -5,6 +5,7 @@
 - [Bắt đầu tại đây — bộ hướng dẫn Mac](HUONG-DAN-MAC.md)
 - [Cài lần đầu và bàn giao](deploy/mac-install.md)
 - [Hướng dẫn khách sử dụng hằng ngày](deploy/mac-user-guide.md)
+- [Skill Codex hỗ trợ khách](.agents/skills/so-ghi-chep-mac/README.md)
 
 Trong Finder, bấm `Mo-So-Ghi-Chep-Mac.command` để tự mở Docker Desktop và tool. Đóng tab khi dùng xong; chỉ bấm `Dung-So-Ghi-Chep-Mac.command` nếu muốn dừng hẳn lịch chạy. Lần đầu cần cài Docker Desktop; tool sẽ yêu cầu tạo mật khẩu quản trị. Dữ liệu và key nằm trong `.local/` cạnh hai file này. Không đưa `.local/`, `inbox/`, API key hoặc token vào ZIP gửi khách.
 
