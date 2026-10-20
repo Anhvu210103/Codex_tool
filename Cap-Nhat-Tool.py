@@ -16,7 +16,7 @@ import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parent
-URL = 'https://github.com/Anhvu210103/Codex_tool/archive/refs/heads/codex/admin-web.zip'
+URL = 'https://github.com/Anhvu210103/Codex_tool/archive/refs/heads/codex/partner-linux-test.zip'
 DIRECTORIES = {'mailnotes', 'chrome-extension', 'examples', 'packaging', 'deploy', 'tests', '.github'}
 FILES = {'config.json', 'README.md', 'requirements.txt', 'requirements-web.txt', 'requirements-build.txt',
          'pyproject.toml', 'requirements-browser.txt', 'Mo-So-Ghi-Chep.sh', 'Mo-So-Ghi-Chep.command', 'Mo-AI-Gmail.sh', 'Cap-Nhat-Tool.py', 'Cap-Nhat-So-Ghi-Chep.sh'}

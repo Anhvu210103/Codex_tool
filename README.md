@@ -249,7 +249,7 @@ Module Gmail trả các trường `id`, `sender`, `subject`, `received_at`, `bod
 
 ### Cập nhật dễ hơn trên Linux (bản mã nguồn)
 
-Mở bằng `Mo-So-Ghi-Chep.sh`, vào **Cài đặt → Cập nhật tool**. Tool tải nhánh `codex/admin-web`, kiểm tra gói tải về, chờ phiên cũ tắt, sao lưu mã rồi mở lại. Không thay `.local`, `.venv`, `.env` hoặc file đăng nhập. Mã cũ nằm trong `.local/updates/backup-*`. Nếu kiểm tra nhập module hoặc cài phụ thuộc thất bại, mã được phục hồi; thay đổi phụ thuộc đã cài vào `.venv` không được tự hoàn tác. Bản cập nhật không tự xóa các file cũ không còn trong nhánh.
+Mở bằng `Mo-So-Ghi-Chep.sh`, vào **Cài đặt → Cập nhật tool**. Bản thử này tải nhánh `codex/partner-linux-test`, kiểm tra gói tải về, chờ phiên cũ tắt, sao lưu mã rồi mở lại. Không thay `.local`, `.venv`, `.env` hoặc file đăng nhập. Mã cũ nằm trong `.local/updates/backup-*`. Nếu kiểm tra nhập module hoặc cài phụ thuộc thất bại, mã được phục hồi; thay đổi phụ thuộc đã cài vào `.venv` không được tự hoàn tác. Bản cập nhật không tự xóa các file cũ không còn trong nhánh.
 
 Có thể chạy `Cap-Nhat-So-Ghi-Chep.sh` bằng **Run as a Program / Run in Terminal**. Nếu đang chạy bằng lệnh `python -m mailnotes.web`, nhấn Ctrl+C ở cửa sổ đó trước lần cập nhật đầu tiên. Không cập nhật khi tài liệu đang xử lý. Nếu cập nhật lỗi trước khi dừng app, app cũ tiếp tục chạy; xem thông báo trong Cài đặt hoặc `.local/admin/update.log`.
 
