@@ -135,6 +135,19 @@ footer { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; fon
 .topbar .company-credit { border-right: 1px solid var(--line); padding-right: 18px; }
 .auth-credit { margin-top: 24px; display: flex; justify-content: center; }
 .notebook-card { padding: 0; overflow: hidden; }
+/* Give the notebook its own reading width; the summary is the main content. */
+.content:has(> #notebook:not([hidden])) { max-width: none; }
+#notebook .table-scroll { overflow-x: auto; }
+#notebook table { min-width: 1420px; }
+#notebook th, #notebook td { padding-inline: 16px; }
+#notebook td { line-height: 1.55; }
+#notebook th:nth-child(1), #notebook td:nth-child(1) { width: 105px; min-width: 105px; }
+#notebook th:nth-child(2), #notebook td:nth-child(2) { width: 220px; min-width: 220px; }
+#notebook th:nth-child(3), #notebook td:nth-child(3) { width: 165px; min-width: 165px; }
+#notebook th:nth-child(4), #notebook td:nth-child(4) { width: 38%; min-width: 460px; max-width: none; }
+#notebook th:nth-child(5), #notebook td:nth-child(5) { width: 145px; min-width: 145px; }
+#notebook th:nth-child(6), #notebook td:nth-child(6) { min-width: 235px; }
+#notebook .summary-text { overflow-wrap: break-word; }
 .filters { padding: 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: end; background: #fbfcfb; }
 .filters label { margin: 0; min-width: 170px; flex: 1; }
 .filters .search { flex: 2; min-width: 250px; }
