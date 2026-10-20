@@ -39,6 +39,8 @@ def create_app(base=None, data_root=None, public_url=None):
     if parsed.scheme != 'https' and parsed.hostname not in ('localhost', '127.0.0.1', '::1'):
         raise ValueError('Use HTTPS for remote deployment')
     allowed_origins = {public_url}
+    local_docker_setup = (os.environ.get('MAILNOTES_DOCKER_LOCAL_SETUP') == '1'
+                          and parsed.hostname in ('localhost', '127.0.0.1', '::1'))
     if parsed.scheme == 'http' and parsed.port == 8080 and parsed.hostname in ('localhost', '127.0.0.1', '::1'):
         allowed_origins.update(f'http://{hostname}:8080' for hostname in ('localhost', '127.0.0.1'))
     app.config.update(TEMPLATES_AUTO_RELOAD=True, SECRET_KEY=read_json(secret_path, {})['key'], MAX_CONTENT_LENGTH=22 * 1024 * 1024,
@@ -70,7 +72,8 @@ def create_app(base=None, data_root=None, public_url=None):
     @app.before_request
     def security():
         if request.path.startswith('/extension/'):
-            if parsed.hostname not in ('localhost', '127.0.0.1') or request.remote_addr not in ('127.0.0.1', '::1'):
+            if not local_docker_setup and (parsed.hostname not in ('localhost', '127.0.0.1')
+                                           or request.remote_addr not in ('127.0.0.1', '::1')):
                 return jsonify(error='Tiện ích chỉ kết nối tool trên cùng máy.'), 403
             origin = request.headers.get('Origin', '')
             if not re.fullmatch(r'chrome-extension://[a-p]{32}', origin):
@@ -155,7 +158,8 @@ def create_app(base=None, data_root=None, public_url=None):
     @app.post('/api/setup')
     def setup():
         # Bootstrap only from loopback before exposing the server to the network.
-        if request.remote_addr not in ('127.0.0.1', '::1') or parsed.hostname not in ('localhost', '127.0.0.1', '::1'):
+        if not local_docker_setup and (request.remote_addr not in ('127.0.0.1', '::1')
+                                       or parsed.hostname not in ('localhost', '127.0.0.1', '::1')):
             return jsonify(error='Quản trị viên cần thiết lập mật khẩu trên máy chủ trước.'), 403
         with operations:
             if password_path.exists():
@@ -615,7 +619,10 @@ def main():
     args = parser.parse_args()
     app = create_app(public_url=args.public_url or f'http://localhost:{args.port}')
     admin = app.extensions['admin']
-    if args.host not in ('127.0.0.1', '::1', 'localhost') and not (admin.private / 'password.json').exists():
+    local_docker_setup = (os.environ.get('MAILNOTES_DOCKER_LOCAL_SETUP') == '1'
+                          and urllib.parse.urlsplit(args.public_url or f'http://localhost:{args.port}').hostname
+                          in ('localhost', '127.0.0.1', '::1'))
+    if args.host not in ('127.0.0.1', '::1', 'localhost') and not local_docker_setup and not (admin.private / 'password.json').exists():
         parser.error('Set MAILNOTES_ADMIN_PASSWORD (12+ characters) before binding remotely.')
     admin.start_scheduler()
     try:

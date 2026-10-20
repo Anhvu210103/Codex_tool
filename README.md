@@ -1,75 +1,10 @@
 # Mailnotes — Gmail → sổ ghi chép theo ngày
 
-## Chạy cục bộ bằng Docker Compose
+## Chạy trên Windows bằng Docker Desktop
 
-Yêu cầu Docker Desktop đang chạy. Từ thư mục `Codex_tool`, tạo file `.env` từ mẫu và thay mật khẩu bằng giá trị riêng dài ít nhất 12 ký tự:
+Bản gửi đối tác dùng Docker Desktop và file mở nhanh `Mo-So-Ghi-Chep-Windows.cmd`; xem [hướng dẫn cài và sử dụng trên Windows](deploy/windows-partner.md). Lượt đầu mở `http://localhost:8080` để tự tạo mật khẩu quản trị. Không có mật khẩu mẫu gắn sẵn. Dữ liệu nằm trong `.local/`, thư mục nhận PDF là `inbox/` cạnh file mở nhanh. Khi gửi đối tác, chỉ gửi mã nguồn; không kèm `.local`, `.env`, token hoặc API key.
 
-```powershell
-Copy-Item .env.example .env
-notepad .env
-docker compose up --build -d
-```
-
-Mở [http://localhost:8080](http://localhost:8080). Dữ liệu, cấu hình, OAuth token và API key được lưu persistent trong thư mục `.local` của project. Mật khẩu trong `MAILNOTES_ADMIN_PASSWORD` chỉ dùng để bootstrap khi `.local/admin/password.json` chưa tồn tại; sau đó có thể đổi mật khẩu trên web và xóa biến này khỏi `.env`.
-
-### Thư mục đưa PDF cho AI xử lý
-
-Tạo hoặc dùng thư mục sau trên máy Windows:
-
-```text
-D:\Tcom_AI\Codex_tool\inbox
-```
-
-Chép các file PDF cần đọc vào thư mục này. Container sẽ thấy cùng thư mục tại
-`/app/inbox`; trong giao diện, vào **Cài đặt → Thư mục nhận PDF thủ công** rồi
-bấm **Quét thư mục ngay**, hoặc bật tự quét theo chu kỳ. File hợp lệ sẽ được
-đọc, trích chữ, phân loại/tóm tắt theo cấu hình, rồi chuyển vào:
-
-```text
-D:\Tcom_AI\Codex_tool\inbox\Da-xu-ly
-```
-
-File scan không có lớp chữ hoặc file lỗi sẽ được giữ lại/đánh dấu cần xem lại.
-PDF phải ổn định ít nhất 3 giây trước khi quét; giới hạn kích thước là 20 MB.
-
-Kiểm tra trạng thái hoặc dừng ứng dụng:
-
-```powershell
-docker compose ps
-docker compose logs -f mailnotes
-docker compose down
-```
-
-### Các thành phần trong cùng một file Compose
-
-Service `mailnotes` là runtime chính và bao gồm web quản trị, scheduler Gmail API,
-thư mục nhận PDF, SQLite và xử lý PDF → Markdown → DeepSeek. Chạy đúng một service
-này để tránh hai process cùng xử lý một thư mục dữ liệu.
-
-Các job one-shot dùng profile `tools`:
-
-```powershell
-# Chạy dữ liệu mẫu qua CLI
-docker compose --profile tools run --rm demo
-
-# Chạy một lượt Gmail API (cần credentials/token trong .local)
-docker compose --profile tools run --rm cli-gmail
-
-# Chạy toàn bộ test trong image
-docker compose --profile tools run --rm tests
-```
-
-`cli-gmail` không được chạy đồng thời với một lượt xử lý Gmail đang chạy trên
-website nếu cùng dùng thư mục `.local`.
-
-Chrome Extension không phải Docker service: nó được load vào Chrome trên máy
-người dùng và kết nối về `localhost:8080`. AI Gmail pilot (`gmail_browser_pilot`)
-cũng cần Chrome/Chromium có phiên Gmail đăng nhập và cửa sổ đồ họa tương tác,
-nên không thể chạy đầy đủ headless bằng Compose trên Docker Desktop Windows.
-Các thành phần này tiếp tục chạy trên host và dùng service `mailnotes` trong
-Compose.
-
-MVP đọc nội dung Gmail, PDF đính kèm và PDF tải lên, phân loại theo rules, chống xử lý trùng bằng SQLite và xuất Sổ ghi chép dạng bảng Markdown theo ngày nhận email. Bảng gồm giờ nhận, tiêu đề, người gửi, phân loại, nội dung ngắn và nguồn; giờ hiển thị theo múi giờ cấu hình. Chỉ đọc Gmail, không gửi thư, không đổi nhãn hoặc đánh dấu đã đọc.
+Có thể chạy bằng PowerShell trong thư mục repo: `docker compose up -d --build mailnotes`. Dừng bằng `docker compose down`. Tiện ích Chrome chạy trên máy Windows, không chạy bên trong container. Luồng tự tải và nhập PDF bằng tiện ích trên Windows cần thử với Gmail thật; phương án ổn định là chép PDF vào `inbox/` rồi quét bằng tool.
 
 ## Mở bằng app, không gõ lệnh mỗi lần
 

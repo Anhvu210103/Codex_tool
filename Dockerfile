@@ -13,7 +13,7 @@ COPY . .
 
 RUN useradd --system --uid 10001 mailnotes \
     && mkdir -p /app/.local \
-    && chown mailnotes:mailnotes /app/.local
+    && chown -R mailnotes:mailnotes /app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

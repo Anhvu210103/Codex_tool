@@ -127,6 +127,18 @@ class AdminTests(unittest.TestCase):
         self.assertEqual(reopened.config()['source'],'gmail')
         self.assertFalse(reopened.config()['schedule_enabled'])
 
+    def test_docker_local_setup_requires_explicit_mode(self):
+        remote={'REMOTE_ADDR':'172.18.0.1'}
+        data={'password':'correct-private-password'}
+        denied=self.client.post('/api/setup',json=data,headers={'X-CSRF-Token':self.csrf},environ_overrides=remote)
+        self.assertEqual(denied.status_code,403)
+        with patch.dict(os.environ,{'MAILNOTES_DOCKER_LOCAL_SETUP':'1'}):
+            app=create_app(BASE,self.root,public_url='http://localhost:8080')
+        client=app.test_client()
+        csrf=client.get('/api/session').get_json()['csrf']
+        accepted=client.post('/api/setup',json=data,headers={'X-CSRF-Token':csrf},environ_overrides=remote)
+        self.assertEqual(accepted.status_code,200)
+
     def test_secrets_are_private_and_never_returned(self):
         self.setup_login()
         config=self.admin.config();config['summary']['provider']='deepseek';self.admin.save_settings(config)

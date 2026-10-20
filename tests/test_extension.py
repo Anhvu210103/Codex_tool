@@ -1,4 +1,5 @@
 import io
+import os
 import tempfile
 import unittest
 import zipfile
@@ -32,6 +33,13 @@ class ExtensionTests(unittest.TestCase):
         self.assertEqual(preflight.headers['Access-Control-Allow-Origin'],self.headers['Origin'])
         self.client.post('/api/extension/pair',json={},headers={'X-CSRF-Token':self.csrf})
         self.assertEqual(self.client.post('/extension/choose',json={},headers=self.headers).status_code,401)
+
+    def test_bridge_accepts_local_docker_gateway_only_in_local_mode(self):
+        remote={'REMOTE_ADDR':'172.18.0.1'}
+        self.assertEqual(self.client.post('/extension/ping',json={},headers=self.headers,environ_overrides=remote).status_code,403)
+        with patch.dict(os.environ,{'MAILNOTES_DOCKER_LOCAL_SETUP':'1'}):
+            client=create_app(data_root=self.root,public_url='http://localhost:8080').test_client()
+        self.assertEqual(client.post('/extension/ping',json={},headers=self.headers,environ_overrides=remote).status_code,200)
 
     def test_ai_choice_and_pdf_import_without_exposing_key(self):
         config=self.client.get('/api/settings').get_json();config['summary'].update(mode='openai',ai_consent=True)

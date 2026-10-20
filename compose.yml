@@ -10,13 +10,16 @@ x-mailnotes-environment: &mailnotes-environment
 services:
   mailnotes:
     <<: *mailnotes-build
+    # Windows bind-mounted PDFs can be unreadable to the image's unprivileged UID.
+    # Only .local and inbox are mounted; the host port remains loopback-only.
+    user: "0:0"
     container_name: mailnotes
     restart: unless-stopped
     init: true
 
     environment:
       <<: *mailnotes-environment
-      MAILNOTES_ADMIN_PASSWORD: "1234567890@Abcd"
+      MAILNOTES_DOCKER_LOCAL_SETUP: "1"
       MAILNOTES_INBOX_DIR: /app/inbox
 
     ports:
