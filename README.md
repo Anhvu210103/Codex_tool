@@ -164,9 +164,9 @@ python -m venv .venv
 .venv/bin/python -m mailnotes.web
 ```
 
-Mặc định dịch vụ nghe trên loopback, cổng 8080. Trên máy của bạn, mở trình duyệt tới dịch vụ đó, tạo mật khẩu (ít nhất 12 ký tự), rồi chọn **Thử dữ liệu mẫu**. Trong môi trường cloud này, không có web preview công khai; dùng các ảnh trong `.local/screenshots/` để xem giao diện đã kiểm thử. Máy cloud không tương đương dịch vụ luôn hoạt động cho khách.
+Mặc định dịch vụ nghe trên loopback, cổng 8080. Trên máy của bạn, mở trình duyệt tới dịch vụ đó, tạo mật khẩu (ít nhất 12 ký tự), rồi kết nối Gmail hoặc tải PDF lên ở Sổ ghi chép. Trong môi trường cloud này, không có web preview công khai; dùng các ảnh trong `.local/screenshots/` để xem giao diện đã kiểm thử. Máy cloud không tương đương dịch vụ luôn hoạt động cho khách.
 
-Các trang: **Tổng quan · Sổ ghi chép · Quy tắc phân loại · Cài đặt**. Lịch mặc định tắt, nguồn mặc định là mẫu. Lưu cài đặt sẽ áp dụng cho lượt tiếp theo; không thay đổi lượt đang chạy. Dữ liệu mẫu luôn dùng trích đoạn miễn phí.
+Các trang: **Tổng quan · Sổ ghi chép · Nhóm tài liệu · Token & chi phí · Cài đặt**. Lịch mặc định tắt; bản cài mới chọn Gmail nhưng chỉ xử lý sau khi bạn kết nối và bật lịch hoặc quét thủ công. Lưu cài đặt sẽ áp dụng cho lượt tiếp theo; không thay đổi lượt đang chạy.
 
 Gmail trên web dùng OAuth client loại **Web application**, không dùng client Desktop của CLI bên dưới. Trang Cài đặt hiển thị redirect URI chính xác, nhận file JSON client và nút kết nối Google. Việc thiết lập Google Cloud và domain HTTPS cần quản trị viên kỹ thuật thực hiện một lần; các thay đổi hằng ngày do khách tự làm trên web.
 

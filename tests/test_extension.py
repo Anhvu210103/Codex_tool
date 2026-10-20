@@ -77,6 +77,10 @@ class ExtensionTests(unittest.TestCase):
         result=self.client.get('/api/extension/download');self.assertEqual(result.status_code,200)
         with zipfile.ZipFile(io.BytesIO(result.data)) as archive:
             self.assertIn('SoGhiChep-AI-Gmail/manifest.json',archive.namelist())
+            import json
+            manifest=json.loads(archive.read('SoGhiChep-AI-Gmail/manifest.json'))
+            self.assertEqual(manifest['version'],'0.7.3')
+            self.assertIn(b'local_markdown_paths',archive.read('SoGhiChep-AI-Gmail/worker.js'))
 
     def test_automation_state_is_persisted_for_extension_restart(self):
         state={'action':'save','failures':[{'stage':'process-pdf','rowIndex':0,'key':'mail-1','text':'Công văn','fileIndex':0,'name':'one.pdf','fileKey':'gmail:a','lastError':'Tải lỗi','attempts':2,'createdAt':1,'updatedAt':2}], 'scan_cursors':{'0':123456}, 'auto_enabled_at':120000, 'auto_filter':{'period':'range','start':'2026-10-01','end':'2026-10-05'}}

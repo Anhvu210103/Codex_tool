@@ -137,7 +137,9 @@ async function refreshStatus() {
   $('schedule-state').textContent=status.schedule_enabled?'Đang bật':'Đang tắt';
   $('next-run').textContent=status.schedule_enabled?(status.running?'Chờ lượt hiện tại hoàn tất':status.next_run?'Lần tới: '+dateText(status.next_run):'Đang chuẩn bị lịch'):'Bạn có thể chạy thủ công';
   const folderErrors=(folder.errors||[]).slice(0,5).map(item=>`\n• ${item.file}: ${item.error}`).join('');$('folder-inbox-status').textContent=folder.running?'Đang đọc PDF...':folder.last_finished?`Lần cuối: ${dateText(folder.last_finished)} · ${folder.last_processed||0} tệp · ${folder.last_added||0} ghi chép mới${folder.error?' · '+folder.error:''}${folderErrors}`:'Chưa quét thư mục.';
-  $('run-now').hidden=config.source!=='gmail';$('run-now').disabled=busy;$('run-folder-inbox').disabled=busy;
+  $('run-now').hidden=config.source!=='gmail';$('run-now').disabled=busy||!status.gmail_connected;
+  $('run-now').title=status.gmail_connected?'Quét Gmail theo bộ lọc đã lưu':'Kết nối Gmail trong Cài đặt trước khi quét';
+  $('run-folder-inbox').disabled=busy;
   $('run-now').textContent='Quét Gmail API ngay';
   $('run-error').hidden=!status.error; $('run-error').textContent=status.error || '';
   $('source-name').textContent=config.source==='gmail'?'Gmail API':'Nguồn tự động';

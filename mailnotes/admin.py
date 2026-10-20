@@ -193,8 +193,11 @@ class Admin:
         self.credentials = self.private / 'gmail-client.json'
         self.token = self.private / 'gmail-token.json'
         defaults = read_json(self.base / 'config.json', {})
-        defaults.update(source='demo', schedule_enabled=False)
+        defaults.update(source='gmail', schedule_enabled=False)
         saved = read_json(self.settings_path, defaults)
+        if saved.get('source') == 'demo':
+            saved['source'] = 'gmail'
+            saved['schedule_enabled'] = False
         # A previous release offered other AI providers. Retain the private file
         # and its notes, but never call that provider after this migration.
         if saved.get('summary', {}).get('provider', 'deepseek') != 'deepseek':

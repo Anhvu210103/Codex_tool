@@ -97,12 +97,13 @@ class AdminTests(unittest.TestCase):
 
     def test_run_lock_and_scheduler(self):
         self.setup_login()
+        self.assertEqual(self.admin.config()['source'],'gmail')
         self.admin.run_lock.acquire()
         try:
             self.assertEqual(self.post('/api/run', {'source':'demo'}).status_code,409)
         finally:
             self.admin.run_lock.release()
-        config=self.admin.config();config['schedule_enabled']=True
+        config=self.admin.config();config['source']='demo';config['schedule_enabled']=True
         self.admin.save_settings(config)
         self.admin.start_scheduler()
         with self.admin.lock:
@@ -117,6 +118,14 @@ class AdminTests(unittest.TestCase):
         config['schedule_enabled']=False
         self.admin.save_settings(config)
         self.assertIsNone(self.admin.status()['next_run'])
+
+    def test_old_sample_source_is_not_started_automatically(self):
+        from mailnotes.admin import Admin
+        config=self.admin.config();config['source']='demo';config['schedule_enabled']=True
+        self.admin.save_settings(config)
+        reopened=Admin(BASE,self.root)
+        self.assertEqual(reopened.config()['source'],'gmail')
+        self.assertFalse(reopened.config()['schedule_enabled'])
 
     def test_secrets_are_private_and_never_returned(self):
         self.setup_login()
