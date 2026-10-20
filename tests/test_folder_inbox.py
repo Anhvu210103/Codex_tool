@@ -71,6 +71,11 @@ class FolderInboxTests(unittest.TestCase):
             app=create_app(data_root=root/'data');client=app.test_client();csrf=client.get('/api/session').get_json()['csrf'];csrf=client.post('/api/setup',json={'password':'test-private-password'},headers={'X-CSRF-Token':csrf}).get_json()['csrf']
             with patch('mailnotes.folder_inbox.inbox_directory',return_value=inbox):
                 info=client.get('/api/folder-inbox');self.assertEqual(info.status_code,200);self.assertEqual(info.get_json()['path'],str(inbox))
+                self.assertEqual(info.get_json()['display_path'],str(inbox))
+                with patch.dict(os.environ,{'MAILNOTES_INBOX_DISPLAY_PATH':'inbox cạnh file mở tool'}):
+                    remote=client.get('/api/folder-inbox',environ_overrides={'REMOTE_ADDR':'172.17.0.1'}).get_json()
+                    self.assertEqual(remote['display_path'],'inbox cạnh file mở tool')
+                    self.assertFalse(remote['can_open'])
                 started=client.post('/api/folder-inbox',json={'action':'run'},headers={'X-CSRF-Token':csrf});self.assertEqual(started.status_code,202)
                 for _ in range(100):
                     if not app.extensions['admin'].status()['folder_inbox']['running']:break

@@ -1,5 +1,7 @@
 # Mailnotes — Gmail → sổ ghi chép theo ngày
 
+Khách hàng nên bắt đầu từ [quy trình PDF → DeepSeek → sổ ghi chép](deploy/customer-workflow.md): nhận file trong thư mục `inbox`, quét ngay hoặc theo lịch, rồi xem/sửa nhóm và chi phí trên Tổng quan.
+
 ## Chạy trên Windows bằng Docker Desktop
 
 Bản gửi đối tác dùng Docker Desktop và file mở nhanh `Mo-So-Ghi-Chep-Windows.cmd`; xem [hướng dẫn cài và sử dụng trên Windows](deploy/windows-partner.md). Lượt đầu mở `http://localhost:8080` để tự tạo mật khẩu quản trị. Không có mật khẩu mẫu gắn sẵn. Dữ liệu nằm trong `.local/`, thư mục nhận PDF là `inbox/` cạnh file mở nhanh. Khi gửi đối tác, chỉ gửi mã nguồn; không kèm `.local`, `.env`, token hoặc API key.

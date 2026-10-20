@@ -21,6 +21,7 @@ services:
       <<: *mailnotes-environment
       MAILNOTES_DOCKER_LOCAL_SETUP: "1"
       MAILNOTES_INBOX_DIR: /app/inbox
+      MAILNOTES_INBOX_DISPLAY_PATH: "inbox (cạnh file mở tool trên máy này)"
 
     ports:
       - "127.0.0.1:8080:8080"

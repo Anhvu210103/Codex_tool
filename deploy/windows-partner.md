@@ -13,6 +13,8 @@ Tool chỉ công bố cổng 8080 trên máy này. Nếu cổng bị ứng dụn
 
 ## Thiết lập để dùng
 
+Trên **Tổng quan**, nút **Thư mục PDF** chỉ vị trí `inbox` trên Windows và nút **Quét thư mục** bắt đầu xử lý ngay. Trình duyệt trong Docker không thể tự mở File Explorer của máy khách.
+
 1. Vào **Cài đặt**, mở mục **Nội dung & chi phí**. Dán **DeepSeek API key** vào ô tương ứng, bấm **Lưu key riêng**. Tích ô đồng ý gửi dữ liệu PDF cho dịch vụ AI, rồi bấm **Lưu cài đặt**. Đơn giá token đã điền sẵn; tiền hiển thị trong tool là **ước tính** theo số token trả về, đối chiếu hóa đơn DeepSeek khi cần.
 2. Vào **Nhóm tài liệu**. Có thể bấm **Thêm nhóm mẫu cơ quan nhà nước**, sửa tên và mô tả cho đúng nghiệp vụ của khách rồi bấm **Lưu nhóm**. AI có thể gán một tài liệu vào nhiều nhóm. Kết quả chưa đủ rõ vào nhóm **Cần xem lại**; người dùng có thể sửa nhóm trong sổ.
 3. Vào **Sổ ghi chép**, chọn một PDF có thể bôi đen chữ, bấm **Đọc & ghi vào sổ**. Chờ thông báo xử lý xong, vào **Tổng quan** xem số tài liệu và chi phí, rồi vào **Sổ ghi chép** xem nhóm, nội dung ngắn và đường dẫn file Markdown (`.md`). Chọn đúng nguồn **PDF tải lên** nếu bộ lọc nguồn đang bật. Thử lại cùng PDF có thể tốn thêm phí vì ô **Xử lý lại PDF đã có theo cấu hình mới** được tích sẵn; bỏ tích nếu chỉ muốn kiểm tra chống trùng.

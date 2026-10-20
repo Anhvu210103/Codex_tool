@@ -18,6 +18,8 @@ App tự mở web và lưu dữ liệu ở `~/Library/Application Support/SoGhiC
 
 ## Thiết lập và thử tài liệu
 
+Trên **Tổng quan**, nút **Thư mục PDF** chỉ vị trí `inbox` trên Mac và nút **Quét thư mục** bắt đầu xử lý ngay. Trình duyệt trong Docker không thể tự mở Finder của máy khách.
+
 1. Vào **Cài đặt → Nội dung & chi phí**; lưu DeepSeek API key và tích đồng ý gửi dữ liệu cho AI. Không gửi key qua chat. Vào **Nhóm tài liệu**, sửa/tạo nhóm rồi lưu.
 2. Vào **Sổ ghi chép**, chọn một PDF có thể bôi đen chữ, bấm **Đọc & ghi vào sổ**. Chọn nguồn **PDF tải lên** để xem ghi chú, file `.md` theo nhóm và chi phí token. Thử lại file cũ có thể phát sinh phí nếu ô **Xử lý lại PDF đã có** còn tích.
 3. Thử một PDF scan. Bật **Dùng OCR qua DeepSeek cho PDF scan** trong Cài đặt, lưu rồi nhập PDF. Đối chiếu kết quả với bản gốc, nhất là số hiệu và ngày tháng. OCR có thể phát sinh phí.

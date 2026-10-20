@@ -506,7 +506,7 @@ def create_app(base=None, data_root=None, public_url=None):
         local = parsed.hostname in ('localhost', '127.0.0.1') and request.remote_addr in ('127.0.0.1', '::1')
         can_open = local and sys.platform in ('linux', 'darwin')
         if request.method == 'GET':
-            return jsonify(path=str(root),can_open=can_open)
+            return jsonify(path=str(root),display_path=os.environ.get('MAILNOTES_INBOX_DISPLAY_PATH',str(root)),can_open=can_open)
         action = payload().get('action')
         if action == 'run':
             if not admin.start_folder_import():

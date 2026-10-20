@@ -1,6 +1,6 @@
 'use strict';
 const $ = id => document.getElementById(id);
-let csrf = '', config = null, activeTab = 'overview', polling = null, currentNotes = null;
+let csrf = '', config = null, activeTab = 'overview', polling = null, currentNotes = null, folderCanOpen = false;
 const titles = {overview:'Tổng quan',notebook:'Sổ ghi chép',usage:'Token & chi phí',rules:'Nhóm tài liệu',settings:'Cài đặt'};
 let appBooted=false;
 function showStartupError(){
@@ -53,8 +53,7 @@ function rememberSource(source){try{localStorage.setItem('mailnotes.viewSource',
 async function initialSource(){
  let saved='';try{saved=localStorage.getItem('mailnotes.viewSource')||'';}catch{}
  if(['gmail','pdf','ai','folder'].includes(saved))return saved;
- try{const ai=await api('/api/dashboard?source=ai');return ai.total_notes>0?'ai':config.source==='demo'?'ai':config.source;}
- catch{return config.source==='demo'?'ai':config.source;}
+ return 'folder';
 }
 function simplifySettings(){
  const titles=['Nguồn & lịch chạy','Kết nối Gmail','Tiện ích Chrome — AI thao tác Gmail','Bảo vệ trang quản trị','Cập nhật tool'];
@@ -133,13 +132,13 @@ async function refreshStatus() {
   $('run-state').textContent=busy?'Đang xử lý':status.error?'Cần kiểm tra':'Sẵn sàng';
   $('run-detail').textContent=status.last_finished?'Hoàn tất: '+dateText(status.last_finished):'Chưa có lượt xử lý';
   $('added-count').textContent=status.last_added ?? '—';
-  $('last-source').textContent=status.last_source==='gmail'?'Nguồn Gmail':status.last_source==='demo'?'Lượt kiểm tra cũ':'Chưa có dữ liệu';
-  $('schedule-state').textContent=status.schedule_enabled?'Đang bật':'Đang tắt';
-  $('next-run').textContent=status.schedule_enabled?(status.running?'Chờ lượt hiện tại hoàn tất':status.next_run?'Lần tới: '+dateText(status.next_run):'Đang chuẩn bị lịch'):'Bạn có thể chạy thủ công';
+  $('last-source').textContent=({gmail:'Gmail API',folder:'Thư mục PDF',pdf:'PDF tải lên',ai:'Gmail qua tiện ích',demo:'Lượt thử cũ'})[status.last_source] || 'Chưa có dữ liệu';
+  $('schedule-state').textContent='Gmail '+(status.schedule_enabled?'bật':'tắt')+' · Thư mục '+(status.folder_inbox_enabled?'bật':'tắt');
+  $('next-run').textContent=status.folder_inbox_enabled&&status.folder_next_run?'Thư mục quét tiếp: '+dateText(status.folder_next_run):status.schedule_enabled&&status.next_run?'Gmail quét tiếp: '+dateText(status.next_run):'Bạn có thể quét thủ công';
   const folderErrors=(folder.errors||[]).slice(0,5).map(item=>`\n• ${item.file}: ${item.error}`).join('');$('folder-inbox-status').textContent=folder.running?'Đang đọc PDF...':folder.last_finished?`Lần cuối: ${dateText(folder.last_finished)} · ${folder.last_processed||0} tệp · ${folder.last_added||0} ghi chép mới${folder.error?' · '+folder.error:''}${folderErrors}`:'Chưa quét thư mục.';
   $('run-now').hidden=config.source!=='gmail';$('run-now').disabled=busy||!status.gmail_connected;
   $('run-now').title=status.gmail_connected?'Quét Gmail theo bộ lọc đã lưu':'Kết nối Gmail trong Cài đặt trước khi quét';
-  $('run-folder-inbox').disabled=busy;
+  $('run-folder-inbox').disabled=busy;$('overview-scan').disabled=busy;
   $('run-now').textContent='Quét Gmail API ngay';
   $('run-error').hidden=!status.error; $('run-error').textContent=status.error || '';
   $('source-name').textContent=config.source==='gmail'?'Gmail API':'Nguồn tự động';
@@ -212,7 +211,7 @@ async function boot() {
   }
   for(const id of ['notes-source','dashboard-source']){const select=$(id);if(select&&!select.querySelector('option[value="folder"]')){const option=document.createElement('option');option.value='folder';option.textContent='Thư mục nhận PDF';select.append(option);}}
   config=await api('/api/settings'); populateSettings();simplifySettings();
-  const inbox=await api('/api/folder-inbox');$('folder-inbox-path').textContent=inbox.path;$('open-folder-inbox').disabled=!inbox.can_open;
+  const inbox=await api('/api/folder-inbox');folderCanOpen=!!inbox.can_open;$('folder-inbox-path').textContent=inbox.display_path||inbox.path;$('open-folder-inbox').disabled=!folderCanOpen;
   const viewSource=await initialSource();$('notes-source').value=viewSource;$('dashboard-source').value=viewSource;
   const gmail=await api('/api/gmail/info');$('callback').value=gmail.callback;
   await refreshStatus();setTab(activeTab);
@@ -312,6 +311,12 @@ $('dashboard-source').addEventListener('change',()=>{rememberSource($('dashboard
 for(const id of ['overview-notes','overview-all-notes'])action(id,()=>openNotebook($('dashboard-source').value));
 action('overview-review',()=>openNotebook($('dashboard-source').value,'Cần xem lại'));
 action('overview-pdf',()=>{openNotebook('pdf');$('pdf-file').scrollIntoView({behavior:'smooth',block:'center'});$('pdf-file').focus();});
+action('overview-folder',async()=>{
+ if(folderCanOpen){await post('/api/folder-inbox',{action:'open'});notice('Đã mở thư mục nhận PDF. Chép tài liệu vào đó rồi bấm Quét thư mục.');return;}
+ setTab('settings');$('folder-inbox-path').scrollIntoView({behavior:'smooth',block:'center'});
+ notice('Mở thư mục inbox nằm cạnh file khởi động tool trên máy, chép PDF vào đó rồi bấm Quét thư mục.');
+});
+action('overview-scan',async()=>{await post('/api/folder-inbox',{action:'run'});notice('Đang quét thư mục PDF. Xem kết quả ở Sổ ghi chép → Thư mục nhận PDF.');await refreshStatus();});
 function priceValue(id){const value=$(id).value.trim();if(value==='')return null;const price=Number(value);if(!Number.isFinite(price)||price<0)throw new Error('Đơn giá phải là số không âm.');return price;}
 function clearPrices(){for(const id of ['price-input','price-cache','price-output'])$(id).value='';}
 $('model').addEventListener('input',clearPrices);
