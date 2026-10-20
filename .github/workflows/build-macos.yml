@@ -1,0 +1,50 @@
+name: Build macOS test app
+
+on:
+  push:
+    branches: [codex/windows-partner-test]
+    paths:
+      - '.github/workflows/build-macos.yml'
+      - 'mailnotes/**'
+      - 'packaging/**'
+      - 'chrome-extension/**'
+      - 'requirements-*.txt'
+      - 'config.json'
+      - 'examples/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            label: Intel
+          - runner: macos-15
+            label: AppleSilicon
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements-build.txt
+      - name: Run application tests
+        run: python -m unittest discover -s tests -v
+      - name: Build macOS app
+        run: python packaging/build.py
+      - name: Smoke test packaged app
+        run: python packaging/smoke_app.py
+      - name: Archive macOS app
+        run: ditto -c -k --sequesterRsrc --keepParent dist/SoGhiChep.app SoGhiChep-macOS-${{ matrix.label }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SoGhiChep-macOS-${{ matrix.label }}
+          path: SoGhiChep-macOS-${{ matrix.label }}.zip
+          if-no-files-found: error
+          retention-days: 14

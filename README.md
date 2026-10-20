@@ -4,6 +4,10 @@
 
 Bản gửi đối tác dùng Docker Desktop và file mở nhanh `Mo-So-Ghi-Chep-Windows.cmd`; xem [hướng dẫn cài và sử dụng trên Windows](deploy/windows-partner.md). Lượt đầu mở `http://localhost:8080` để tự tạo mật khẩu quản trị. Không có mật khẩu mẫu gắn sẵn. Dữ liệu nằm trong `.local/`, thư mục nhận PDF là `inbox/` cạnh file mở nhanh. Khi gửi đối tác, chỉ gửi mã nguồn; không kèm `.local`, `.env`, token hoặc API key.
 
+## Thử trên macOS
+
+Xem [hướng dẫn thử trên Mac](deploy/mac-partner.md). Bản Docker Desktop mở bằng `Mo-So-Ghi-Chep-Mac.command` dùng cùng luồng xử lý với Windows; GitHub Actions còn tạo `.app` riêng cho Intel và Apple Silicon để thử. Không gửi `.local`, `inbox`, token hoặc API key kèm mã nguồn.
+
 Có thể chạy bằng PowerShell trong thư mục repo: `docker compose up -d --build mailnotes`. Dừng bằng `docker compose down`. Tiện ích Chrome chạy trên máy Windows, không chạy bên trong container. Luồng tự tải và nhập PDF bằng tiện ích trên Windows cần thử với Gmail thật; phương án ổn định là chép PDF vào `inbox/` rồi quét bằng tool.
 
 ## Mở bằng app, không gõ lệnh mỗi lần
