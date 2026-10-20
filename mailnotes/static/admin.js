@@ -49,9 +49,26 @@ function setTab(tab) {
   if (tab === 'usage') loadUsage().catch(error => notice(error.message,true));
   if (tab === 'notebook') loadNotes().catch(error => notice(error.message,true));
 }
+function rememberSource(source){try{localStorage.setItem('mailnotes.viewSource',source);}catch{}}
+async function initialSource(){
+ let saved='';try{saved=localStorage.getItem('mailnotes.viewSource')||'';}catch{}
+ if(['demo','gmail','pdf','ai','folder'].includes(saved))return saved;
+ try{const ai=await api('/api/dashboard?source=ai');return ai.total_notes>0?'ai':config.source;}
+ catch{return config.source;}
+}
+function simplifySettings(){
+ const titles=['Nguồn & lịch chạy','Kết nối Gmail','Tiện ích Chrome — AI thao tác Gmail','Bảo vệ trang quản trị','Cập nhật tool'];
+ for(const title of titles){
+  const heading=[...$('settings').querySelectorAll('article h2')].find(node=>node.textContent.trim()===title);
+  const card=heading?.closest('article');if(!card||card.dataset.collapsed)continue;
+  const details=document.createElement('details');details.className=card.className+' setup-details';details.dataset.collapsed='yes';
+  const summary=document.createElement('summary');summary.textContent=title;details.append(summary);
+  heading.remove();while(card.firstChild)details.append(card.firstChild);card.replaceWith(details);
+ }
+}
 function addRule(rule = {category:'',description:'',keywords:[],senders:[]}) {
   const card = document.createElement('article'); card.className = 'card rule-card';
-  card.innerHTML = '<div class="section-heading"><h2>Nhóm tài liệu</h2><button class="quiet danger remove-rule" type="button">Xóa quy tắc</button></div><div class="rule-grid"><label class="rule-description-label">Mô tả nhóm cho AI<textarea class="rule-description" maxlength="1000" placeholder="Tài liệu thuộc nhóm này khi nào? Ví dụ: văn bản yêu cầu thực hiện hoặc có thời hạn."></textarea></label><label>Tên nhóm<input class="rule-category" maxlength="100" placeholder="Ví dụ: Văn bản pháp luật"></label><label>Từ khóa (cách nhau bằng dấu phẩy)<input class="rule-keywords" placeholder="nghị định, thông tư, quyết định"></label><label>Người gửi (cách nhau bằng dấu phẩy)<input class="rule-senders" placeholder="@example.gov.vn"></label></div><p class="field-help">Để trống người gửi nếu không giới hạn. Khớp chuỗi con, không phân biệt hoa thường, có phân biệt dấu.</p>';
+  card.innerHTML = '<div class="section-heading"><h2>Nhóm tài liệu</h2><button class="quiet danger remove-rule" type="button">Xóa nhóm</button></div><div class="rule-grid"><label class="rule-description-label">Mô tả nhóm cho AI<textarea class="rule-description" maxlength="1000" placeholder="Tài liệu thuộc nhóm này khi nào? Ví dụ: văn bản yêu cầu thực hiện hoặc có thời hạn."></textarea></label><label>Tên nhóm<input class="rule-category" maxlength="100" placeholder="Ví dụ: Văn bản pháp luật"></label><label class="legacy-rule-field">Từ khóa (cách nhau bằng dấu phẩy)<input class="rule-keywords" placeholder="nghị định, thông tư, quyết định"></label><label class="legacy-rule-field">Người gửi (cách nhau bằng dấu phẩy)<input class="rule-senders" placeholder="@example.gov.vn"></label></div>';
   card.querySelector('.rule-category').value = rule.category;
   card.querySelector('.rule-description').value = rule.description || '';
   card.querySelector('.rule-keywords').value = rule.keywords.join(', ');
@@ -101,8 +118,8 @@ async function saveSettings(includeRules = false) {
   }
   const previousSource=config.source;
   config=await post('/api/settings',next);
-  if(config.source!==previousSource)$('dashboard-source').value=config.source;
-  notice(includeRules?'Đã lưu quy tắc. Áp dụng cho email chưa xử lý.':'Đã lưu cài đặt. Lịch chạy và lượt xử lý tiếp theo dùng cấu hình mới.');
+  if(config.source!==previousSource){$('dashboard-source').value=config.source;$('notes-source').value=config.source;rememberSource(config.source);}
+  notice(includeRules?'Đã lưu nhóm tài liệu. Áp dụng cho tài liệu chưa xử lý.':'Đã lưu cài đặt. Lịch chạy và lượt xử lý tiếp theo dùng cấu hình mới.');
   await refreshStatus();
 }
 function dateText(value) {
@@ -121,6 +138,7 @@ async function refreshStatus() {
   $('next-run').textContent=status.schedule_enabled?(status.running?'Chờ lượt hiện tại hoàn tất':status.next_run?'Lần tới: '+dateText(status.next_run):'Đang chuẩn bị lịch'):'Bạn có thể chạy thủ công';
   const folderErrors=(folder.errors||[]).slice(0,5).map(item=>`\n• ${item.file}: ${item.error}`).join('');$('folder-inbox-status').textContent=folder.running?'Đang đọc PDF...':folder.last_finished?`Lần cuối: ${dateText(folder.last_finished)} · ${folder.last_processed||0} tệp · ${folder.last_added||0} ghi chép mới${folder.error?' · '+folder.error:''}${folderErrors}`:'Chưa quét thư mục.';
   $('run-now').disabled=busy; $('demo-run').disabled=busy;$('run-folder-inbox').disabled=busy;
+  $('run-now').textContent=config.source==='gmail'?'Quét Gmail API ngay':'Chạy dữ liệu mẫu';
   $('run-error').hidden=!status.error; $('run-error').textContent=status.error || '';
   $('source-name').textContent=config.source==='gmail'?'Gmail':'Dữ liệu mẫu';
   $('source-badge').textContent=config.source==='gmail'?(status.gmail_connected?'Đã lưu kết nối':'Cần kết nối'):'Sẵn sàng thử';
@@ -191,9 +209,9 @@ async function boot() {
     $('auth-form').dataset.setup=info.needs_setup?'yes':'no';return;
   }
   for(const id of ['notes-source','dashboard-source']){const select=$(id);if(select&&!select.querySelector('option[value="folder"]')){const option=document.createElement('option');option.value='folder';option.textContent='Thư mục nhận PDF';select.append(option);}}
-  config=await api('/api/settings'); populateSettings();
+  config=await api('/api/settings'); populateSettings();simplifySettings();
   const inbox=await api('/api/folder-inbox');$('folder-inbox-path').textContent=inbox.path;$('open-folder-inbox').disabled=!inbox.can_open;
-  $('notes-source').value=config.source;$('dashboard-source').value=config.source;
+  const viewSource=await initialSource();$('notes-source').value=viewSource;$('dashboard-source').value=viewSource;
   const gmail=await api('/api/gmail/info');$('callback').value=gmail.callback;
   await refreshStatus();setTab(activeTab);
   polling=setInterval(()=>refreshStatus().catch(error=>notice(error.message,true)),4000);
@@ -218,12 +236,12 @@ action('add-preset-groups',async()=>{
   const existing=new Set([...document.querySelectorAll('.rule-category')].map(node=>node.value.trim().toLocaleLowerCase('vi-VN')));
   let added=0;
   for(const rule of presets){const key=rule.category.toLocaleLowerCase('vi-VN');if(existing.has(key))continue;addRule(rule);existing.add(key);added++;}
-  notice(added?`Đã thêm ${added} nhóm mẫu. Xem lại mô tả rồi bấm Lưu quy tắc.`:'Bạn đã có đủ các nhóm mẫu.');
+  notice(added?`Đã thêm ${added} nhóm mẫu. Xem lại mô tả rồi bấm Lưu nhóm.`:'Bạn đã có đủ các nhóm mẫu.');
 });
 $('add-rule').addEventListener('click',()=>addRule());
 $('keep-unmatched').addEventListener('change',()=>{$('unmatched').disabled=!$('keep-unmatched').checked;});
 $('summary-mode').addEventListener('change',()=>{$('ai-options').hidden=$('summary-mode').value!=='openai';updateProviderUI();});
-for(const id of ['notes-source','notes-day','notes-category']) $(id).addEventListener('change',()=>{if(id==='notes-source'){$('notes-day').value='';$('notes-category').value='';}loadNotes().catch(error=>notice(error.message,true));});
+for(const id of ['notes-source','notes-day','notes-category']) $(id).addEventListener('change',()=>{if(id==='notes-source'){$('notes-day').value='';$('notes-category').value='';$('dashboard-source').value=$('notes-source').value;rememberSource($('notes-source').value);}loadNotes().catch(error=>notice(error.message,true));});
 let searchTimer;$('notes-search').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadNotes().catch(error=>notice(error.message,true)),250);});
 action('export',async()=>{if(!$('notes-day').value)throw new Error('Chọn một ngày để tải sổ.');window.location.assign('/api/export?'+new URLSearchParams({source:$('notes-source').value,day:$('notes-day').value}));});
 action('upload-client',async()=>{
@@ -259,7 +277,7 @@ function updateGmailFilter(){
 for(const id of ['gmail-period','gmail-start','gmail-end','gmail-senders','gmail-label','gmail-only-pdf','gmail-spam'])$(id).addEventListener('input',updateGmailFilter);
 let overviewSequence=0;
 function openNotebook(source,category='',search=''){
- $('notes-source').value=source;$('notes-category').value='';$('notes-day').value='';$('notes-search').value=search;
+ $('notes-source').value=source;$('dashboard-source').value=source;rememberSource(source);$('notes-category').value='';$('notes-day').value='';$('notes-search').value=search;
  if(category){if(![...$('notes-category').options].some(option=>option.value===category))$('notes-category').add(new Option(category,category));$('notes-category').value=category;}
  setTab('notebook');
 }
@@ -273,7 +291,7 @@ async function loadOverview(){
  $('dashboard-cost-detail').textContent=(today.unpriced_calls?today.unpriced_calls+' lượt chưa tính được tiền. ':'')+'Tổng đã biết: '+money(total.estimated_usd)+(total.unpriced_calls?' · chưa đầy đủ':'')+' · tất cả nguồn';
  $('dashboard-tokens').textContent=number(today.total_tokens);
  $('dashboard-token-detail').textContent=number(today.api_calls)+' lượt API hôm nay'+(today.unknown_usage_calls?' · '+today.unknown_usage_calls+' lượt thiếu usage':'')+' · tất cả nguồn';
- $('dashboard-today').textContent=number(data.received_today);$('dashboard-total').textContent='Đã lưu '+number(data.total_notes)+' tài liệu · '+({gmail:'Gmail',pdf:'PDF tải lên',ai:'AI thao tác',folder:'Thư mục nhận PDF',demo:'Dữ liệu mẫu'}[data.source]);
+ $('dashboard-today').textContent=number(data.received_today);$('dashboard-total').textContent='Đã lưu '+number(data.total_notes)+' tài liệu · '+({gmail:'Gmail API',pdf:'PDF tải lên',ai:'Gmail qua tiện ích',folder:'Thư mục nhận PDF',demo:'Dữ liệu mẫu'}[data.source]);
  $('dashboard-review').textContent=number(data.needs_review);
  $('dashboard-groups').replaceChildren();$('dashboard-groups-empty').hidden=data.groups.length>0;
  for(const group of data.groups.slice(0,6)){const row=document.createElement('div');row.className='group-count';const name=document.createElement('button');name.textContent=group.name;name.addEventListener('click',()=>openNotebook(data.source,group.name));const count=document.createElement('strong');count.textContent=number(group.count);row.append(name,count);$('dashboard-groups').append(row);}
@@ -288,7 +306,7 @@ async function loadOverview(){
   row.append(time,title,groups,summary,actions);$('dashboard-recent').append(row);
  }
 }
-$('dashboard-source').addEventListener('change',()=>loadOverview().catch(error=>notice(error.message,true)));
+$('dashboard-source').addEventListener('change',()=>{rememberSource($('dashboard-source').value);$('notes-source').value=$('dashboard-source').value;loadOverview().catch(error=>notice(error.message,true));});
 for(const id of ['overview-notes','overview-all-notes'])action(id,()=>openNotebook($('dashboard-source').value));
 action('overview-review',()=>openNotebook($('dashboard-source').value,'Cần xem lại'));
 action('overview-pdf',()=>{openNotebook('pdf');$('pdf-file').scrollIntoView({behavior:'smooth',block:'center'});$('pdf-file').focus();});
@@ -336,7 +354,7 @@ action('upload-pdf',async()=>{
   notice('Đang đọc PDF và xử lý theo cấu hình đã lưu. Vui lòng chờ…');
   const response=await fetch('/api/pdf',{method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':csrf},body:form});
   const data=await response.json();if(!response.ok)throw new Error(data.error || 'Không xử lý được PDF.');
-  $('pdf-file').value='';$('notes-source').value='pdf';$('notes-day').value='';$('notes-category').value='';
+  $('pdf-file').value='';$('notes-source').value='pdf';$('dashboard-source').value='pdf';rememberSource('pdf');$('notes-day').value='';$('notes-category').value='';
   notice(data.added?'Đã ghi/cập nhật PDF vào sổ.':'PDF này đã xử lý, không gọi AI lại.');await loadNotes();
 });
 boot().catch(()=>{if($('auth'))$('auth').hidden=true;if($('app'))$('app').hidden=true;showStartupError();});
