@@ -1,4 +1,5 @@
 import io
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -51,20 +52,29 @@ class MarkdownArchiveTests(unittest.TestCase):
             self.assertEqual(sent,markdown.read_text())
             self.assertEqual(markdown.stat().st_mode&0o777,0o600)
             copies=list((self.root/'ai/Theo-nhom').glob('*/*.md'));self.assertEqual(len(copies),2)
-            pdf_copies=list((self.root/'ai/Theo-nhom').glob('*/*.pdf'));self.assertEqual(len(pdf_copies),2)
-            self.assertTrue(all(path.read_bytes()==raw for path in pdf_copies))
-            pdf_copies[0].unlink()  # Existing installs gain grouped PDFs on first notebook read.
+            self.assertEqual(len(list((self.root/'ai/Theo-nhom').glob('*/*.pdf'))),0)
             self.assertIn('Submit report',copies[0].read_text())
             self.assertIn('monthly statistics',copies[0].read_text())
+            copies[0].unlink()  # Missing Markdown is restored on the first notebook read.
             note=self.admin.notes('ai')['notes'][0]
-            self.assertTrue(pdf_copies[0].is_file())
-            self.assertEqual({item['path'] for item in note['local_pdf_paths']},{str(path) for path in pdf_copies})
+            self.assertTrue(copies[0].is_file())
+            self.assertEqual({item['path'] for item in note['local_markdown_paths']},{str(path) for path in copies})
             notebook=next((self.root/'ai/notebooks').glob('*.md')).read_text()
-            self.assertIn('PDF trên máy',notebook)
-            self.assertIn(str(pdf_copies[0]).replace('_','\\_'),notebook)
+            self.assertIn('Markdown theo nhóm',notebook)
+            self.assertIn(str(copies[0]).replace('_','\\_'),notebook)
+            key=hashlib.sha256(note['id'].encode()).hexdigest()
+            digest=hashlib.sha256(raw).hexdigest()
+            old_pdf=copies[0].with_name(component('report')+'--'+key[:16]+'--'+digest[:12]+'.pdf')
+            old_pdf.write_bytes(raw)
+            manifest=self.root/'ai/exports'/(key+'.json')
+            old_entries=json.loads(manifest.read_text())
+            old_entries.append(old_pdf.relative_to(self.root/'ai').as_posix())
+            manifest.write_text(json.dumps(old_entries))
+            self.admin.notes('ai')  # Old grouped PDF is removed, but the original remains.
+            self.assertFalse(old_pdf.exists())
             self.admin.edit_categories('ai',note['id'],['Ngân sách'])
             self.assertEqual(len(list((self.root/'ai/Theo-nhom').glob('*/*.md'))),1)
-            self.assertEqual(len(list((self.root/'ai/Theo-nhom').glob('*/*.pdf'))),1)
+            self.assertEqual(len(list((self.root/'ai/Theo-nhom').glob('*/*.pdf'))),0)
             self.assertEqual(api.call_count,1)
             self.assertEqual(len(list((self.root/'ai/files').glob('*.pdf'))),1)
 
@@ -82,7 +92,7 @@ class MarkdownArchiveTests(unittest.TestCase):
             self.assertTrue(ocr_payload['messages'][1]['content'][1]['image_url']['url'].startswith('data:image/png;base64,'))
         self.assertEqual(self.admin.notes('ai')['notes'][0]['categories'],['Kinh tế','Cần xem lại'])
         self.assertEqual(len(list((self.root/'ai/Can-xem-lai').glob('*.md'))),1)
-        self.assertEqual(len(list((self.root/'ai/Can-xem-lai').glob('*.pdf'))),1)
+        self.assertEqual(len(list((self.root/'ai/Can-xem-lai').glob('*.pdf'))),0)
         self.assertIn('Nội dung OCR đầy đủ',next((self.root/'ai/Can-xem-lai').glob('*.md')).read_text())
         from mailnotes.database import connect
         with connect(self.root/'ai/notes.sqlite3') as connection:
@@ -106,8 +116,8 @@ class MarkdownArchiveTests(unittest.TestCase):
         csrf=client.get('/api/session').get_json()['csrf']
         csrf=client.post('/api/setup',json={'password':'test-private-password'},headers={'X-CSRF-Token':csrf}).get_json()['csrf']
         note=client.get('/api/notes?source=ai').get_json()['notes'][0]
-        self.assertGreaterEqual(len(note['local_pdf_paths']),1)
-        self.assertTrue(Path(note['local_pdf_paths'][0]['path']).is_file())
+        self.assertGreaterEqual(len(note['local_markdown_paths']),1)
+        self.assertTrue(Path(note['local_markdown_paths'][0]['path']).is_file())
         response=client.get('/api/document',query_string={'source':'ai','id':note['id'],'format':'markdown'})
         self.assertEqual(response.status_code,200);self.assertIn('Text available',response.get_data(as_text=True));response.close()
         self.assertEqual(client.get('/api/archive?source=../../outside').status_code,400)
