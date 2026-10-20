@@ -2,7 +2,7 @@ name: Build macOS test app
 
 on:
   push:
-    branches: [codex/windows-partner-test]
+    branches: [codex/mac-customer-test]
     paths:
       - '.github/workflows/build-macos.yml'
       - 'mailnotes/**'
