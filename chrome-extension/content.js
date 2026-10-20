@@ -57,7 +57,7 @@ function pdfTiles() {
 }
 async function stablePdfTiles(cancelled) {
  let previous='',stable=0;
- for(let attempt=0;attempt<20&&!cancelled();attempt++){
+ for(let attempt=0;attempt<40&&!cancelled();attempt++){
   const tiles=pdfTiles(),signature=tiles.map(item=>item.fileKey+'\u0000'+item.name).join('\u0001');
   if(tiles.length&&signature===previous)stable++;else stable=0;
   if(stable>=2)return tiles;
@@ -227,12 +227,27 @@ async function backToList(listURL,cancelled) {
  const back = [...document.querySelectorAll('[aria-label],[data-tooltip],[title],[role="button"]')]
   .find(node => visible(node) && /quay lại|\bback\b/i.test(label(node)) && !dangerous.test(label(node)));
  if (back) {
-  await send({type:'trusted-click',...clickPoint(back)});
-  if (await until(() => mailRows().some(item=>visible(item.node)),4000,cancelled)) return true;
+  try {
+   await send({type:'trusted-click',...clickPoint(back)});
+   if (await until(() => mailRows().some(item=>visible(item.node)),4000,cancelled)) return true;
+  } catch (error) {await trace('quay-lai-loi',0,'',error.message);}
  }
- if (location.href === listURL || cancelled()) return false;
- history.back();
- return !!await until(() => mailRows().some(item=>visible(item.node)),7000,cancelled);
+ if (cancelled()) return false;
+ // Gmail is a single-page app. Browser history can point to the PDF viewer
+ // or another message, so restore the exact search route first.
+ const target=new URL(listURL);
+ if(target.origin===location.origin && target.pathname===location.pathname && target.hash && location.hash!==target.hash){
+  await trace('quay-lai-danh-sach',0,'','Khôi phục bộ lọc Gmail đã mở');
+  location.hash=target.hash;
+  if(await until(() => mailRows().some(item=>visible(item.node)),10000,cancelled))return true;
+ }
+ if(cancelled())return false;
+ if(location.href!==listURL){
+  history.back();
+  if(await until(() => mailRows().some(item=>visible(item.node)),7000,cancelled))return true;
+ }
+ await trace('quay-lai-that-bai',0,'','URL hiện tại: '+location.hash.slice(0,110)+' · hàng thư: '+mailRows().length);
+ return false;
 }
 function nextPageButton(){
  for(const node of document.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"]')){
@@ -291,7 +306,12 @@ async function run(limit,only=[],automatic=false) {
    }
    if(key&&known.complete)await send({type:'mail-incomplete',...identity});
    let mailFailed=false;
-   if (!tiles) {const error=Error('Thư '+mails+': danh sách PDF chưa ổn định hoặc không thấy PDF');errors++;mailFailed=true;faults.push(error.message);await rememberFailure('list-pdf',{...entry,key},error);await trace('loi-danh-sach-pdf',mails,'',error.message);}
+   if (!tiles) {
+    const candidates=[...document.querySelectorAll('[aria-label],[data-tooltip],[title]')].map(label).filter(value=>/\.pdf\b/i.test(value)).slice(0,4);
+    const detail='Thư '+mails+': chưa thấy ô PDF sau 12 giây · URL '+location.hash.slice(0,70)+' · .aV3 '+document.querySelectorAll('.aV3').length+' · nhãn '+candidates.join(' | ');
+    const error=Error(detail);errors++;mailFailed=true;faults.push(error.message);
+    await rememberFailure('list-pdf',{...entry,key},error);await trace('loi-danh-sach-pdf',mails,'',detail);
+   }
    else {
     const attachments=tiles.map(item=>({name:item.name,index:item.index,fileKey:item.fileKey,legacyKey:item.legacyKey})).filter(item=>!only.length||only.some(failed=>(failed.key?failed.key===key:failed.rowIndex===entry.index&&failed.text===entry.text)&&(failed.fileKey?[item.fileKey,item.legacyKey].includes(failed.fileKey):failed.fileIndex===item.index&&failed.name===item.name)));
     const recordedFiles=new Set(known.files);
