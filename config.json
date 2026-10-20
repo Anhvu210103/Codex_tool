@@ -5,7 +5,7 @@
   "timezone": "Asia/Ho_Chi_Minh",
   "summary": {
     "mode": "extractive",
-    "max_chars": 1200,
+    "max_chars": 350,
     "provider": "deepseek",
     "model": "deepseek-chat"
   },

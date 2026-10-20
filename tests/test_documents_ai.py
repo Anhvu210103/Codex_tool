@@ -61,6 +61,14 @@ class DocumentAITests(unittest.TestCase):
         self.assertIn('20 October',self.row()[1])
         self.assertIn('monthly report', self.row()[2])
 
+    def test_ai_summary_respects_short_note_limit(self):
+        self.config['summary']['max_chars'] = 120
+        long_summary = 'Nội dung dài cần rút gọn. ' * 30
+        with patch('mailnotes.core.request_json', return_value=ai_result(summary=long_summary)):
+            process([self.mail], self.config, 'gmail')
+        self.assertLessEqual(len(self.row()[1]), 120)
+        self.assertTrue(self.row()[1].endswith('…'))
+
     def test_unknown_or_uncertain_categories_go_to_review(self):
         for result in [ai_result(['Invented']),ai_result(['Work'],confidence=.4),ai_result(['Work'],needs_review=True)]:
             with tempfile.TemporaryDirectory() as directory:

@@ -51,7 +51,7 @@ def classify(message, config):
 def summarize(message, config):
     settings = config.get('summary', {})
     body = clean_body(message['body'])
-    limit = int(settings.get('max_chars', 1200))
+    limit = int(settings.get('max_chars', 350))
     if settings.get('mode', 'extractive') == 'extractive':
         return body[:limit] + ('…' if len(body) > limit else '')
     if settings['mode'] != 'openai':
@@ -70,7 +70,15 @@ def summarize(message, config):
     summary = result['choices'][0]['message']['content']
     if not isinstance(summary, str) or not summary.strip():
         raise ValueError('AI response did not contain a summary')
-    return summary
+    return shorten_summary(summary, limit)
+
+
+def shorten_summary(value, limit):
+    value = ' '.join(value.split())
+    if len(value) <= limit:
+        return value
+    prefix = value[:limit - 1].rsplit(' ', 1)[0]
+    return (prefix or value[:limit - 1]) + '…'
 
 
 def safe_text(value):
