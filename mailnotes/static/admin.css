@@ -132,6 +132,8 @@ footer { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; fon
 .sidebar-credit { padding: 14px 8px 0; }
 .company-credit { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; font-size: .82rem; font-weight: 650; color: var(--muted); }
 .company-credit img { display: block; width: 24px; height: 24px; object-fit: contain; }
+.topbar .company-credit { border-right: 1px solid var(--line); padding-right: 18px; }
+.auth-credit { margin-top: 24px; display: flex; justify-content: center; }
 .notebook-card { padding: 0; overflow: hidden; }
 .filters { padding: 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: end; background: #fbfcfb; }
 .filters label { margin: 0; min-width: 170px; flex: 1; }
