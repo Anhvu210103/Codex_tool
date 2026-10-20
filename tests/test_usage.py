@@ -91,10 +91,15 @@ class UsageTests(unittest.TestCase):
         headers={'X-CSRF-Token':setup.get_json()['csrf']}
         config=client.get('/api/settings').get_json();config['summary']['pricing']={'input_per_million':None,'cached_input_per_million':None,'output_per_million':-1}
         self.assertEqual(client.post('/api/settings',json=config,headers=headers).status_code,400)
-        upload=client.post('/api/pdf',data={'file':(io.BytesIO(sample_pdf()),'report.pdf')},headers=headers)
+        config=client.get('/api/settings').get_json();config['summary']['ai_consent']=True
+        self.assertEqual(client.post('/api/settings',json=config,headers=headers).status_code,200)
+        private_json(app.extensions['admin'].key_path('deepseek'),{'key':'test-key'})
+        with patch('mailnotes.core.request_json',return_value=ai_result()):
+            upload=client.post('/api/pdf',data={'file':(io.BytesIO(sample_pdf()),'report.pdf')},headers=headers)
         self.assertEqual(upload.status_code,200)
         note=client.get('/api/notes?source=pdf').get_json()['notes'][0]
-        reread=client.post('/api/notes/reprocess',json={'source':'pdf','id':note['id']},headers=headers)
+        with patch('mailnotes.core.request_json',return_value=ai_result()):
+            reread=client.post('/api/notes/reprocess',json={'source':'pdf','id':note['id']},headers=headers)
         self.assertEqual(reread.status_code,200)
         self.assertEqual(client.get('/api/notes?source=pdf').get_json()['total'],1)
-        self.assertEqual(client.get('/api/usage').get_json()['totals']['api_calls'],0)
+        self.assertGreaterEqual(client.get('/api/usage').get_json()['totals']['api_calls'],1)

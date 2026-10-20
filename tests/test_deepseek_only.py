@@ -21,8 +21,8 @@ class DeepSeekOnlyTests(unittest.TestCase):
             self.assertEqual(migrated['summary']['provider'],'deepseek')
             self.assertEqual(migrated['summary']['model'],'deepseek-chat')
             self.assertFalse(migrated['summary']['ai_consent'])
-            self.assertEqual(migrated['summary']['mode'],'extractive')
-            self.assertIsNone(migrated['summary']['pricing']['input_per_million'])
+            self.assertEqual(migrated['summary']['mode'],'openai')
+            self.assertEqual(migrated['summary']['pricing']['input_per_million'],0.30)
             self.assertEqual(migrated['rules'],original['rules'])
 
     def test_api_rejects_other_provider_and_html_only_offers_deepseek(self):

@@ -24,6 +24,8 @@ from .core import process, ensure_schema, render_notes
 from .gmail import messages
 from .gmail_filters import validate_filter
 
+DEFAULT_DEEPSEEK_PRICING = {'input_per_million': 0.30, 'cached_input_per_million': 0.006, 'output_per_million': 1.20}
+
 
 def private_json(path, value):
     path = Path(path)
@@ -71,8 +73,8 @@ def validate_settings(value):
     provider = summary.get('provider', 'deepseek')
     if provider != 'deepseek':
         raise ValueError('Nhà cung cấp AI không hợp lệ.')
-    if (classification == 'ai' or summary['mode'] == 'openai') and summary.get('ai_consent') is not True:
-        raise ValueError('Cần xác nhận đồng ý xử lý nội dung qua nhà cung cấp AI đã chọn.')
+    # Consent is checked when processing. An installation can start before its
+    # operator has supplied an API key and explicitly opted in.
     raw_prices = summary.get('pricing', {})
     if not isinstance(raw_prices, dict):
         raise ValueError('Đơn giá không hợp lệ.')
@@ -81,7 +83,7 @@ def validate_settings(value):
         price = raw_prices.get(field)
         if price is not None and (isinstance(price, bool) or not isinstance(price, (int, float)) or not math.isfinite(price) or not 0 <= price <= 100000):
             raise ValueError('Đơn giá phải là số không âm, tối đa 100.000 USD / triệu token.')
-        prices[field] = price
+        prices[field] = DEFAULT_DEEPSEEK_PRICING[field] if price is None else price
     rules = value.get('rules')
     if not isinstance(rules, list) or len(rules) > 100:
         raise ValueError('Tối đa 100 quy tắc.')
@@ -113,7 +115,7 @@ def validate_settings(value):
             'interval_seconds': integer('Chu kỳ (giây)', value.get('interval_seconds'), 60, 604800),
             'timezone': zone, 'rules': clean_rules, 'unmatched_category': unmatched,
             'summary': {'mode': summary['mode'], 'provider': provider,
-                        'max_chars': integer('Độ dài trích đoạn', summary.get('max_chars', 1200), 100, 10000),
+                        'max_chars': integer('Độ dài nội dung ngắn', summary.get('max_chars', 350), 100, 10000),
                         'max_input_chars': integer('Giới hạn đầu vào AI', summary.get('max_input_chars', 12000), 1000, 100000),
                         'model': text('Mô hình', summary.get('model', 'deepseek-chat'), 100),
                         'ai_consent': summary.get('ai_consent') is True, 'pricing': prices}}
@@ -123,9 +125,15 @@ class MissingAIKey(RuntimeError):
     pass
 
 
+class MissingAIConsent(RuntimeError):
+    pass
+
+
 def error_message(error):
     if isinstance(error, MissingAIKey):
-        return 'Chưa có API key cho nhà cung cấp AI đã chọn. Lưu key trong Cài đặt hoặc dùng rules và trích đoạn miễn phí.'
+        return 'Chưa có DeepSeek API key. Lưu key trong Cài đặt rồi thử lại.'
+    if isinstance(error, MissingAIConsent):
+        return 'Trong Cài đặt, hãy xác nhận đồng ý gửi nội dung tài liệu cho DeepSeek trước khi chạy.'
     if isinstance(error, FileNotFoundError):
         return 'Thiếu thông tin kết nối. Vào Cài đặt để kết nối Gmail.'
     if isinstance(error, HTTPError):
@@ -196,6 +204,9 @@ class Admin:
                                              'cached_input_per_million':None,
                                              'output_per_million':None})
             saved['classification_mode'] = 'rules'
+        saved['classification_mode'] = 'ai'
+        saved['summary']['mode'] = 'openai'
+        saved['summary']['max_chars'] = 350
         self.settings = validate_settings(saved)
         self.lock = threading.RLock()
         self.run_lock = threading.Lock()
@@ -217,6 +228,10 @@ class Admin:
             return copy.deepcopy(self.settings)
 
     def save_settings(self, value):
+        value = copy.deepcopy(value)
+        value['classification_mode'] = 'ai'
+        value['summary']['mode'] = 'openai'
+        value['summary']['max_chars'] = 350
         clean = validate_settings(value)
         with self.lock:
             folder_was_enabled = self.settings['folder_inbox_enabled']
@@ -324,8 +339,8 @@ class Admin:
         config = self.runtime_config(source)
         ai_enabled = (config['classification_mode'] == 'ai'
                       or config['summary']['mode'] == 'openai')
-        if ai_enabled and not (config.get('_api_key') or os.environ.get('DEEPSEEK_API_KEY')):
-            raise MissingAIKey()
+        if config.get('pdf_ocr') and not config['summary']['ai_consent']:
+            raise MissingAIConsent()
         from hashlib import sha256
         identifier = source + ':' + sha256(data).hexdigest()
         database = Path(config['data_dir']) / 'notes.sqlite3'
@@ -338,6 +353,10 @@ class Admin:
             config['_reprocess_id'] = identifier
         senders={'ai':'AI thao tác','folder':'Thư mục nhận PDF','pdf':'PDF tải lên'}
         document = pdf_message(data, filename, config, id=sha256(data).hexdigest(), sender=senders[source], received_at=datetime.now(timezone.utc).isoformat())
+        if document['body'].strip() and ai_enabled and not config['summary']['ai_consent']:
+            raise MissingAIConsent()
+        if document['body'].strip() and ai_enabled and not (config.get('_api_key') or os.environ.get('DEEPSEEK_API_KEY')):
+            raise MissingAIKey()
         return process([document], config, source)
 
     def process_pdf(self, data, filename, reprocess=False, source='pdf'):
@@ -426,6 +445,8 @@ class Admin:
                 config['_api_key'] = key
                 if (config['classification_mode'] == 'ai' or config['summary']['mode'] == 'openai') and not self.has_key(config['summary']['provider']):
                     raise MissingAIKey()
+                if not config['summary']['ai_consent']:
+                    raise MissingAIConsent()
                 incoming = messages(config, self.credentials, self.token)
             added = process(incoming, config, source)
             with self.lock:

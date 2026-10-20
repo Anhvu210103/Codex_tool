@@ -16,7 +16,7 @@ OCR_INSTRUCTION = ('Chuyển hình ảnh thành văn bản, toàn bộ nội dun
                    'không thêm thông tin ngoài hình ảnh.')
 
 
-def pdf_text(data, ocr=False, api_key=None, model='deepseek-chat'):
+def pdf_text(data, ocr=False, api_key=None, model='deepseek-chat', usage_callback=None):
     from pypdf import PdfReader
     if len(data) > MAX_PDF_BYTES:
         return '', 'PDF vượt giới hạn 20 MB; cần xử lý riêng.'
@@ -72,6 +72,8 @@ def pdf_text(data, ocr=False, api_key=None, model='deepseek-chat'):
                         ]
                     },
                     headers={'Authorization': 'Bearer ' + api_key, 'Content-Type': 'application/json'})
+                if usage_callback:
+                    usage_callback(response)
                 choices = response.get('choices', [])
                 if not choices:
                     raise ValueError('DeepSeek không trả kết quả OCR.')
@@ -102,11 +104,21 @@ def save_pdf(data, root):
 def pdf_message(data, filename, config, **metadata):
     if len(data) > MAX_PDF_BYTES or not data.startswith(b'%PDF-'):
         raise ValueError('Chọn file PDF hợp lệ, tối đa 20 MB.')
+    def record_ocr_response(response):
+        from .database import connect
+        from .usage import record_usage
+        database = Path(config['data_dir']) / 'notes.sqlite3'
+        database.parent.mkdir(parents=True, exist_ok=True)
+        with connect(database) as connection:
+            record_usage(connection, response, 'deepseek', config.get('summary', {}).get('model', 'deepseek-chat'),
+                         metadata.get('id'), config.get('summary', {}).get('pricing', {}))
+
     text, warning = pdf_text(
         data,
         config.get('pdf_ocr', False),
         config.get('_api_key') or os.environ.get('DEEPSEEK_API_KEY'),
-        config.get('summary', {}).get('model', 'deepseek-chat'))
+        config.get('summary', {}).get('model', 'deepseek-chat'),
+        record_ocr_response)
     digest = save_pdf(data, config['data_dir'])
     from .archive import save_markdown
     markdown = save_markdown(config['data_dir'], digest, text)

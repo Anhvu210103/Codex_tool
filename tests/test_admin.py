@@ -73,8 +73,7 @@ class AdminTests(unittest.TestCase):
         self.assertEqual(self.post('/api/settings',bad).status_code, 400)
         bad=copy.deepcopy(config);bad['timezone']='../../bad'
         self.assertEqual(self.post('/api/settings',bad).status_code, 400)
-        bad=copy.deepcopy(config);bad['summary']['mode']='openai'
-        self.assertEqual(self.post('/api/settings',bad).status_code, 400)
+        self.assertEqual(self.admin.config()['summary']['mode'], 'openai')
         self.assertEqual(self.admin.config()['interval_seconds'],600)
         self.assertEqual((BASE / 'config.json').read_bytes(),original)
 

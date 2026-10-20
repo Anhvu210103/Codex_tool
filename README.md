@@ -137,7 +137,7 @@ Tiền/token tổng hợp tất cả nguồn; tài liệu/nhóm tính theo ngu�
 
 Mở **Token & chi phí** để xem tổng token API đã báo, đầu vào/đầu ra, cache đầu vào của nhà cung cấp, cache nội bộ miễn phí, thống kê từng provider/model và 50 lượt gần nhất. Dữ liệu bắt đầu được ghi từ phiên bản này; không dựng lại usage của các lượt cũ.
 
-Trong **Cài đặt → Nội dung & chi phí**, nhập đơn giá model hiện tại bằng **USD / 1 triệu token** cho đầu vào không cache, đầu vào cache API và đầu ra. Để trống nếu chưa biết. Tiền là **ước tính**, không phải số dư hay hóa đơn thực tế. Đơn giá được chụp tại thời điểm có phản hồi API; đổi giá không làm thay đổi chi phí lịch sử. Đổi provider/model trên UI sẽ xóa các ô đơn giá để tránh dùng nhầm giá cũ.
+Bản thử Linux mặc định dùng DeepSeek để phân nhóm và tóm tắt, ghi chú tối đa 350 ký tự. Tool dùng đơn giá ước tính mặc định **USD / 1 triệu token**: đầu vào không cache 0.30, đầu vào cache API 0.006, đầu ra 1.20. OCR từng trang cũng ghi usage khi API trả về. Kiểm tra bảng giá DeepSeek trước khi dùng số tiền để dự toán cho khách. Tiền là **ước tính**, không phải số dư hay hóa đơn thực tế. Đơn giá được chụp tại thời điểm có phản hồi API; đổi giá không làm thay đổi chi phí lịch sử.
 
 Lượt API có phản hồi vẫn ghi usage trước khi kiểm tra JSON, vì phản hồi không hợp lệ vẫn có thể tính phí. API không trả usage được đánh dấu chưa biết; request lỗi/timeout không có usage có thể thiếu trong thống kê. Cache nội bộ không gọi API, token/chi phí mới bằng 0. Email/PDF đã xử lý và bị bỏ qua không tạo thêm lượt thống kê. Cache đầu vào API là một khái niệm khác, vẫn có thể bị tính phí theo bảng giá nhà cung cấp.
 

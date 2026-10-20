@@ -84,6 +84,9 @@ class MarkdownArchiveTests(unittest.TestCase):
         self.assertEqual(len(list((self.root/'ai/Can-xem-lai').glob('*.md'))),1)
         self.assertEqual(len(list((self.root/'ai/Can-xem-lai').glob('*.pdf'))),1)
         self.assertIn('Nội dung OCR đầy đủ',next((self.root/'ai/Can-xem-lai').glob('*.md')).read_text())
+        from mailnotes.database import connect
+        with connect(self.root/'ai/notes.sqlite3') as connection:
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM ai_usage').fetchone()[0], 2)
 
     def test_mixed_pdf_reports_unread_image_pages_and_names_cannot_escape(self):
         config=self.admin.runtime_config('pdf')
@@ -94,8 +97,10 @@ class MarkdownArchiveTests(unittest.TestCase):
         self.assertLess(len(component('Ngân sách nhà nước ' * 40).encode('utf-8')),200)
 
     def test_markdown_download_and_local_folder_action(self):
-        config=self.admin.config();config['summary']['mode']='extractive';config['classification_mode']='rules';self.admin.save_settings(config)
-        self.admin.process_pdf(pdf('Text available in Markdown.'),'text.pdf',source='ai')
+        config=self.admin.config();config['summary']['ai_consent']=True;self.admin.save_settings(config)
+        response={'choices':[{'finish_reason':'stop','message':{'content':json.dumps({'categories':['Kinh tế'],'summary':'Text available in Markdown.','confidence':.9,'needs_review':False,'review_reason':''})}}]}
+        with patch('mailnotes.core.request_json',return_value=response):
+            self.admin.process_pdf(pdf('Text available in Markdown.'),'text.pdf',source='ai')
         app=create_app(data_root=self.root);client=app.test_client()
         self.assertEqual(client.get('/api/archive?source=ai').status_code,401)
         csrf=client.get('/api/session').get_json()['csrf']

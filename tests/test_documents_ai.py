@@ -11,6 +11,7 @@ from pypdf import PdfWriter
 from pypdf.generic import DictionaryObject, NameObject, DecodedStreamObject
 
 from mailnotes.core import process
+from mailnotes.admin import private_json
 from mailnotes.documents import pdf_text, pdf_message
 from mailnotes.gmail import messages
 from mailnotes.web import create_app
@@ -155,7 +156,10 @@ class DocumentAITests(unittest.TestCase):
         csrf=client.get('/api/session').get_json()['csrf']
         setup=client.post('/api/setup',json={'password':'test-private-password'},headers={'X-CSRF-Token':csrf})
         headers={'X-CSRF-Token':setup.get_json()['csrf']}
-        upload=client.post('/api/pdf',data={'file':(io.BytesIO(sample_pdf()),'report.pdf')},headers=headers)
+        admin=app.extensions['admin'];settings=admin.config();settings['summary']['ai_consent']=True;admin.save_settings(settings)
+        private_json(admin.key_path('deepseek'),{'key':'test-key'})
+        with patch('mailnotes.core.request_json',return_value=ai_result()):
+            upload=client.post('/api/pdf',data={'file':(io.BytesIO(sample_pdf()),'report.pdf')},headers=headers)
         self.assertEqual(upload.status_code,200);self.assertEqual(upload.get_json()['added'],1)
         note=client.get('/api/notes?source=pdf').get_json()['notes'][0]
         download=client.get('/api/document?source=pdf&id='+note['id'])
