@@ -1,8 +1,10 @@
 # Dùng Sổ ghi chép hằng ngày trên Mac
 
-## Mở và dừng
+## Mở Sổ ghi chép
 
-Mở **Docker Desktop**, đợi ứng dụng sẵn sàng, rồi trong Finder bấm đúp `Mo-So-Ghi-Chep-Mac.command` ở thư mục Sổ ghi chép. Tool mở tại `http://localhost:8080`; đăng nhập bằng mật khẩu đã tạo. Muốn dừng hẳn, bấm đúp `Dung-So-Ghi-Chep-Mac.command`. Đóng tab trình duyệt chỉ đóng giao diện; máy ngủ hoặc tắt sẽ ngừng lịch quét.
+Trong Finder, **bấm đúp `Mo-So-Ghi-Chep-Mac.command`**. Tool tự mở Docker Desktop nếu cần, đợi sẵn sàng rồi mở trang Sổ ghi chép. Đăng nhập bằng mật khẩu đã tạo. Bấm file này lần nữa chỉ mở lại trang, không xử lý thêm tài liệu hay dựng lại ứng dụng.
+
+Khi dùng xong, **chỉ cần đóng tab trình duyệt**. Tool vẫn chạy nền để quét theo lịch đã bật. Nếu muốn dừng hẳn, bấm đúp `Dung-So-Ghi-Chep-Mac.command`; lần dùng sau bấm file mở như thường lệ. Máy ngủ hoặc tắt sẽ tạm ngừng quét.
 
 ## Xử lý tài liệu
 
@@ -17,7 +19,7 @@ PDF scan không có chữ cần OCR. Trước khi quét, bật **Dùng OCR qua D
 
 ## Nếu gặp lỗi
 
-- **Trang không mở:** kiểm tra Docker Desktop đã chạy, bấm lại file mở, thử nhập `http://localhost:8080` vào trình duyệt.
+- **Trang không mở:** bấm lại file mở, chờ Docker Desktop khởi động; nếu chưa hiện trang, thử nhập `http://localhost:8080` vào trình duyệt.
 - **PDF chưa xuất hiện:** kiểm tra file đã nằm trực tiếp trong `inbox/`, không còn đang tải, rồi bấm **Quét thư mục**; xem file đã chuyển vào `Da-xu-ly` chưa.
 - **Chữ quá nhỏ / bảng bị ngắt:** góc trên chọn **Cỡ chữ → Lớn**; bảng Sổ ghi chép có thể cuộn ngang trên màn hình hẹp.
 - **PDF scan vào Cần xem lại:** mở PDF gốc, kiểm tra thông báo OCR và báo người triển khai. Đừng xóa file gốc.

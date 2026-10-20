@@ -7,7 +7,7 @@ export PATH
 if ! command -v docker >/dev/null 2>&1; then
   open -a 'Docker' >/dev/null 2>&1 || true
   if ! command -v docker >/dev/null 2>&1; then
-    printf 'Can cai Docker Desktop truoc. Xem deploy/mac-partner.md\n'
+    printf 'Can cai Docker Desktop truoc. Xem deploy/mac-install.md\n'
     read -r _
     exit 1
   fi
@@ -28,10 +28,15 @@ if ! docker info >/dev/null 2>&1; then
   done
 fi
 
-if ! docker compose up -d --build --wait mailnotes; then
-  printf 'Tool chua khoi dong duoc. Xem loi phia tren va deploy/mac-partner.md\n'
-  read -r _
-  exit 1
+# A second click should only reopen the browser, not rebuild the image.
+if ! docker compose ps --status running --services 2>/dev/null | grep -qx mailnotes \
+   || ! curl -fsS --max-time 3 'http://localhost:8080/health' 2>/dev/null | grep -q '"app":"mailnotes"'; then
+  printf 'Dang mo So ghi chep, vui long doi...\n'
+  if ! docker compose up -d --build --wait mailnotes; then
+    printf 'Tool chua khoi dong duoc. Xem loi phia tren va deploy/mac-install.md\n'
+    read -r _
+    exit 1
+  fi
 fi
 
 open 'http://localhost:8080'

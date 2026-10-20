@@ -6,7 +6,7 @@
 - [Cài lần đầu và bàn giao](deploy/mac-install.md)
 - [Hướng dẫn khách sử dụng hằng ngày](deploy/mac-user-guide.md)
 
-Trong Finder, bấm `Mo-So-Ghi-Chep-Mac.command` để mở và `Dung-So-Ghi-Chep-Mac.command` để dừng. Lần đầu cần cài Docker Desktop; tool sẽ yêu cầu tạo mật khẩu quản trị. Dữ liệu và key nằm trong `.local/` cạnh hai file này. Không đưa `.local/`, `inbox/`, API key hoặc token vào ZIP gửi khách.
+Trong Finder, bấm `Mo-So-Ghi-Chep-Mac.command` để tự mở Docker Desktop và tool. Đóng tab khi dùng xong; chỉ bấm `Dung-So-Ghi-Chep-Mac.command` nếu muốn dừng hẳn lịch chạy. Lần đầu cần cài Docker Desktop; tool sẽ yêu cầu tạo mật khẩu quản trị. Dữ liệu và key nằm trong `.local/` cạnh hai file này. Không đưa `.local/`, `inbox/`, API key hoặc token vào ZIP gửi khách.
 
 Bản `.app` build trên macOS là bản thử kỹ thuật riêng, lưu dữ liệu ở chỗ khác. Không chạy đồng thời `.app` và bản Docker. Hướng dẫn bàn giao trên nhánh này chỉ áp dụng cho Docker Desktop.
 
