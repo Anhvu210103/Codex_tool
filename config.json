@@ -4,8 +4,8 @@
   "data_dir": ".local",
   "timezone": "Asia/Ho_Chi_Minh",
   "summary": {
-    "mode": "extractive",
-    "max_chars": 1200,
+    "mode": "openai",
+    "max_chars": 350,
     "provider": "deepseek",
     "model": "deepseek-chat"
   },
@@ -141,7 +141,7 @@
     }
   ],
   "unmatched_category": "Khác",
-  "classification_mode": "rules",
+  "classification_mode": "ai",
   "gmail_pdf": true,
   "gmail_filter": {
     "period": "today",

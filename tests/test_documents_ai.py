@@ -155,6 +155,12 @@ class DocumentAITests(unittest.TestCase):
         csrf=client.get('/api/session').get_json()['csrf']
         setup=client.post('/api/setup',json={'password':'test-private-password'},headers={'X-CSRF-Token':csrf})
         headers={'X-CSRF-Token':setup.get_json()['csrf']}
+        blocked=client.post('/api/pdf',data={'file':(io.BytesIO(sample_pdf()),'report.pdf')},headers=headers)
+        self.assertEqual(blocked.status_code,400)
+        self.assertIn('đồng ý',blocked.get_json()['error'])
+        settings=client.get('/api/settings').get_json()
+        settings['classification_mode']='rules';settings['summary']['mode']='extractive'
+        self.assertEqual(client.post('/api/settings',json=settings,headers=headers).status_code,200)
         upload=client.post('/api/pdf',data={'file':(io.BytesIO(sample_pdf()),'report.pdf')},headers=headers)
         self.assertEqual(upload.status_code,200);self.assertEqual(upload.get_json()['added'],1)
         note=client.get('/api/notes?source=pdf').get_json()['notes'][0]

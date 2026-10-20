@@ -16,13 +16,16 @@ class DeepSeekOnlyTests(unittest.TestCase):
             original['summary'].update(provider='gemini',model='gemini-flash-latest',mode='openai',ai_consent=True,
                                        pricing={'input_per_million':99})
             original['rules']=[{'category':'Nhóm riêng','description':'Giữ nguyên','keywords':[],'senders':[]}]
+            original.update(schedule_enabled=True,folder_inbox_enabled=True)
             private_json(root/'admin/settings.json',original)
             migrated=Admin(base,root).config()
             self.assertEqual(migrated['summary']['provider'],'deepseek')
             self.assertEqual(migrated['summary']['model'],'deepseek-chat')
             self.assertFalse(migrated['summary']['ai_consent'])
-            self.assertEqual(migrated['summary']['mode'],'extractive')
-            self.assertIsNone(migrated['summary']['pricing']['input_per_million'])
+            self.assertEqual(migrated['summary']['mode'],'openai')
+            self.assertEqual(migrated['summary']['pricing']['input_per_million'],0.30)
+            self.assertFalse(migrated['schedule_enabled'])
+            self.assertFalse(migrated['folder_inbox_enabled'])
             self.assertEqual(migrated['rules'],original['rules'])
 
     def test_api_rejects_other_provider_and_html_only_offers_deepseek(self):

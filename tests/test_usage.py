@@ -91,6 +91,9 @@ class UsageTests(unittest.TestCase):
         headers={'X-CSRF-Token':setup.get_json()['csrf']}
         config=client.get('/api/settings').get_json();config['summary']['pricing']={'input_per_million':None,'cached_input_per_million':None,'output_per_million':-1}
         self.assertEqual(client.post('/api/settings',json=config,headers=headers).status_code,400)
+        config=client.get('/api/settings').get_json()
+        config['classification_mode']='rules';config['summary']['mode']='extractive'
+        self.assertEqual(client.post('/api/settings',json=config,headers=headers).status_code,200)
         upload=client.post('/api/pdf',data={'file':(io.BytesIO(sample_pdf()),'report.pdf')},headers=headers)
         self.assertEqual(upload.status_code,200)
         note=client.get('/api/notes?source=pdf').get_json()['notes'][0]

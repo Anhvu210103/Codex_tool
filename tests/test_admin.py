@@ -73,7 +73,7 @@ class AdminTests(unittest.TestCase):
         self.assertEqual(self.post('/api/settings',bad).status_code, 400)
         bad=copy.deepcopy(config);bad['timezone']='../../bad'
         self.assertEqual(self.post('/api/settings',bad).status_code, 400)
-        bad=copy.deepcopy(config);bad['summary']['mode']='openai'
+        bad=copy.deepcopy(config);bad['summary']['mode']='unsupported'
         self.assertEqual(self.post('/api/settings',bad).status_code, 400)
         self.assertEqual(self.admin.config()['interval_seconds'],600)
         self.assertEqual((BASE / 'config.json').read_bytes(),original)
@@ -103,7 +103,7 @@ class AdminTests(unittest.TestCase):
             self.assertEqual(self.post('/api/run', {'source':'demo'}).status_code,409)
         finally:
             self.admin.run_lock.release()
-        config=self.admin.config();config['schedule_enabled']=True
+        config=self.admin.config();config.update(source='demo',schedule_enabled=True)
         self.admin.save_settings(config)
         self.admin.start_scheduler()
         with self.admin.lock:
