@@ -19,7 +19,7 @@ with sync_playwright() as playwright:
       window.showList=()=>{
         document.querySelector('#app').innerHTML=[0,1].map(i=>`<div class="zA" data-legacy-thread-id="mail-${i}" style="width:600px;padding:15px">Thư PDF ${i}</div>`).join('');
         document.querySelectorAll('.zA').forEach((row,i)=>row.onclick=()=>{
-          opened.push(i);location.hash='#mail-'+i;
+          opened.push(i);if(!window.stuckOnSameHash)location.hash='#mail-'+i;
           document.querySelector('#app').innerHTML='<p>Gmail đang mở thư, nút quay lại bị thiếu</p>';
         });
       };
@@ -31,5 +31,14 @@ with sync_playwright() as playwright:
     assert page.evaluate('opened') == [0, 1], page.evaluate('report')
     assert not any(event['phase'] == 'dung' for event in page.evaluate('report'))
     assert any(event['phase'] == 'quay-lai-danh-sach' for event in page.evaluate('report'))
+    page.evaluate('''() => {
+      opened=[];report=[];finished=false;window.stuckOnSameHash=true;location.hash='#list';showList();
+    }''')
+    page.wait_for_timeout(300)
+    page.evaluate("listener({type:'run',limit:20})")
+    page.wait_for_function('finished', timeout=45000)
+    assert page.evaluate('opened') == [0, 1], page.evaluate('report')
+    assert any(event['phase'] == 'tai-lai-danh-sach' for event in page.evaluate('report')), page.evaluate('report')
+    assert not any(event['phase'] == 'dung' for event in page.evaluate('report'))
     browser.close()
-    print('Browser passed: missing Back control restores Gmail search and opens next mail')
+    print('Browser passed: missing Back control and blank search view recover the next mail')

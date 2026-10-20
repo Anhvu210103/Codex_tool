@@ -246,7 +246,18 @@ async function backToList(listURL,cancelled) {
   history.back();
   if(await until(() => mailRows().some(item=>visible(item.node)),7000,cancelled))return true;
  }
- await trace('quay-lai-that-bai',0,'','URL hiện tại: '+location.hash.slice(0,110)+' · hàng thư: '+mailRows().length);
+ // Gmail occasionally updates its address bar to the search URL but leaves
+ // the message view blank. A route change through All Mail makes Gmail render
+ // the saved search again without reloading (which would kill this batch).
+ if(!cancelled() && target.hash && location.hash===target.hash){
+  await trace('tai-lai-danh-sach',0,'','Đúng URL tìm kiếm nhưng Gmail chưa hiện hàng thư; mở lại bộ lọc');
+  location.hash='#all';
+  await pause(500);
+  location.hash=target.hash;
+  if(await until(() => mailRows().some(item=>visible(item.node)),12000,cancelled))return true;
+ }
+ const empty=/không tìm thấy (?:thư|cuộc trò chuyện|cuộc hội thoại) nào|không có (?:kết quả|thư nào|cuộc trò chuyện nào)|no conversations found|no results found|your search did not match/i.test(document.body.innerText);
+ await trace('quay-lai-that-bai',0,'','URL: '+location.hash.slice(0,85)+' · .zA: '+document.querySelectorAll('.zA').length+' · tìm kiếm trống: '+empty);
  return false;
 }
 function nextPageButton(){
