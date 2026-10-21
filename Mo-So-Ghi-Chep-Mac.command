@@ -3,6 +3,10 @@
 cd "$(dirname "$0")" || exit 1
 PATH="/usr/local/bin:/opt/homebrew/bin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
 export PATH
+MAILNOTES_INBOX_HOST_PATH="$(pwd -P)/inbox"
+MAILNOTES_DATA_HOST_PATH="$(pwd -P)/.local"
+export MAILNOTES_INBOX_HOST_PATH MAILNOTES_DATA_HOST_PATH
+mkdir -p inbox .local || exit 1
 
 if ! command -v docker >/dev/null 2>&1; then
   open -a 'Docker' >/dev/null 2>&1 || true

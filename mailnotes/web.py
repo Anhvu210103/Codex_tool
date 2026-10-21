@@ -414,13 +414,24 @@ def create_app(base=None, data_root=None, public_url=None):
     @app.get('/api/export')
     def export():
         source, day = request.args.get('source', 'demo'), request.args.get('day', '')
-        if source not in ('demo', 'gmail', 'pdf', 'ai', 'folder') or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
+        if source not in ('all', 'demo', 'gmail', 'pdf', 'ai', 'folder') or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
             raise ValueError('Chọn nguồn và ngày hợp lệ để tải sổ.')
-        path = admin.root / source / 'notebooks' / (day + '.md')
-        if not path.exists():
-            return jsonify(error='Ngày này chưa có ghi chép.'), 404
-        # Read a snapshot, so an atomic notebook replacement cannot affect transfer.
-        return send_file(io.BytesIO(path.read_bytes()), mimetype='text/markdown; charset=utf-8',
+        if source == 'all':
+            names = {'gmail': 'Gmail API', 'pdf': 'PDF tải lên', 'ai': 'Gmail qua tiện ích', 'folder': 'Thư mục PDF'}
+            parts = []
+            for item, name in names.items():
+                path = admin.root / item / 'notebooks' / (day + '.md')
+                if path.exists():
+                    parts.append('## ' + name + '\n\n' + path.read_text(encoding='utf-8'))
+            if not parts:
+                return jsonify(error='Ngày này chưa có ghi chép.'), 404
+            snapshot = ('# Sổ ghi chép · ' + day + '\n\n' + '\n\n---\n\n'.join(parts)).encode('utf-8')
+        else:
+            path = admin.root / source / 'notebooks' / (day + '.md')
+            if not path.exists():
+                return jsonify(error='Ngày này chưa có ghi chép.'), 404
+            snapshot = path.read_bytes()
+        return send_file(io.BytesIO(snapshot), mimetype='text/markdown; charset=utf-8',
                          as_attachment=True, download_name=f'so-ghi-chep-{day}.md')
 
     @app.post('/api/pdf')

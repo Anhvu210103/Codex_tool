@@ -77,6 +77,8 @@ def pdf_text(data, ocr=False, api_key=None, model='deepseek-chat', usage_callbac
                 choices = response.get('choices', [])
                 if not choices:
                     raise ValueError('DeepSeek không trả kết quả OCR.')
+                if choices[0].get('finish_reason') not in (None, 'stop'):
+                    raise ValueError('Kết quả OCR bị cắt; cần kiểm tra lại tài liệu.')
                 content = choices[0].get('message', {}).get('content')
                 if not isinstance(content, str):
                     raise ValueError('DeepSeek trả kết quả OCR không hợp lệ.')

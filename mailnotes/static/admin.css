@@ -9,7 +9,7 @@
   --light: #eaf3ed;
   --danger: #a32323;
   --radius: 16px;
-  --sidebar: 276px;
+  --sidebar: 240px;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   color: var(--ink);
   font-size: 18px;
@@ -135,19 +135,31 @@ footer { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; fon
 .topbar .company-credit { border-right: 1px solid var(--line); padding-right: 18px; }
 .auth-credit { margin-top: 24px; display: flex; justify-content: center; }
 .notebook-card { padding: 0; overflow: hidden; }
-/* Give the notebook its own reading width; the summary is the main content. */
+/* Keep the content in view; downloads and paths live under each document. */
 .content:has(> #notebook:not([hidden])) { max-width: none; }
-#notebook .table-scroll { overflow-x: auto; }
-#notebook table { min-width: 1420px; }
-#notebook th, #notebook td { padding-inline: 16px; }
-#notebook td { line-height: 1.55; }
-#notebook th:nth-child(1), #notebook td:nth-child(1) { width: 105px; min-width: 105px; }
-#notebook th:nth-child(2), #notebook td:nth-child(2) { width: 220px; min-width: 220px; }
-#notebook th:nth-child(3), #notebook td:nth-child(3) { width: 165px; min-width: 165px; }
-#notebook th:nth-child(4), #notebook td:nth-child(4) { width: 38%; min-width: 460px; max-width: none; }
-#notebook th:nth-child(5), #notebook td:nth-child(5) { width: 145px; min-width: 145px; }
-#notebook th:nth-child(6), #notebook td:nth-child(6) { min-width: 235px; }
-#notebook .summary-text { overflow-wrap: break-word; }
+#notebook table { min-width: 1040px; table-layout: fixed; }
+#notebook th, #notebook td { padding: 20px 16px; }
+#notebook td { line-height: 1.6; }
+#notebook th:nth-child(1), #notebook td:nth-child(1) { width: 124px; min-width: 124px; }
+#notebook th:nth-child(2), #notebook td:nth-child(2) { width: 26%; min-width: 250px; }
+#notebook th:nth-child(3), #notebook td:nth-child(3) { width: 170px; min-width: 170px; }
+#notebook th:nth-child(4), #notebook td:nth-child(4) { width: auto; min-width: 430px; max-width: none; }
+#notebook .summary-text { overflow-wrap: break-word; font-size: 1rem; }
+.note-details { margin-top: 18px; }
+.note-details > summary { color: var(--green); cursor: pointer; padding: 10px 0; min-height: 48px; font-weight: 650; font-size: .88rem; }
+.note-details[open] { padding-bottom: 12px; }
+.note-details code { display: block; white-space: normal; overflow-wrap: anywhere; font-size: .83rem; user-select: text; }
+.note-details .local-file { margin-top: 16px; }
+.needs-review td:first-child { border-left: 4px solid #9d660d; }
+.pdf-upload > summary, #archive-card > summary { cursor: pointer; font-size: 1.1rem; font-weight: 700; min-height: 44px; }
+.pdf-upload[open] > summary { margin-bottom: 20px; }
+.pdf-picker { margin: 0; min-width: 0; flex: 1; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+#pdf-filename { overflow-wrap: anywhere; }
+#folder-help code { display: block; overflow-wrap: anywhere; padding: 16px; background: var(--light); border-radius: 8px; }
+#settings > .page-heading { position: sticky; top: 0; z-index: 3; background: var(--bg); padding-block: 12px; }
+#settings-unsaved { font-weight: 700; color: #794a0f; }
+.password-toggle { margin-block: 12px; }
+#folder-results { margin-bottom: 24px; }
 .filters { padding: 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: end; background: #fbfcfb; }
 .filters label { margin: 0; min-width: 170px; flex: 1; }
 .filters .search { flex: 2; min-width: 250px; }
@@ -220,7 +232,7 @@ dialog::backdrop { background: #112d2780; }
 .dashboard-recent td button { font-size: .89rem; }
 @media (max-width: 1350px) { .dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1250px) {
-  :root { --sidebar: 242px; }
+  :root { --sidebar: 220px; }
   .sidebar { padding: 24px 12px; }
   .content { padding: 30px 24px 0; }
   .topbar { padding-inline: 24px; }
@@ -287,3 +299,13 @@ dialog::backdrop { background: #112d2780; }
 .table-scroll:focus-visible { outline: 3px solid var(--green); outline-offset: -3px; }
 @media (max-width: 760px) { .nav-item span { display: none; } .table-scroll::before { content: "Vuốt sang ngang để xem đầy đủ bảng"; display: block; position: sticky; left: 0; padding: 12px 18px; color: var(--muted); background: #f0f5f1; font-size: .83rem; } }
 #folder-inbox-status{white-space:pre-wrap}
+
+#notice { max-height: 32vh; overflow: auto; }
+
+@media (max-width: 760px) {
+ .topbar-tools { flex-wrap: wrap; max-width: 100%; gap: 12px; }
+ .topbar .company-credit { border-right: 0; padding-right: 0; }
+ .text-size-control { flex-wrap: wrap; }
+ .pdf-upload .card-actions { flex-direction: column; align-items: stretch; }
+ #settings > .page-heading { position: static; }
+}

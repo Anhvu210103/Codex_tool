@@ -10,9 +10,9 @@
 
 1. Mở [nhánh Mac dành cho khách](https://github.com/Anhvu210103/Codex_tool/tree/codex/mac-customer-test) → **Code → Download ZIP**. Trong Finder, giải nén và chuyển thư mục vào vị trí cố định, ví dụ `Documents/So-Ghi-Chep-Mac`. Mở đến thư mục chứa `compose.yml`, `Dockerfile` và `Mo-So-Ghi-Chep-Mac.command`. Đừng chỉ chép riêng file `.command`.
 2. Bấm đúp `Mo-So-Ghi-Chep-Mac.command` (không cần mở Docker Desktop trước). Nếu macOS chặn file tải về, nhấp phải → **Open / Mở** và xác nhận. Không tắt Gatekeeper. Lượt đầu Docker dựng image có thể mất vài phút. Đợi trình duyệt mở `http://localhost:8080`.
-3. Tạo mật khẩu quản trị riêng, ít nhất 12 ký tự. Không có mật khẩu mẫu. Vào **Cài đặt → Nội dung & chi phí**, lưu DeepSeek API key, tích đồng ý gửi nội dung tài liệu cho DeepSeek rồi lưu cài đặt. Xem lại nhóm tài liệu ở **Nhóm tài liệu**.
-4. Thử một PDF có thể bôi đen chữ: chép vào `inbox/` cạnh file `.command`, đợi chép xong, trên **Tổng quan** bấm **Quét thư mục**. Kiểm tra tài liệu xuất hiện ở **Sổ ghi chép → Thư mục nhận PDF**, có nội dung ngắn, nhóm và file Markdown. PDF đã xử lý sẽ sang `inbox/Da-xu-ly`.
-5. Thử PDF scan riêng: trong **Cài đặt → Nguồn & lịch chạy**, bật **Dùng OCR qua DeepSeek cho PDF scan** và lưu trước khi quét. OCR qua DeepSeek có thể bị API từ chối ảnh; nếu vậy tài liệu phải vào **Cần xem lại**, không được coi là đã đọc. Đối chiếu chữ OCR, số hiệu, ngày và tên cơ quan với PDF gốc trước khi nghiệm thu.
+3. Tạo mật khẩu quản trị riêng, ít nhất 12 ký tự. Không có mật khẩu mẫu. Vào **Cài đặt → Nội dung & chi phí**, nhập DeepSeek API key, tích đồng ý gửi nội dung tài liệu rồi bấm **Lưu kết nối DeepSeek**. Xem lại nhóm tài liệu ở **Nhóm tài liệu**.
+4. Thử một PDF có thể bôi đen chữ: chép vào `inbox/` cạnh file `.command`, đợi chép xong, trên **Tổng quan** bấm **Quét thư mục**. Kiểm tra tài liệu xuất hiện ở **Sổ ghi chép** (mặc định **Tất cả tài liệu**), có nội dung ngắn, nhóm và file Markdown. PDF đã xử lý sẽ sang `inbox/Da-xu-ly`.
+5. Thử PDF scan riêng: trong **Cài đặt → Nội dung & chi phí**, bật **Dùng OCR qua DeepSeek cho PDF scan** và lưu trước khi quét. OCR qua DeepSeek có thể bị API từ chối ảnh; nếu vậy tài liệu phải vào **Cần xem lại**, không được coi là đã đọc. Đối chiếu chữ OCR, số hiệu, ngày và tên cơ quan với PDF gốc trước khi nghiệm thu.
 
 Tool chỉ mở ở `localhost:8080`. Nếu cổng bận, dừng ứng dụng đang dùng cổng đó trước khi chạy lại. Trình duyệt trong Docker không thể tự mở Finder: khách mở `inbox/` bằng Finder. Không xóa `.local/` khi cập nhật.
 

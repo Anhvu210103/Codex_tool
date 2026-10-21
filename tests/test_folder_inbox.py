@@ -55,6 +55,7 @@ class FolderInboxTests(unittest.TestCase):
                     time.sleep(.02)
             self.assertEqual(admin.notes('folder')['total'],1)
             self.assertFalse(duplicate.exists());self.assertEqual(admin.status()['folder_inbox']['last_added'],0)
+            self.assertEqual(admin.status()['folder_inbox']['last_skipped'],1)
             from_upload=self.pdf('already uploaded');self.assertEqual(admin.process_pdf(from_upload,'uploaded.pdf'),1)
             cross_source=inbox/'downloaded-again.pdf';cross_source.write_bytes(from_upload);os.utime(cross_source,(old,old))
             with patch('mailnotes.folder_inbox.inbox_directory',return_value=inbox):

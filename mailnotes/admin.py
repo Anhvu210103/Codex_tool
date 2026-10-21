@@ -303,15 +303,16 @@ class Admin:
         today = (now or datetime.now(timezone.utc)).astimezone(zone).date()
         count_today = review_count = 0
         groups = {}
-        database = self.root / source / 'notes.sqlite3'
-        if database.exists():
-            with connect(f'{database.as_uri()}?mode=ro', uri=True) as connection:
-                for categories, received in connection.execute('SELECT categories,received_at FROM notes'):
-                    categories = json.loads(categories)
-                    count_today += datetime.fromisoformat(received).astimezone(zone).date() == today
-                    review_count += 'Cần xem lại' in categories
-                    for category in set(categories):
-                        groups[category] = groups.get(category, 0) + 1
+        for selected_source in (('gmail', 'pdf', 'ai', 'folder') if source == 'all' else (source,)):
+            database = self.root / selected_source / 'notes.sqlite3'
+            if database.exists():
+                with connect(f'{database.as_uri()}?mode=ro', uri=True) as connection:
+                    for categories, received in connection.execute('SELECT categories,received_at FROM notes'):
+                        categories = json.loads(categories)
+                        count_today += datetime.fromisoformat(received).astimezone(zone).date() == today
+                        review_count += 'Cần xem lại' in categories
+                        for category in set(categories):
+                            groups[category] = groups.get(category, 0) + 1
         return {'source': source, 'day': today.isoformat(), 'total_notes': notes['total'],
                 'received_today': count_today, 'needs_review': review_count,
                 'groups': [{'name': name, 'count': count} for name, count in sorted(groups.items(), key=lambda item:(-item[1],item[0]))],
@@ -366,9 +367,24 @@ class Admin:
         if not self.run_lock.acquire(blocking=False):
             raise ValueError('Đang có lượt xử lý. Chờ hoàn tất rồi tải PDF.')
         try:
-            return self._process_pdf_locked(data, filename, reprocess, source)
+            with self.lock:
+                self.state.update(running=True, last_started=datetime.now(timezone.utc).isoformat(),
+                                  last_source=source, last_added=None, error=None)
+            added = self._process_pdf_locked(data, filename, reprocess, source)
+            with self.lock:self.state.update(last_added=added)
+            return added
+        except Exception as error:
+            # Preserve upstream error bodies for the API error handler.
+            message = 'Lượt đọc PDF chưa hoàn tất. Kiểm tra kết nối AI rồi thử lại.' if isinstance(error, HTTPError) else error_message(error)
+            with self.lock:self.state.update(error=message)
+            raise
         finally:
-            self.run_lock.release()
+            try:
+                with self.lock:
+                    self.state.update(running=False, last_finished=datetime.now(timezone.utc).isoformat())
+                    private_json(self.private / 'status.json', self.state)
+            finally:
+                self.run_lock.release()
 
     def reprocess_note(self, source, identifier):
         from .documents import pdf_message
@@ -509,29 +525,43 @@ class Admin:
         return False
 
     def _run_folder_import(self):
-        added=0;processed=0;errors=[]
+        added=0;processed=0;skipped=0;reviewed=0;errors=[]
         try:
-            from .folder_inbox import archive_processed, inbox_directory, ready_pdfs
-            root=inbox_directory();candidates,errors=ready_pdfs(root)
+            from .folder_inbox import archive_processed, inbox_directory, iter_ready_pdfs
+            root=inbox_directory();candidates=iter_ready_pdfs(root,errors=errors)
             for path,data,digest in candidates:
+                with self.lock:self.folder_state.update(current_file=path.name,checked_count=processed)
                 try:
-                    if not self._has_document_hash(digest):added += self._process_pdf_locked(data,path.name,False,'folder')
+                    if self._has_document_hash(digest):
+                        skipped += 1
+                    else:
+                        added += self._process_pdf_locked(data,path.name,False,'folder')
+                        with connect(self.root / 'folder' / 'notes.sqlite3') as connection:
+                            row = connection.execute('SELECT categories FROM notes WHERE file_hash=? LIMIT 1',(digest,)).fetchone()
+                            reviewed += bool(row and 'Cần xem lại' in json.loads(row[0]))
                     archive_processed(path,digest,root);processed += 1
                 except Exception as error:
                     errors.append({'file':path.name,'error':error_message(error)})
             with self.lock:
-                self.folder_state.update(last_added=added,last_processed=processed,error=None if not errors else f'{len(errors)} tệp cần thử lại.',errors=errors[-20:])
+                self.folder_state.update(last_added=added,last_processed=processed,last_skipped=skipped,last_review=reviewed,error=None if not errors else f'{len(errors)} tệp cần thử lại.',errors=errors[-20:])
         except Exception as error:
             with self.lock:self.folder_state.update(last_added=None,error=error_message(error))
         finally:
             try:
                 with self.lock:
-                    self.folder_state.update(running=False,last_finished=datetime.now(timezone.utc).isoformat())
+                    self.folder_state.update(running=False,current_file=None,checked_count=processed,last_finished=datetime.now(timezone.utc).isoformat())
                     self.folder_next_due=time.time()+self.settings['interval_seconds'] if self.settings['folder_inbox_enabled'] else None
                     private_json(self.private/'folder-inbox-status.json',self.folder_state)
             finally:self.run_lock.release()
 
     def notes(self, source, day='', search='', category=''):
+        if source == 'all':
+            results = [self.notes(item, day, search, category) for item in ('gmail', 'pdf', 'ai', 'folder')]
+            rows = sorted((note for result in results for note in result['notes']),
+                          key=lambda note: (datetime.fromisoformat(note['received_at']).timestamp(), note['id']), reverse=True)
+            return {'notes': rows[:500], 'total': sum(result['total'] for result in results),
+                    'categories': sorted({group for result in results for group in result['categories']}),
+                    'days': sorted({stamp for result in results for stamp in result['days']}, reverse=True)}
         if source not in ('demo', 'gmail', 'pdf', 'ai', 'folder'):
             raise ValueError('Nguồn không hợp lệ.')
         database = self.root / source / 'notes.sqlite3'
@@ -557,13 +587,16 @@ class Admin:
         with connect(f'{database.as_uri()}?mode=ro', uri=True) as connection:
             connection.row_factory = sqlite3.Row
             rows = [dict(row) for row in connection.execute('SELECT id,sender,subject,categories,summary,received_at,day,source,origin_id,review_reason,file_hash FROM notes ORDER BY received_at DESC,id')]
+        rows.sort(key=lambda row: (datetime.fromisoformat(row['received_at']).timestamp(), row['id']), reverse=True)
         for row in rows:
             row['categories'] = json.loads(row['categories'])
             row['local_markdown_paths'] = []
             if row['file_hash']:
                 from .archive import classified_markdown_paths
                 paths = classified_markdown_paths(database.parent, row['id'], row['subject'], row['categories'], row['file_hash'])
-                row['local_markdown_paths'] = [{'category': group, 'path': str(path)}
+                row['local_markdown_paths'] = [{'category': group, 'path': str(path),
+                                           'display_path': str(Path(os.environ['MAILNOTES_DATA_DISPLAY_PATH']) / path.relative_to(self.root))
+                                           if os.environ.get('MAILNOTES_DATA_DISPLAY_PATH') else str(path)}
                                           for group, path in zip(row['categories'], paths) if path.is_file()]
         categories = sorted({item for row in rows for item in row['categories']})
         days = sorted({row['day'] for row in rows}, reverse=True)

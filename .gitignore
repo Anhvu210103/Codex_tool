@@ -10,3 +10,9 @@ build/
 dist/
 
 *.spec
+
+# Customer documents must stay outside Git and the Docker image.
+inbox/
+**/.local/
+**/.venv/
+.DS_Store
