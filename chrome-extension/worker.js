@@ -88,7 +88,7 @@ async function setAuto(enabled){
   const [active]=await chrome.tabs.query({active:true,currentWindow:true}),gmailTabs=await chrome.tabs.query({url:'https://mail.google.com/*'});
   const source=active?.url?.startsWith('https://mail.google.com/')?active:gmailTabs[0];
   const accountIndex=source?.url?.match(/^https:\/\/mail\.google\.com\/mail\/u\/(\d+)\//)?.[1]||'0';
-  const previous=await chrome.storage.local.get('autoEnabledAt');await chrome.storage.local.set({autoEnabled:true,autoAccountIndex:accountIndex,autoEnabledAt:previous.autoEnabledAt||Date.now()});await mirrorAutomationState();await chrome.alarms.create(AUTO_ALARM,{periodInMinutes:30});await autoScan(true);
+  const previous=await chrome.storage.local.get('autoEnabledAt');await chrome.storage.local.set({autoAccountIndex:accountIndex,autoEnabledAt:previous.autoEnabledAt||Date.now()});await mirrorAutomationState();await chrome.alarms.create(AUTO_ALARM,{periodInMinutes:30});await chrome.storage.local.set({autoEnabled:true});await autoScan(true);
  }
  else {await chrome.storage.local.set({autoEnabled:false});await chrome.alarms.clear(AUTO_ALARM);if((await chrome.storage.session.get('run')).run?.automatic)await stop();}
 }
