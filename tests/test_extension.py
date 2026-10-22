@@ -79,7 +79,7 @@ class ExtensionTests(unittest.TestCase):
             self.assertIn('SoGhiChep-AI-Gmail/manifest.json',archive.namelist())
             import json
             manifest=json.loads(archive.read('SoGhiChep-AI-Gmail/manifest.json'))
-            self.assertEqual(manifest['version'],'0.7.3')
+            self.assertEqual(manifest['version'],json.loads((Path(__file__).resolve().parents[1]/'chrome-extension/manifest.json').read_text())['version'])
             self.assertIn(b'local_markdown_paths',archive.read('SoGhiChep-AI-Gmail/worker.js'))
 
     def test_automation_state_is_persisted_for_extension_restart(self):
