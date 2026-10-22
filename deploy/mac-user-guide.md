@@ -25,3 +25,5 @@ PDF scan không có chữ cần OCR. Trước khi quét, bật **Dùng OCR qua D
 - **PDF scan vào Cần xem lại:** mở PDF gốc, kiểm tra thông báo OCR và báo người triển khai. Đừng xóa file gốc.
 
 Gmail qua tiện ích hoặc Gmail API là nguồn bổ sung, chỉ bật sau khi luồng thư mục đã dùng ổn. Không chia sẻ mật khẩu, DeepSeek API key, mã ghép nối hoặc thư mục `.local/`.
+
+Tiện ích Gmail **0.8.0** có các nút **Thử 1 thư**, **Quét 20 thư** và ô **Kiểm tra mỗi 30 phút**. **Dừng lượt này** chỉ ngừng lượt hiện tại; muốn ngừng các lượt sau thì bỏ tích ô tự kiểm tra. Đổi phạm vi thời gian rồi bấm **Lưu phạm vi cho lượt sau** không làm gián đoạn lượt đang chạy. Khi báo lỗi, mở **Báo cáo và hỗ trợ → Sao chép báo cáo**. Xem [hướng dẫn tiện ích](../chrome-extension/README.md) để cài hoặc cập nhật; đầu cửa sổ phải hiện **v0.8.0**.

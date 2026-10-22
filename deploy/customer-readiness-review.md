@@ -35,3 +35,11 @@ Lượt Docker build ban đầu vướng CA của proxy môi trường phát tri
 - Gmail thật, nhiều tệp PDF/thư và lịch tiện ích nếu nằm trong phạm vi bàn giao. Khả năng tự thao tác website nhà nước khác vẫn cần bộ kết nối/kiểm thử riêng.
 
 Làm theo [kiểm tra bàn giao Mac](mac-handover-check.md), dùng luồng thư mục làm đường vận hành chính nếu nguồn web chưa ổn.
+
+## Tiện ích Gmail 0.8.0 — cập nhật 22/10/2026
+
+Trạng thái và phiên bản nằm trên cùng. Ghép nối thu lại sau khi lưu; phần quét tay nằm cao để dễ bấm. Khi đang chạy, phần quét tay được ẩn và nút Dừng lượt này hiện rõ. Tắt lịch 30 phút là thao tác riêng. Chọn thời gian mới không ngắt lượt cũ; báo cáo đầy đủ và nhập PDF thủ công nằm trong phần mở khi cần.
+
+Đã kiểm tra popup với Chromium và API Chrome mô phỏng: ghép nối, từ chối địa chỉ ngoài localhost, khoảng ngày sai/đúng, lưu phạm vi không dừng lượt đang chạy, bật/tắt lịch, dừng lượt, báo lỗi, sao chép báo cáo có phiên bản nhưng không kèm mã ghép nối, nhập PDF thủ công và bố cục 440/390/360px. Có thể chạy lại bằng `python packaging/smoke_extension_ui.py --screenshots /tmp/extension-ui`.
+
+Chính sách Chromium trong môi trường phát triển chặn tiện ích ngoài, nên lần kiểm tra này không nạp được extension thật và không quét Gmail thật. Bộ kiểm thử backend vẫn đạt 80 kiểm thử trên nhánh Mac. Cần nghiệm thu tiện ích 0.8.0 trên Chrome của khách theo phần Gmail trong tài liệu bàn giao.
