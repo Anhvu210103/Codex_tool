@@ -15,9 +15,10 @@ function visible(node) {
  const top = document.elementFromPoint(Math.min(innerWidth-1, Math.max(0, r.left+r.width/2)), Math.min(innerHeight-1, Math.max(0, r.top+r.height/2)));
  return !!top && (node === top || node.contains(top));
 }
-function viewerOpen() {
- return [...document.querySelectorAll('[aria-label],[role="status"]')].some(node => visible(node) && /đang hiển thị người xem|showing viewer|trang\s*\d+\s*\/\s*\d+|page\s*\d+\s*(?:of|\/)/i.test(label(node)));
+function viewerMarker() {
+ return [...document.querySelectorAll('[aria-label],[role="status"]')].find(node => visible(node) && /đang hiển thị người xem|showing viewer|trang\s*\d+\s*\/\s*\d+|page\s*\d+\s*(?:of|\/)/i.test(label(node)));
 }
+function viewerOpen() { return !!viewerMarker(); }
 function shortHash(value){let hash=2166136261;for(let i=0;i<value.length;i++){hash^=value.charCodeAt(i);hash=Math.imul(hash,16777619);}return (hash>>>0).toString(16).padStart(8,'0');}
 function mailNodeIdentity(node){
  const metadata=node.matches('[data-legacy-thread-id],[data-thread-id],[data-legacy-message-id],[data-message-id]')?node:node.querySelector('[data-legacy-thread-id],[data-thread-id],[data-legacy-message-id],[data-message-id]');
@@ -116,37 +117,66 @@ function controlAt(x,y) {
  }
  return null;
 }
-function downloadControl() {
- if (!viewerOpen()) return null;
- // Gmail can expose other visible "Tải xuống" controls behind the PDF
- // overlay. Only the viewer's compact, top-right toolbar can download
- // the PDF currently open.
- const inViewerHeader = button => {
-  const r = button.getBoundingClientRect();
-  return r.top >= 0 && r.bottom <= 80 && r.width >= 20 && r.width <= 80 &&
-   r.right >= innerWidth - 160 && r.left >= innerWidth - 220;
- };
- const candidates = [...document.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"]')]
-  .filter(node => visible(node) && downloadName.test(label(node)) && !/drive|tất cả|all attachments/i.test(label(node)) && !dangerous.test(label(node)));
- if (candidates.length) {
-  // A tooltip can carry the text but not the click handler. Prefer its
-  // associated button, and never click the tooltip itself.
-  for (const node of candidates) {
-   const button = node.closest('button,[role="button"],a,[tabindex="0"]');
-   if (button && visible(button) && inViewerHeader(button)) return button;
-  }
+function viewerHeaderControl(button) {
+ const r=button.getBoundingClientRect();
+ // Use the actual viewer/dialog bounds. Browser zoom, window width and Gmail
+ // toolbar spacing must not force the download icon into a fixed 160px strip.
+ const dialog=viewerMarker()?.closest('[role="dialog"]');
+ if(dialog&&!dialog.contains(button))return false;
+ const frame=dialog?.getBoundingClientRect();
+ const top=frame?.top||0, width=frame?.width||innerWidth;
+ return r.width>=10 && r.height>=10 && r.width<=Math.max(240,width*.4) &&
+  r.top>=Math.max(0,top) && r.bottom<=Math.max(0,top)+Math.min(220,innerHeight*.35);
+}
+function downloadCandidates() {
+ const found=new Set();
+ for(const node of document.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"]')){
+  // Check each accessible name: an unrelated aria-label must not hide a
+  // correctly named tooltip, and nested icon labels belong to their button.
+  const names=[node.getAttribute('aria-label'),node.getAttribute('data-tooltip'),node.getAttribute('title'),node.innerText].map(clean);
+  if(!names.some(name=>downloadName.test(name)))continue;
+  const button=node.closest('button,[role="button"],a,[tabindex="0"]');
+  if(button)found.add(button);
  }
- // Gmail's PDF viewer can render icon-only controls. In its header, the
- // download button sits between Print and More. Verify the Print neighbour.
- const print = controlAt(innerWidth-115,29), target = controlAt(innerWidth-65,29), more = controlAt(innerWidth-19,29);
- const printText = label(print), targetText=label(target);
- const aligned=[print,target,more].every(node=>{if(!node)return false;const r=node.getBoundingClientRect();return r.top>=0&&r.bottom<=65&&r.width>=20&&r.width<=64;});
- // The user's Gmail viewer has three adjacent toolbar buttons at these
- // positions: Print, Download, More. Accept an icon-only Print button only
- // when the whole three-button layout matches; never click More or Print.
- if (aligned && print !== target && target !== more && print !== more &&
-     (!printText || /^(print|in)(?:\b|$)/i.test(printText)) &&
-     !dangerous.test(targetText) && !/drive|print|^in$|more|thêm|khác/i.test(targetText)) return target;
+ return [...found];
+}
+function downloadControl() {
+ if(!viewerOpen())return null;
+ const safe=button=>!dangerous.test(label(button))&&!/drive|tất cả|all attachments/i.test(label(button));
+ const named=downloadCandidates().filter(button=>visible(button)&&viewerHeaderControl(button)&&safe(button)&&!downloadButtonDisabled(button));
+ // Fail closed on ambiguity rather than download the wrong attachment.
+ if(named.length===1)return named[0];
+ if(named.length>1)return null;
+ // Icon-only fallback requires semantic Print and More neighbours, never a
+ // guessed screen coordinate. Resizing/reordered toolbars stay supported.
+ const controls=[...document.querySelectorAll('button,[role="button"],a[tabindex],div[tabindex="0"]')]
+  .filter(button=>visible(button)&&viewerHeaderControl(button));
+ const prints=controls.filter(button=>/^(print|in)(?:\b|$)/i.test(label(button)));
+ const more=controls.filter(button=>/more|thêm|khác/i.test(label(button)));
+ const matches=new Set();
+ for(const print of prints)for(const end of more){
+  const pr=print.getBoundingClientRect(),er=end.getBoundingClientRect();
+  if(er.left<=pr.right||Math.abs(er.top-pr.top)>12)continue;
+  const between=controls.filter(button=>{
+   const r=button.getBoundingClientRect();
+   return button!==print&&button!==end&&r.left>=pr.right&&r.right<=er.left&&Math.abs(r.top-pr.top)<=12&&r.width<=80;
+  });
+  if(between.length===1&&!label(between[0])&&safe(between[0])&&!downloadButtonDisabled(between[0]))matches.add(between[0]);
+ }
+ return matches.size===1?[...matches][0]:null;
+}
+async function readyDownload(cancelled,mail,file) {
+ const button=await until(()=>{revealToolbar();return downloadControl();},12000,cancelled);
+ if(button||cancelled())return button;
+ await trace('chan-doan-tai',mail,file,'viewer='+viewerOpen()+' · màn hình '+innerWidth+'x'+innerHeight+' · '+downloadCandidates().length+' nút có nhãn tải');
+ for(const node of downloadCandidates().slice(0,6)){
+  const r=node.getBoundingClientRect();
+  await trace('nut-tai-bi-loai',mail,file,(label(node)||'không nhãn').slice(0,65)+' · x='+Math.round(r.x)+',y='+Math.round(r.y)+',w='+Math.round(r.width)+',h='+Math.round(r.height)+' · thấy='+visible(node)+' · header='+viewerHeaderControl(node)+' · tắt='+downloadButtonDisabled(node));
+ }
+ if(!downloadCandidates().length){
+  const labels=[...document.querySelectorAll('button,[role="button"],[aria-label]')].filter(node=>visible(node)&&viewerHeaderControl(node)).map(label).filter(Boolean);
+  await trace('toolbar-pdf',mail,file,labels.slice(0,8).join(' | '));
+ }
  return null;
 }
 async function waitDownload(cancelled) {
@@ -200,7 +230,7 @@ async function clickAndWaitDownload(button,cancelled,mail,file) {
    if(state.result){await trace('tai-den-tre',mail,file,'Chrome bắt đầu tải sau 12 giây');return state.result;}
    if(state.downloadId){await trace('tai-den-tre',mail,file,'Chrome đang tải sau 12 giây');return await waitDownload(cancelled);}
    if(!viewerOpen())throw Error('Trình xem PDF đã đóng trước khi thử tải lại.');
-   button=await until(()=>{revealToolbar();const found=downloadControl();return found&&!downloadButtonDisabled(found)?found:null;},6000,cancelled);
+   button=await readyDownload(cancelled,mail,file);
    if(!button)throw Error('Nút tải PDF chưa sẵn sàng để thử lại.');
    await trace('thu-lai-tai',mail,file,'Chrome chưa có lượt tải; thử bấm lại nút đang hiển thị');
   }
@@ -307,7 +337,7 @@ async function run(limit,only=[],automatic=false) {
       await trace('mo-pdf',mails,attachment.name);
       await openTile(tile.node,cancelled);
       if (!await until(viewerOpen,10000,cancelled)) throw Error('PDF chưa mở trong Gmail.');
-      const button=await until(()=>{revealToolbar();const found=downloadControl();return found&&!downloadButtonDisabled(found)?found:null;},6000,cancelled);
+      const button=await readyDownload(cancelled,mail,file);
       if (!button) throw Error('Không thấy nút tải PDF đã sẵn sàng trong trình xem.');
       const point=clickPoint(button);
       await trace('tim-nut-tai',mails,attachment.name,'Nút '+button.tagName.toLowerCase()+' · '+(label(button)||'không có nhãn')+' · x='+Math.round(point.x)+', y='+Math.round(point.y));
