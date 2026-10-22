@@ -42,4 +42,6 @@ Trạng thái và phiên bản nằm trên cùng. Ghép nối thu lại sau khi 
 
 Đã kiểm tra popup với Chromium và API Chrome mô phỏng: ghép nối, từ chối địa chỉ ngoài localhost, khoảng ngày sai/đúng, lưu phạm vi không dừng lượt đang chạy, bật/tắt lịch, dừng lượt, báo lỗi, sao chép báo cáo có phiên bản nhưng không kèm mã ghép nối, nhập PDF thủ công và bố cục 440/390/360px. Có thể chạy lại bằng `python packaging/smoke_extension_ui.py --screenshots /tmp/extension-ui`.
 
-Chính sách Chromium trong môi trường phát triển chặn tiện ích ngoài, nên lần kiểm tra này không nạp được extension thật và không quét Gmail thật. Bộ kiểm thử backend vẫn đạt 80 kiểm thử trên nhánh Mac. Cần nghiệm thu tiện ích 0.8.0 trên Chrome của khách theo phần Gmail trong tài liệu bàn giao.
+Đã bổ sung kiểm thử lịch tự động: khi lưu kết nối thất bại, lịch phải giữ trạng thái tắt, không tạo báo thức hay bắt đầu quét. Khi lưu thành công mới bật lịch và chạy ngay lượt đầu.
+
+Chính sách Chromium trong môi trường phát triển chặn tiện ích ngoài, nên lần kiểm tra này không nạp được extension thật và không quét Gmail thật. Bộ kiểm thử Python đạt 81 kiểm thử trên nhánh Mac. Cần nghiệm thu tiện ích 0.8.0 trên Chrome của khách theo phần Gmail trong tài liệu bàn giao.
