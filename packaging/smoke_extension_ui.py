@@ -115,9 +115,18 @@ def main():
     assert 'Chưa chọn file' in page.locator('#file-name').inner_text()
     page.locator('#open-tool').click()
     assert page.evaluate('()=>popupTest.tabs[0].url')=='http://localhost:8080'
-    for width in (440,390,360):
-     page.set_viewport_size({'width':width,'height':780})
-     assert not page.evaluate('()=>document.documentElement.scrollWidth>innerWidth'),f'Popup overflows at {width}'
+    # Chrome initially measures popup content in a narrow viewport. Its intrinsic
+    # width must not depend on 100vw, or it can stay stuck at about 175px.
+    page.set_viewport_size({'width':175,'height':600})
+    assert page.evaluate('()=>document.documentElement.getBoundingClientRect().width')==440
+    assert page.evaluate('()=>document.body.getBoundingClientRect().width')==440
+    page.set_viewport_size({'width':440,'height':600})
+    assert not page.evaluate('()=>document.documentElement.scrollWidth>innerWidth')
+    page.evaluate("()=>popupTest.emit('local',{status:'Sẵn sàng kiểm tra Gmail.',autoEnabled:false,failures:[]})")
+    page.evaluate("()=>{popupTest.emit('session',{run:null},true);for(const panel of document.querySelectorAll('details'))panel.open=false;window.scrollTo(0,0);}")
+    page.wait_for_timeout(100)
+    shot(page,'compact-ready')
+    assert page.locator('#auto').bounding_box()['y']<540
     assert not errors,errors
    finally:context.close();browser.close()
  finally:server.shutdown();thread.join(timeout=3);server.server_close()

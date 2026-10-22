@@ -1,4 +1,4 @@
-# Tiện ích Sổ ghi chép Gmail — 0.8.0
+# Tiện ích Sổ ghi chép Gmail — 0.8.1
 
 Tiện ích tự bấm trên Gmail đang đăng nhập trong Chrome để tải PDF vào Sổ ghi chép. Giao diện dùng chữ 18px, nút tối thiểu 50px, trạng thái nằm đầu cửa sổ. Phiên bản luôn hiện ở đầu để kiểm tra đã nạp đúng bản mới.
 
@@ -21,7 +21,7 @@ Trạng thái đầu cửa sổ tóm tắt lượt đang chạy. Thông báo đ�
 
 ## Cập nhật bản đã cài
 
-Tải ZIP tiện ích mới trong Cài đặt của tool, giải nén vào thư mục cố định. Mở `chrome://extensions`, nạp đúng thư mục có `manifest.json` hoặc thay nội dung thư mục Chrome đang dùng rồi bấm **Reload**. Đầu popup phải hiện **v0.8.0**. Chỉ Reload một thư mục cũ trong Downloads không tải mã mới. Không cần tạo mã ghép nối lại nếu vẫn dùng cùng tiện ích và cùng tool; khi nạp thành một tiện ích mới thì ghép nối lại.
+Tải ZIP tiện ích mới trong Cài đặt của tool, giải nén vào thư mục cố định. Mở `chrome://extensions`, nạp đúng thư mục có `manifest.json` hoặc thay nội dung thư mục Chrome đang dùng rồi bấm **Reload**. Đầu popup phải hiện **v0.8.1**. Chỉ Reload một thư mục cũ trong Downloads không tải mã mới. Không cần tạo mã ghép nối lại nếu vẫn dùng cùng tiện ích và cùng tool; khi nạp thành một tiện ích mới thì ghép nối lại.
 
 ## Cơ chế và giới hạn
 
@@ -32,3 +32,5 @@ Tiện ích kiểm tra lại thư cũ trong phạm vi để không bỏ sót PDF
 Khi file đã về máy mà không tự nhập, chọn PDF tại tiện ích hoặc đưa vào `inbox` của tool. PDF scan chỉ được thử OCR theo cấu hình DeepSeek của tool; cần đối chiếu bản gốc và xác minh API nhận ảnh. Gmail API trong trang Cài đặt là kết nối khác, có lịch riêng.
 
 Mã ghép nối lưu trong vùng cục bộ của tiện ích; API key lưu tại tool. Bridge chỉ nhận kết nối localhost được ghép nối. Quyền Chrome debugger dùng để gửi thao tác chuột/phím vào tab đang quét. Kiểm thử UI với Chromium không thay thế nghiệm thu Gmail thật và nhiều PDF trên máy khách.
+
+Bản 0.8.1 cố định chiều rộng popup 440px, sửa lỗi cửa sổ Chrome bị co hẹp khiến chữ xuống dòng liên tục. Các thao tác quét và lịch tự động nằm phía trên; báo cáo, kết nối và nhập file nằm dưới.
