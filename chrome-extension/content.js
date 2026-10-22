@@ -368,7 +368,7 @@ async function run(limit,only=[],automatic=false) {
       await trace('mo-pdf',mails,attachment.name);
       await openTile(tile.node,cancelled);
       if (!await until(viewerOpen,10000,cancelled)) throw Error('PDF chưa mở trong Gmail.');
-      const button=await readyDownload(cancelled,mail,file);
+      const button=await readyDownload(cancelled,mails,attachment.name);
       if (!button) throw Error('Không thấy nút tải PDF đã sẵn sàng trong trình xem.');
       const point=clickPoint(button);
       await trace('tim-nut-tai',mails,attachment.name,'Nút '+button.tagName.toLowerCase()+' · '+(label(button)||'không có nhãn')+' · x='+Math.round(point.x)+', y='+Math.round(point.y));
