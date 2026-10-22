@@ -26,7 +26,7 @@ function render(){
  $('status-card').dataset.tone=run?'running':error?'error':'ready';
  $('connection-state').textContent=!connected?'Chưa ghép nối':run?'Đang quét':error?'Cần kiểm tra':'Đã ghép nối';
  $('show-report').hidden=!error||!connected;
- $('status-help').textContent=!connected?'Mở mục Kết nối lần đầu bên dưới.':run?'Bạn có thể đóng cửa sổ này. Lượt quét vẫn tiếp tục.':error?'Xem thông báo đầy đủ hoặc sao chép báo cáo để người hỗ trợ kiểm tra.':saved.autoEnabled?'Lịch 30 phút đang bật. Mỗi lượt xong sẽ dừng và chờ lượt sau.':'Lịch tự động đang tắt.';
+ $('status-help').textContent=!connected?'Mở mục Kết nối lần đầu bên dưới.':run?'Bạn có thể đóng cửa sổ này. Lượt quét vẫn tiếp tục.':error?'Mở báo cáo bên dưới để xem chi tiết.':saved.autoEnabled?'Lịch 30 phút đang bật. Mỗi lượt xong sẽ dừng và chờ lượt sau.':'Lịch tự động đang tắt.';
  $('connected-controls').hidden=!connected;
  $('stop').hidden=!run;$('stop').disabled=!run;
  $('auto').disabled=pending||!connected;
