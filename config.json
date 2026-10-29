@@ -6,8 +6,8 @@
   "summary": {
     "mode": "openai",
     "max_chars": 350,
-    "provider": "deepseek",
-    "model": "deepseek-chat"
+    "provider": "vngcloud",
+    "model": "deepseek/deepseek-v4-flash"
   },
   "rules": [
     {

@@ -23,8 +23,9 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from .core import process, ensure_schema, render_notes
 from .gmail import messages
 from .gmail_filters import validate_filter
+from .providers import PROVIDERS, provider
 
-DEFAULT_DEEPSEEK_PRICING = {'input_per_million': 0.30, 'cached_input_per_million': 0.006, 'output_per_million': 1.20}
+DEFAULT_PRICING = {'input_per_million': None, 'cached_input_per_million': None, 'output_per_million': None}
 
 
 def private_json(path, value):
@@ -70,8 +71,8 @@ def validate_settings(value):
     summary = value.get('summary')
     if not isinstance(summary, dict) or summary.get('mode') not in ('extractive', 'openai'):
         raise ValueError('Chế độ tóm tắt không hợp lệ.')
-    provider = summary.get('provider', 'deepseek')
-    if provider != 'deepseek':
+    provider_name = summary.get('provider', 'vngcloud')
+    if provider_name not in PROVIDERS:
         raise ValueError('Nhà cung cấp AI không hợp lệ.')
     # Consent is required when processing; setup must be saveable before a key is entered.
     raw_prices = summary.get('pricing', {})
@@ -82,7 +83,7 @@ def validate_settings(value):
         price = raw_prices.get(field)
         if price is not None and (isinstance(price, bool) or not isinstance(price, (int, float)) or not math.isfinite(price) or not 0 <= price <= 100000):
             raise ValueError('Đơn giá phải là số không âm, tối đa 100.000 USD / triệu token.')
-        prices[field] = DEFAULT_DEEPSEEK_PRICING[field] if price is None else price
+        prices[field] = DEFAULT_PRICING[field] if price is None else price
     rules = value.get('rules')
     if not isinstance(rules, list) or len(rules) > 100:
         raise ValueError('Tối đa 100 quy tắc.')
@@ -113,10 +114,10 @@ def validate_settings(value):
             'gmail_filter': gmail_filter,
             'interval_seconds': integer('Chu kỳ (giây)', value.get('interval_seconds'), 60, 604800),
             'timezone': zone, 'rules': clean_rules, 'unmatched_category': unmatched,
-            'summary': {'mode': summary['mode'], 'provider': provider,
+            'summary': {'mode': summary['mode'], 'provider': provider_name,
                         'max_chars': integer('Độ dài trích đoạn', summary.get('max_chars', 1200), 100, 10000),
                         'max_input_chars': integer('Giới hạn đầu vào AI', summary.get('max_input_chars', 12000), 1000, 100000),
-                        'model': text('Mô hình', summary.get('model', 'deepseek-chat'), 100),
+                        'model': text('Mô hình', summary.get('model', PROVIDERS[provider_name]['model']), 100),
                         'ai_consent': summary.get('ai_consent') is True, 'pricing': prices}}
 
 
@@ -130,9 +131,9 @@ class MissingAIConsent(RuntimeError):
 
 def error_message(error):
     if isinstance(error, MissingAIKey):
-        return 'Chưa có DeepSeek API key. Lưu key trong Cài đặt rồi thử lại.'
+        return 'Chưa có GreenNode / VNG Cloud API key. Lưu key trong Cài đặt rồi thử lại.'
     if isinstance(error, MissingAIConsent):
-        return 'Trong Cài đặt, hãy đồng ý gửi nội dung tài liệu cho DeepSeek trước khi chạy.'
+        return 'Trong Cài đặt, hãy đồng ý gửi nội dung tài liệu đến GreenNode / VNG Cloud trước khi chạy.'
     if isinstance(error, FileNotFoundError):
         return 'Thiếu thông tin kết nối. Vào Cài đặt để kết nối Gmail.'
     if isinstance(error, HTTPError):
@@ -168,10 +169,10 @@ def error_message(error):
                 return 'Quyền Gmail đã hết hạn hoặc bị thu hồi. Kết nối lại Gmail; token của ứng dụng Google ở chế độ Testing có thể hết hạn sau 7 ngày.'
             if reasons & {'invalid_client', 'unauthorized_client'}:
                 return 'Cấu hình OAuth không còn hợp lệ. Kiểm tra OAuth client và tải lại file JSON đúng project.'
-        if host == 'api.deepseek.com' and error.code == 402:
-            return 'Tài khoản DeepSeek chưa đủ số dư. Kiểm tra tài khoản thanh toán của bạn.'
-        if host == 'api.deepseek.com' and error.code in (401, 403):
-            return 'DeepSeek từ chối API key hoặc quyền sử dụng. Kiểm tra key DeepSeek trong Cài đặt.'
+        if host == 'maas-llm-aiplatform-hcm.api.vngcloud.vn' and error.code == 402:
+            return 'Tài khoản GreenNode / VNG Cloud chưa đủ số dư. Kiểm tra tài khoản thanh toán của bạn.'
+        if host == 'maas-llm-aiplatform-hcm.api.vngcloud.vn' and error.code in (401, 403):
+            return 'GreenNode / VNG Cloud từ chối API key hoặc quyền sử dụng. Kiểm tra key trong Cài đặt.'
         if error.code in (401, 403):
             return 'Dịch vụ từ chối truy cập. Kiểm tra quyền Gmail/API hoặc kết nối lại tài khoản.'
         if error.code == 429:
@@ -194,10 +195,10 @@ class Admin:
         defaults = read_json(self.base / 'config.json', {})
         defaults.update(source='gmail', schedule_enabled=False)
         saved = read_json(self.settings_path, defaults)
-        # A previous release offered other AI providers. Retain the private file
-        # and its notes, but never call that provider after this migration.
-        if saved.get('summary', {}).get('provider', 'deepseek') != 'deepseek':
-            saved['summary'].update(provider='deepseek', model='deepseek-chat',
+        # Migrate the old direct-DeepSeek setting without reusing its key or
+        # consent for a different gateway.
+        if saved.get('summary', {}).get('provider', 'vngcloud') != 'vngcloud':
+            saved['summary'].update(provider='vngcloud', model='deepseek/deepseek-v4-flash',
                                     mode='extractive', ai_consent=False,
                                     pricing={'input_per_million':None,
                                              'cached_input_per_million':None,
@@ -315,13 +316,13 @@ class Admin:
                 'groups': [{'name': name, 'count': count} for name, count in sorted(groups.items(), key=lambda item:(-item[1],item[0]))],
                 'recent': notes['notes'][:8], 'usage': self.usage(now)}
 
-    def key_path(self, provider):
-        if provider != 'deepseek':
-            raise ValueError('Chỉ hỗ trợ DeepSeek.')
-        return self.private / 'deepseek-key.json'
+    def key_path(self, provider_name):
+        provider(provider_name)
+        return self.private / (provider_name + '-key.json')
 
-    def has_key(self, provider):
-        return bool(os.environ.get('DEEPSEEK_API_KEY') or self.key_path(provider).exists())
+    def has_key(self, provider_name):
+        gateway = provider(provider_name)
+        return bool(os.environ.get(gateway['environment']) or self.key_path(provider_name).exists())
 
     def runtime_config(self, source):
         config = self.config()
@@ -353,7 +354,7 @@ class Admin:
         if document['body'].strip() and (config['classification_mode'] == 'ai' or config['summary']['mode'] == 'openai'):
             if not config['summary']['ai_consent']:
                 raise MissingAIConsent()
-            if not self.has_key('deepseek'):
+            if not self.has_key(config['summary']['provider']):
                 raise MissingAIKey()
         return process([document], config, source)
 
@@ -391,7 +392,7 @@ class Admin:
             if message['body'].strip() and (config['classification_mode'] == 'ai' or config['summary']['mode'] == 'openai'):
                 if not config['summary']['ai_consent']:
                     raise MissingAIConsent()
-                if not self.has_key('deepseek'):
+                if not self.has_key(config['summary']['provider']):
                     raise MissingAIKey()
             return process([message], config, source)
         finally:

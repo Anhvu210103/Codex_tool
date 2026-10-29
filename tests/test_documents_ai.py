@@ -109,7 +109,7 @@ class DocumentAITests(unittest.TestCase):
         with patch('mailnotes.documents.subprocess.run',side_effect=render_page), patch('mailnotes.core.request_json',return_value=ocr) as request:
             document=pdf_message(output.getvalue(),'scan-ocr.pdf',config,id='scan-ocr',sender='Upload',received_at=self.mail['received_at'])
         self.assertIn('Nội dung OCR',document['body'])
-        self.assertIn('DeepSeek OCR',document['review_reason'])
+        self.assertIn('OCR qua GreenNode / VNG Cloud',document['review_reason'])
         self.assertEqual(request.call_count,1)
         self.assertTrue(request.call_args.kwargs['data']['messages'][1]['content'][1]['image_url']['url'].startswith('data:image/png;base64,'))
 
@@ -120,7 +120,7 @@ class DocumentAITests(unittest.TestCase):
             Path(command[-1] + '-1.png').write_bytes(b'fake image')
         with patch('mailnotes.documents.subprocess.run',side_effect=render_page), patch('mailnotes.core.request_json',side_effect=ValueError('unsupported image')):
             document=pdf_message(output.getvalue(),'scan-fail.pdf',config,id='scan-fail',sender='Upload',received_at=self.mail['received_at'])
-        self.assertIn('OCR thất bại',document['review_reason'])
+        self.assertIn('GreenNode / VNG Cloud thất bại',document['review_reason'])
         self.assertFalse(document['body'].strip())
 
     def test_gmail_pdf_attachment_and_skip_download_after_processing(self):

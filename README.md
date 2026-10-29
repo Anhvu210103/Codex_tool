@@ -1,14 +1,14 @@
 # Sổ ghi chép tài liệu · Powered by TCOM
 
-Tool nhận PDF từ thư mục trên máy, file tải lên hoặc Gmail; trích chữ, dùng DeepSeek phân nhóm và viết nội dung ngắn, rồi lưu vào sổ ghi chép. Một tài liệu có thể thuộc nhiều nhóm. Những file chưa đọc được chữ hoặc chưa rõ nhóm được đánh dấu để xem lại. [Quy trình dùng cho khách hàng](deploy/customer-workflow.md) ghi rõ các bước hằng ngày và phần chỉ cần thiết lập một lần.
+Tool nhận PDF từ thư mục trên máy, file tải lên hoặc Gmail; trích chữ, dùng GreenNode / VNG Cloud phân nhóm và viết nội dung ngắn, rồi lưu vào sổ ghi chép. Một tài liệu có thể thuộc nhiều nhóm. Những file chưa đọc được chữ hoặc chưa rõ nhóm được đánh dấu để xem lại. [Quy trình dùng cho khách hàng](deploy/customer-workflow.md) ghi rõ các bước hằng ngày và phần chỉ cần thiết lập một lần.
 
 ## Dùng trên Linux
 
 Mở `Mo-So-Ghi-Chep.sh` trong thư mục đã cài `.venv`. Tool mở trang quản trị trên máy này; lần đầu tạo mật khẩu quản trị. Đóng tab chỉ đóng giao diện, còn lịch tự động tiếp tục khi tool chạy. Dùng nút **Tắt tool** trong giao diện để dừng hẳn. Nếu cổng 8080 đang bận, tool có thể chọn cổng 8081–8090 và mở địa chỉ mới.
 
-Trong **Cài đặt**, lưu DeepSeek API key và xác nhận đồng ý gửi nội dung tài liệu. Xem lại **Nhóm tài liệu**. Để thử luồng ổn định nhất, trên **Tổng quan** bấm **Mở thư mục PDF**, chép một PDF có chữ vào đó rồi bấm **Quét thư mục**. Mở **Sổ ghi chép → Thư mục nhận PDF** để xem kết quả. Sau đó bật **Tự quét thư mục** với chu kỳ phù hợp. PDF đã xử lý được chuyển vào `Da-xu-ly`; PDF lỗi ở lại để thử lại. Có thể tải PDF trực tiếp ở Sổ ghi chép khi chỉ muốn thử một file.
+Trong **Cài đặt**, lưu GreenNode / VNG Cloud API key và xác nhận đồng ý gửi nội dung tài liệu. Model mặc định là `deepseek/deepseek-v4-flash`. Xem lại **Nhóm tài liệu**. Để thử luồng ổn định nhất, trên **Tổng quan** bấm **Mở thư mục PDF**, chép một PDF có chữ vào đó rồi bấm **Quét thư mục**. Mở **Sổ ghi chép → Thư mục nhận PDF** để xem kết quả. Sau đó bật **Tự quét thư mục** với chu kỳ phù hợp. PDF đã xử lý được chuyển vào `Da-xu-ly`; PDF lỗi ở lại để thử lại. Có thể tải PDF trực tiếp ở Sổ ghi chép khi chỉ muốn thử một file.
 
-PDF scan cần Poppler (`pdftoppm`) trên máy để chuyển trang thành ảnh trước khi thử gửi DeepSeek OCR. Trên Ubuntu/Debian cài `sudo apt install poppler-utils`; trên Mac cài `brew install poppler`. Bản này thử OCR từng trang ảnh qua DeepSeek; nếu API không nhận ảnh hoặc OCR thất bại, file scan được giữ ở nhóm **Cần xem lại**. Mục **Token & chi phí** hiển thị số đo API và tiền ước tính, không thay thế hóa đơn DeepSeek.
+PDF scan cần Poppler (`pdftoppm`) trên máy để chuyển trang thành ảnh trước khi thử gửi model GreenNode / VNG Cloud OCR. Trên Ubuntu/Debian cài `sudo apt install poppler-utils`; trên Mac cài `brew install poppler`. Model mặc định chưa được xác nhận nhận ảnh, nên PDF scan sẽ vào **Cần xem lại** nếu OCR thất bại. Mục **Token & chi phí** hiển thị số đo API và tiền ước tính, không thay thế hóa đơn nhà cung cấp.
 
 ## Gmail và website
 

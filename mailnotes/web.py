@@ -240,14 +240,17 @@ def create_app(base=None, data_root=None, public_url=None):
                 raise ValueError('Điều khiển không hợp lệ.')
         config = admin.runtime_config('ai')
         if config['summary']['mode'] != 'openai' or not config['summary']['ai_consent']:
-            raise ValueError('Bật DeepSeek AI và đồng ý gửi chữ tài liệu trong Cài đặt trước.')
-        key = config.get('_api_key') or os.environ.get('DEEPSEEK_API_KEY')
+            raise ValueError('Bật GreenNode / VNG Cloud AI và đồng ý gửi chữ tài liệu trong Cài đặt trước.')
+        from .providers import provider as configured_provider
+        gateway = configured_provider(config['summary']['provider'])
+        key = config.get('_api_key') or os.environ.get(gateway['environment'])
         if not key:
-            raise ValueError('Chưa lưu DeepSeek key trong tool.')
+            raise ValueError('Chưa lưu GreenNode / VNG Cloud key trong tool.')
         root = Path(config['data_dir']);root.mkdir(parents=True, exist_ok=True)
         try:
             with connect(root / 'notes.sqlite3') as connection:
-                choice = select_with_ai(None, candidates, kind, key, config['summary']['model'], connection, config['summary']['pricing'])
+                choice = select_with_ai(None, candidates, kind, key, config['summary']['model'], connection, config['summary']['pricing'],
+                                        {**gateway, 'name': config['summary']['provider']})
         except Exception as error:
             return jsonify(error=error_message(error)), 400
         return jsonify(choice=choice)
@@ -341,7 +344,7 @@ def create_app(base=None, data_root=None, public_url=None):
     def status():
         status = admin.status()
         requested = request.args.get('provider')
-        if requested == 'deepseek':
+        if requested == admin.config()['summary']['provider']:
             status['ai_key_configured'] = admin.has_key(requested)
         status['desktop_mode'] = 'desktop_shutdown' in app.extensions
         return jsonify(status)
@@ -588,8 +591,8 @@ def create_app(base=None, data_root=None, public_url=None):
     def ai_key():
         data = payload()
         provider = data.get('provider', admin.config()['summary']['provider'])
-        if provider != 'deepseek':
-            raise ValueError('Nhà cung cấp AI không hợp lệ.')
+        from .providers import provider as configured_provider
+        configured_provider(provider)
         key = data.get('key')
         if not isinstance(key, str) or len(key) > 1000:
             raise ValueError('API key không hợp lệ.')

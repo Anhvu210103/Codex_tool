@@ -21,7 +21,7 @@ class BrowserPilotTests(unittest.TestCase):
         with sqlite3.connect(':memory:') as db, patch('mailnotes.gmail_browser_pilot.request_json',return_value=response) as request:
             choice = select_with_ai(page,candidates,'mail','test-key','deepseek-chat',db,{})
             self.assertEqual(choice,candidates[0])
-            self.assertEqual(request.call_args.args[0],'https://api.deepseek.com/chat/completions')
+            self.assertEqual(request.call_args.args[0],'https://maas-llm-aiplatform-hcm.api.vngcloud.vn/v1/chat/completions')
             page.screenshot.assert_not_called()
             self.assertEqual(db.execute('SELECT input_tokens,output_tokens,total_tokens FROM ai_usage').fetchone(),(100,7,107))
 

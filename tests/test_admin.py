@@ -121,15 +121,15 @@ class AdminTests(unittest.TestCase):
 
     def test_secrets_are_private_and_never_returned(self):
         self.setup_login()
-        config=self.admin.config();config['summary']['provider']='deepseek';self.admin.save_settings(config)
+        config=self.admin.config();config['summary']['provider']='vngcloud';self.admin.save_settings(config)
         key='test-secret-do-not-return'
         self.assertEqual(self.post('/api/ai-key',{'key':key}).status_code,200)
-        self.assertEqual((self.admin.private/'deepseek-key.json').stat().st_mode & 0o777,0o600)
+        self.assertEqual((self.admin.private/'vngcloud-key.json').stat().st_mode & 0o777,0o600)
         for path in ['/api/status','/api/settings','/api/gmail/info']:
             self.assertNotIn(key,self.client.get(path).get_data(as_text=True))
         self.assertTrue(self.client.get('/api/status').get_json()['ai_key_configured'])
         self.post('/api/ai-key',{'key':''})
-        self.assertFalse((self.admin.private/'deepseek-key.json').exists())
+        self.assertFalse((self.admin.private/'vngcloud-key.json').exists())
 
     def test_oauth_state_exchange_and_disconnect(self):
         self.setup_login()
@@ -177,7 +177,7 @@ class ServiceErrorTests(unittest.TestCase):
             ('https://gmail.googleapis.com/test', 403, {'error': {'errors': [{'reason': 'accessNotConfigured'}]}}, 'Gmail API chưa được bật'),
             ('https://gmail.googleapis.com/test', 403, {'error': {'details': [{'reason': 'ACCESS_TOKEN_SCOPE_INSUFFICIENT'}]}}, 'thiếu quyền đọc Gmail'),
             ('https://oauth2.googleapis.com/token', 400, {'error': 'invalid_grant'}, 'hết hạn hoặc bị thu hồi'),
-            ('https://api.deepseek.com/test', 401, {'error': {'message': 'SECRET'}}, 'DeepSeek từ chối'),
+            ('https://maas-llm-aiplatform-hcm.api.vngcloud.vn/test', 401, {'error': {'message': 'SECRET'}}, 'GreenNode / VNG Cloud từ chối'),
             ('https://gmail.googleapis.com/test', 403, {'error': {'message': 'SECRET'}}, 'Dịch vụ từ chối'),
         ]
         for url, code, body, expected in cases:

@@ -33,7 +33,7 @@ class MarkdownArchiveTests(unittest.TestCase):
         config=self.admin.config();config['rules']=[{'category':name,'description':'Test','keywords':[]} for name in ('Kinh tế','Ngân sách')]
         config['classification_mode']='ai';config['summary'].update(mode='openai',ai_consent=True)
         self.admin.save_settings(config)
-        private_json(self.admin.key_path('deepseek'),{'key':'test-key'})
+        private_json(self.admin.key_path('vngcloud'),{'key':'test-key'})
 
     def tearDown(self):self.temp.cleanup()
 

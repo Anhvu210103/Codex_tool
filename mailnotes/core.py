@@ -56,11 +56,13 @@ def summarize(message, config):
         return body[:limit] + ('…' if len(body) > limit else '')
     if settings['mode'] != 'openai':
         raise ValueError('summary.mode must be extractive or openai')
-    key = config.get('_api_key') or os.environ.get('DEEPSEEK_API_KEY')
+    from .providers import provider
+    gateway = provider(settings.get('provider', 'vngcloud'))
+    key = config.get('_api_key') or os.environ.get(gateway['environment'])
     if not key:
-        raise RuntimeError('DEEPSEEK_API_KEY is required for AI mode')
-    result = request_json('https://api.deepseek.com/chat/completions', data={
-        'model': settings.get('model', 'deepseek-chat'),
+        raise RuntimeError('AI API key is required for AI mode')
+    result = request_json(gateway['endpoint'], data={
+        'model': settings.get('model', gateway['model']),
         'temperature': 0,
         'max_tokens': 500,
         'messages': [

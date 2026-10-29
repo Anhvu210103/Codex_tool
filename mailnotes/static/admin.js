@@ -94,7 +94,7 @@ function populateSettings() {
   $('summary-mode').value=config.summary.mode; $('max-chars').value=config.summary.max_chars;
   $('max-input').value=config.summary.max_input_chars; $('model').value=config.summary.model;
   $('ai-consent').checked=config.summary.ai_consent || false;
-  $('provider').value=config.summary.provider || 'deepseek';
+  $('provider').value=config.summary.provider || 'vngcloud';
   const prices=config.summary.pricing || {};
   $('price-input').value=prices.input_per_million ?? ''; $('price-cache').value=prices.cached_input_per_million ?? ''; $('price-output').value=prices.output_per_million ?? '';
   $('gmail-pdf').checked=config.gmail_pdf;
@@ -121,7 +121,7 @@ async function saveSettings(includeRules = false) {
     next.classification_mode=$('summary-mode').value==='openai'?'ai':'rules';
     next.gmail_pdf=$('gmail-pdf').checked || (next.gmail_filter.period!=='advanced' && next.gmail_filter.pdf_only);
     next.summary={provider:$('provider').value,mode:$('summary-mode').value,max_chars:Number($('max-chars').value),max_input_chars:Number($('max-input').value),model:$('model').value.trim(),pricing:{input_per_million:priceValue('price-input'),cached_input_per_million:priceValue('price-cache'),output_per_million:priceValue('price-output')},ai_consent:$('ai-consent').checked};
-    if (!next.summary.ai_consent && (next.folder_inbox_enabled || next.schedule_enabled)) throw new Error('Hãy đồng ý gửi nội dung tài liệu cho DeepSeek trước khi bật lịch tự động.');
+    if (!next.summary.ai_consent && (next.folder_inbox_enabled || next.schedule_enabled)) throw new Error('Hãy đồng ý gửi nội dung tài liệu đến GreenNode / VNG Cloud trước khi bật lịch tự động.');
   }
   config=await post('/api/settings',next);
   notice(includeRules?'Đã lưu nhóm tài liệu. Áp dụng cho tài liệu chưa xử lý.':'Đã lưu cài đặt. Lịch chạy và lượt xử lý tiếp theo dùng cấu hình mới.');
@@ -132,7 +132,7 @@ function dateText(value) {
   return new Intl.DateTimeFormat('vi-VN',{dateStyle:'short',timeStyle:'short',timeZone:config?.timezone || 'Asia/Ho_Chi_Minh'}).format(new Date(typeof value==='number'?value*1000:value));
 }
 async function refreshStatus() {
-  const status=await api('/api/status?provider='+encodeURIComponent($('provider').value || 'deepseek'));
+  const status=await api('/api/status?provider='+encodeURIComponent($('provider').value || 'vngcloud'));
   const folder=status.folder_inbox||{},busy=status.running||folder.running;
   $('stop-app').hidden=!status.desktop_mode;
   $('run-state').textContent=busy?'Đang xử lý':status.error?'Cần kiểm tra':'Sẵn sàng';
@@ -154,7 +154,7 @@ async function refreshStatus() {
   $('ai-key-state').textContent=status.ai_key_configured?'Đã có key. Giá trị không hiển thị lại.':'Chưa có API key';
   $('connect-gmail').disabled=!status.gmail_client_configured || status.running;
   $('dashboard-pdf-state').textContent=config.gmail_pdf?'Tự tải và đọc nội dung':'Chưa bật';
-  if($('pdf-processing-description'))$('pdf-processing-description').textContent='PDF có chữ được chuyển sang Markdown rồi gửi DeepSeek. PDF scan được thử OCR qua DeepSeek; nếu API không nhận ảnh, tài liệu vào Cần xem lại.';
+  if($('pdf-processing-description'))$('pdf-processing-description').textContent='PDF có chữ được chuyển sang Markdown rồi gửi GreenNode / VNG Cloud. PDF scan được thử OCR qua model đã chọn; nếu API không nhận ảnh, tài liệu vào Cần xem lại.';
   if (activeTab==='overview') await loadOverview();
   if (activeTab==='notebook') await loadNotes();
   if (activeTab==='usage') await loadUsage();
@@ -349,9 +349,14 @@ $('edit-groups-form').addEventListener('submit',async event=>{
   catch(error){$('edit-error').textContent=error.message;}finally{button.disabled=false;}
 });
 function updateProviderUI(){
- if($('pdf-reader-help'))$('pdf-reader-help').textContent='PDF có chữ → Markdown → DeepSeek. PDF scan được thử OCR bằng DeepSeek; nếu API không nhận ảnh, file vào Cần xem lại.';
+ $('provider').replaceChildren(new Option('GreenNode / VNG Cloud','vngcloud'));
+ $('provider').value='vngcloud';
+ const keyLabel=$('ai-key')?.closest('label');if(keyLabel&&keyLabel.firstChild)keyLabel.firstChild.textContent='GreenNode / VNG Cloud API key';
+ $('setup-deepseek').textContent='Cài GreenNode / VNG Cloud để phân nhóm PDF';
+ $('ai-data-notice').textContent='GreenNode / VNG Cloud nhận tiêu đề và chữ từ Markdown để phân nhóm, tóm tắt. PDF scan chỉ được OCR khi model đã chọn hỗ trợ ảnh.';
+ if($('pdf-reader-help'))$('pdf-reader-help').textContent='PDF có chữ → Markdown → GreenNode / VNG Cloud. PDF scan được thử OCR qua model đã chọn; nếu API không nhận ảnh, file vào Cần xem lại.';
 }
-action('setup-deepseek',()=>{setTab('settings');$('summary-mode').value='openai';$('ai-options').hidden=false;updateProviderUI();notice('Nhập DeepSeek API key, bấm Lưu key riêng, xác nhận đồng ý gửi chữ tài liệu rồi Lưu cài đặt. PDF scan sẽ được thử OCR qua DeepSeek.');$('ai-key').scrollIntoView({behavior:'smooth',block:'center'});$('ai-key').focus();});
+action('setup-deepseek',()=>{setTab('settings');$('summary-mode').value='openai';$('ai-options').hidden=false;updateProviderUI();notice('Nhập GreenNode / VNG Cloud API key, bấm Lưu key riêng, xác nhận đồng ý gửi chữ tài liệu rồi Lưu cài đặt. PDF scan sẽ được thử OCR qua model đã chọn.');$('ai-key').scrollIntoView({behavior:'smooth',block:'center'});$('ai-key').focus();});
 action('upload-pdf',async()=>{
   const file=$('pdf-file').files[0];if(!file)throw new Error('Chọn file PDF trước.');
   if(file.size>20*1024*1024)throw new Error('PDF tối đa 20 MB.');

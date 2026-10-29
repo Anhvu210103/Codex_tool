@@ -36,13 +36,14 @@ class ExtensionTests(unittest.TestCase):
     def test_ai_choice_and_pdf_import_without_exposing_key(self):
         config=self.client.get('/api/settings').get_json();config['summary'].update(mode='openai',ai_consent=True)
         self.client.post('/api/settings',json=config,headers={'X-CSRF-Token':self.csrf})
-        self.client.post('/api/ai-key',json={'provider':'deepseek','key':'test-private-key'},headers={'X-CSRF-Token':self.csrf})
+        self.client.post('/api/ai-key',json={'provider':'vngcloud','key':'test-private-key'},headers={'X-CSRF-Token':self.csrf})
         choice={'index':0,'label':'document.pdf','role':'button'}
         upstream={'choices':[{'message':{'content':'{"index":0}'}}],
                   'usage':{'prompt_tokens':10,'completion_tokens':2,'total_tokens':12,'prompt_cache_hit_tokens':0}}
-        with patch('mailnotes.gmail_browser_pilot.request_json',return_value=upstream):
+        with patch('mailnotes.gmail_browser_pilot.request_json',return_value=upstream) as request:
             response=self.client.post('/extension/choose',json={'kind':'pdf','candidates':[choice]},headers=self.headers)
         self.assertEqual(response.status_code,200);self.assertEqual(response.get_json()['choice'],choice)
+        self.assertEqual(request.call_args.args[0], 'https://maas-llm-aiplatform-hcm.api.vngcloud.vn/v1/chat/completions')
         self.assertNotIn('test-private-key',response.get_data(as_text=True))
         self.assertEqual(self.client.get('/api/usage').get_json()['recent'][0]['source'],'ai')
         writer=PdfWriter();writer.add_blank_page(width=600,height=800);pdf=io.BytesIO();writer.write(pdf);pdf.seek(0);pdf_bytes=pdf.getvalue()
