@@ -7,7 +7,7 @@
     "mode": "openai",
     "max_chars": 350,
     "provider": "vngcloud",
-    "model": "deepseek/deepseek-v4-flash"
+    "model": "deepseek/deepseek-v4.1-flash-thirdparty"
   },
   "rules": [
     {

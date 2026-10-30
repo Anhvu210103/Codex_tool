@@ -17,7 +17,7 @@ OCR_INSTRUCTION = ('Chuyển hình ảnh thành văn bản, toàn bộ nội dun
                    'không thêm thông tin ngoài hình ảnh.')
 
 
-def pdf_text(data, ocr=False, api_key=None, model='deepseek/deepseek-v4-flash', usage_callback=None, endpoint=None):
+def pdf_text(data, ocr=False, api_key=None, model='deepseek/deepseek-v4.1-flash-thirdparty', usage_callback=None, endpoint=None):
     from pypdf import PdfReader
     if len(data) > MAX_PDF_BYTES:
         return '', 'PDF vượt giới hạn 20 MB; cần xử lý riêng.'
@@ -111,7 +111,7 @@ def pdf_message(data, filename, config, **metadata):
         database = Path(config['data_dir']) / 'notes.sqlite3'
         database.parent.mkdir(parents=True, exist_ok=True)
         with connect(database) as connection:
-            record_usage(connection, response, config.get('summary', {}).get('provider', 'vngcloud'), config.get('summary', {}).get('model', 'deepseek/deepseek-v4-flash'),
+            record_usage(connection, response, config.get('summary', {}).get('provider', 'vngcloud'), config.get('summary', {}).get('model', 'deepseek/deepseek-v4.1-flash-thirdparty'),
                          metadata.get('id'), config.get('summary', {}).get('pricing', {}))
 
     from .providers import provider

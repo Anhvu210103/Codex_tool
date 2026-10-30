@@ -9,7 +9,7 @@ PROVIDERS = {
         'label': 'GreenNode / VNG Cloud',
         'endpoint': 'https://maas-llm-aiplatform-hcm.api.vngcloud.vn/v1/chat/completions',
         'environment': 'VNGCLOUD_API_KEY',
-        'model': 'deepseek/deepseek-v4-flash',
+        'model': 'deepseek/deepseek-v4.1-flash-thirdparty',
     },
     # Kept only so older local settings and their historical documents remain
     # readable during migration. The customer-facing setup uses VNG Cloud.

@@ -198,12 +198,16 @@ class Admin:
         # Migrate the old direct-DeepSeek setting without reusing its key or
         # consent for a different gateway.
         if saved.get('summary', {}).get('provider', 'vngcloud') != 'vngcloud':
-            saved['summary'].update(provider='vngcloud', model='deepseek/deepseek-v4-flash',
+            saved['summary'].update(provider='vngcloud', model=PROVIDERS['vngcloud']['model'],
                                     mode='extractive', ai_consent=False,
                                     pricing={'input_per_million':None,
                                              'cached_input_per_million':None,
                                              'output_per_million':None})
             saved['classification_mode'] = 'rules'
+        elif saved['summary'].get('model') == 'deepseek/deepseek-v4-flash':
+            # Upgrade the previous bundled default while respecting any model
+            # the operator selected explicitly.
+            saved['summary']['model'] = PROVIDERS['vngcloud']['model']
         if saved.get('source') == 'demo':
             saved['source'] = 'gmail'
             saved['schedule_enabled'] = False
