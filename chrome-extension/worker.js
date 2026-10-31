@@ -148,6 +148,11 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
    catch(error){await chrome.debugger.sendCommand(target,'Input.dispatchMouseEvent',{type:'mouseReleased',...coords,button:'left',clickCount:1}).catch(()=>{});throw error;}
    return {};
   }
+  if(message.type==='trusted-move'){
+   if(!Number.isFinite(message.x)||!Number.isFinite(message.y)||message.x<0||message.y<0||message.x>10000||message.y>10000)throw Error('Vị trí di chuột không hợp lệ.');
+   await chrome.debugger.sendCommand({tabId:run.tab},'Input.dispatchMouseEvent',{type:'mouseMoved',x:message.x,y:message.y,button:'none'});
+   return {};
+  }
   if(message.type==='trusted-escape'){
    const target={tabId:run.tab},key={key:'Escape',code:'Escape',windowsVirtualKeyCode:27,nativeVirtualKeyCode:27};
    await chrome.debugger.sendCommand(target,'Input.dispatchKeyEvent',{type:'keyDown',...key});

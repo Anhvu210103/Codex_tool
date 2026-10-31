@@ -121,6 +121,9 @@ function directDownloadControl(node,name) {
  return named.length===1?named[0]:null;
 }
 async function readyDirectDownload(node,name,cancelled) {
+ node.scrollIntoView({block:'center'});
+ const card=node.closest('.aZo')||node.closest('.aQH')||node,r=card.getBoundingClientRect();
+ await send({type:'trusted-move',x:Math.min(innerWidth-1,Math.max(0,r.left+r.width/2)),y:Math.min(innerHeight-1,Math.max(0,r.top+r.height/2))});
  return await until(()=>{revealTile(node);return directDownloadControl(node,name);},3000,cancelled);
 }
 async function trace(phase,mail,file,detail='') {
@@ -287,6 +290,11 @@ async function closeViewer(cancelled,mail,file) {
  if (close) {
   try {
    const point=clickPoint(close);
+   // Gmail's overlay can ignore a coordinate click while its download bubble
+   // owns focus. Invoke the identified Close control first, then use a real
+   // Chrome click as fallback.
+   close.click();
+   if (await until(() => !viewerOpen(),1200,cancelled)) {await trace('dong-pdf',mail,file,'Đã đóng bằng điều khiển Gmail');return;}
    await send({type:'trusted-click',...point});
    await trace('dong-pdf',mail,file,'Đã bấm '+(label(close)||'nút đóng')+' tại x='+Math.round(point.x)+', y='+Math.round(point.y));
    if (await until(() => !viewerOpen(),3500,cancelled)) return;
@@ -296,6 +304,24 @@ async function closeViewer(cancelled,mail,file) {
  await trace('dong-pdf-esc',mail,file,close?'Nút đóng chưa đóng trình xem':'Không thấy nút đóng');
  await send({type:'trusted-escape'});
  if (!await until(() => !viewerOpen(),4000,cancelled)) throw Error('Trình xem PDF chưa đóng sau khi bấm nút Đóng và phím Esc.');
+}
+async function restoreMailAfterViewer(mailURL,listURL,cancelled,mail,file) {
+ if(!viewerOpen())return true;
+ try{await closeViewer(cancelled,mail,file);if(!viewerOpen())return true;}
+ catch(error){await trace('phuc-hoi-thu',mail,file,error.message+' · mở lại thư đang xử lý');}
+ if(cancelled())return false;
+ let mailTarget,listTarget;
+ try{mailTarget=new URL(mailURL);listTarget=new URL(listURL);}catch{return false;}
+ if(mailTarget.origin!==location.origin||mailTarget.pathname!==location.pathname||!mailTarget.hash||!listTarget.hash||mailTarget.hash===listTarget.hash)return false;
+ // Gmail sometimes keeps its PDF overlay mounted even after Close and Escape.
+ // Bounce through the saved result list, then reopen the exact message route.
+ // This resets the overlay without reloading the tab or losing the active run.
+ location.hash=listTarget.hash;
+ if(!await until(()=>!viewerOpen()&&mailRows().some(item=>visible(item.node)),10000,cancelled))return false;
+ location.hash=mailTarget.hash;
+ const restored=await until(()=>!viewerOpen()&&pdfTiles().length>0,12000,cancelled);
+ if(restored)await trace('da-phuc-hoi-thu',mail,file,'Đã mở lại thư để xử lý PDF tiếp theo');
+ return !!restored;
 }
 async function backToList(listURL,cancelled) {
  if (mailRows().some(item=>visible(item.node))) return true;
@@ -377,6 +403,7 @@ async function run(limit,only=[],automatic=false) {
    row.node.scrollIntoView({block:'center'});
    if (!visible(row.node)) {const error=Error('Thư '+(entry.index+1)+': không hiển thị sau khi cuộn');errors++;faults.push(error.message);await rememberFailure('open-mail',entry,error);continue;}
    row.node.click(); mails++;await trace('mo-thu',mails,'');
+   const mailURL=await until(()=>location.href!==listURL?location.href:null,4000,cancelled)||location.href;
    const key=entry.key||await until(()=>mailRouteKey(listURL),3000,cancelled)||'';
    const identity={key,fingerprint:entry.fingerprint||key};
    const known=key?await send({type:'mail-state',...identity}):{complete:false,files:[],record:'no-id'};
@@ -427,7 +454,10 @@ async function run(limit,only=[],automatic=false) {
       files++;await trace('da-luu',mails,attachment.name,result.added===0?'đã có trong sổ':'mới');
       await progress('Đã xử lý '+files+' PDF từ '+mails+' thư. Mới nhất: '+result.filename+(result.added===0?' (đã có trong Sổ ghi chép → AI thao tác, không tạo dòng mới)':' (xem tại Sổ ghi chép → AI thao tác)'));
      } catch (error) {errors++;mailFailed=true;faults.push(attachment.name+': '+error.message);await rememberFailure('process-pdf',{...entry,key},error,attachment);await trace('loi',mails,attachment.name,error.message);await progress('Bỏ qua PDF lỗi, tiếp tục file sau: '+attachment.name+' — '+error.message);}
-     if(viewerOpen())try{await closeViewer(cancelled,mails,attachment.name);}catch(error){errors++;mailFailed=true;faults.push(attachment.name+': '+error.message);await rememberFailure('close-viewer',{...entry,key},error,attachment);await trace('loi-dong-pdf',mails,attachment.name,error.message);}
+     if(viewerOpen()&&!await restoreMailAfterViewer(mailURL,listURL,cancelled,mails,attachment.name)){
+      const error=Error('Không đóng hoặc khôi phục được thư sau trình xem PDF.');errors++;mailFailed=true;faults.push(attachment.name+': '+error.message);await rememberFailure('close-viewer',{...entry,key},error,attachment);await trace('loi-dong-pdf',mails,attachment.name,error.message);
+      break;
+     }
     }
     if(key && !mailFailed && tiles.every(item=>recordedFiles.has(item.fileKey)||recordedFiles.has(item.legacyKey))) await send({type:'mail-complete',...identity});
    }

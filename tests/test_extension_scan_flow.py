@@ -13,7 +13,7 @@ class ExtensionScanFlowTests(unittest.TestCase):
         function=source[source.index('async function run('):source.index('chrome.runtime.onMessage.addListener')]
         harness=r'''
 const vm=require('node:vm'),assert=require('node:assert/strict');
-const events=[],attachment={name:'one.pdf',index:0,fileKey:'gmail:file1',legacyKey:'one'};
+const events=[],attachment={name:'one.pdf',index:0,fileKey:'gmail:file1',legacyKey:'one'},viewer=!DIRECT;
 const row={key:'thread1',version:'message1',text:'Sender one.pdf',index:0,node:{scrollIntoView(){},click(){events.push('open-mail');}}};
 const ctx={stopped:true,epoch:0,chrome:{runtime:{getManifest:()=>({version:'test'})}},location:{href:'https://mail.google.com/mail/u/0/#search/pdf'},document:{querySelectorAll:()=>[]},
  trace:async(phase)=>events.push(phase),progress:async()=>{},mailRows:()=>[row],visible:()=>true,
@@ -21,10 +21,10 @@ const ctx={stopped:true,epoch:0,chrome:{runtime:{getManifest:()=>({version:'test
  send:async message=>{events.push(message.type);if(message.type==='mail-state')return {record:'missing',complete:false,files:[]};return {};},
  readyDirectDownload:async()=>DIRECT?{tagName:'BUTTON'}:null,
  clickAndWaitDirect:async()=>{events.push('direct-download');return {added:1,filename:'one.pdf'};},
- openTile:async()=>events.push('open-pdf'),until:async get=>get(),viewerOpen:()=>!DIRECT,
+ openTile:async()=>events.push('open-pdf'),until:async get=>get(),viewerOpen:()=>viewer,
  readyDownload:async(cancelled,mail,file)=>{assert.equal(mail,1);assert.equal(file,'one.pdf');events.push('select-download');return {tagName:'BUTTON'};},
  clickPoint:()=>({x:100,y:30}),label:()=> 'Download',clickAndWaitDownload:async()=>({added:1,filename:'one.pdf'}),
- closeViewer:async()=>events.push('close-pdf'),backToList:async()=>true,nextPageButton:()=>null};
+ restoreMailAfterViewer:async()=>{events.push('close-pdf');viewer=false;return true;},backToList:async()=>true,nextPageButton:()=>null};
 vm.createContext(ctx);vm.runInContext(FUNCTION,ctx);
 ctx.run(1,[],false).then(()=>{
  assert(events.includes('da-luu'));assert(!events.includes('loi'));
