@@ -9,7 +9,7 @@ root = Path(__file__).resolve().parent.parent
 name = 'SoGhiChep'
 args = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--name', name,
         '--exclude-module', 'playwright',
-        '--onefile', '--windowed', '--collect-data', 'certifi', '--paths', str(root), '--collect-all', 'pypdf', '--collect-all', 'waitress',
+        '--onefile', '--windowed', '--collect-data', 'certifi', '--collect-data', 'tzdata', '--paths', str(root), '--collect-all', 'pypdf', '--collect-all', 'waitress',
         '--collect-submodules', 'google.auth', '--collect-submodules', 'google.oauth2',
         '--add-data', str(root/'config.json') + os.pathsep + '.' ,
         '--add-data', str(root/'examples') + os.pathsep + 'examples',

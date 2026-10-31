@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 import urllib.request
 import zipfile
 
@@ -123,6 +124,12 @@ def main():
                 log.flush()
                 detail = (data / 'app.log').read_text(errors='replace')[-4000:]
                 raise RuntimeError(f'Packaged app did not become ready (exit={child.poll()}). {detail}')
+            except Exception:
+                for relative in ('app.log', 'admin/desktop.log', 'admin/errors.log'):
+                    path = data / relative
+                    if path.is_file():
+                        print(f'{relative}: {path.read_text(encoding="utf-8", errors="replace")[-6000:]}', flush=True)
+                raise
             finally:
                 child.terminate()
                 try:
@@ -133,4 +140,10 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception:
+        if os.environ.get('GITHUB_ACTIONS') == 'true':
+            detail = traceback.format_exc().replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+            print(f'::error title=Packaged app smoke failed::{detail[-12000:]}', flush=True)
+        raise
