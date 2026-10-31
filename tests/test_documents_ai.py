@@ -77,6 +77,22 @@ class DocumentAITests(unittest.TestCase):
         with patch('mailnotes.core.request_json',return_value=ai_result()):
             self.assertEqual(process([self.mail],self.config,'gmail'),1)
 
+    def test_incomplete_ai_response_retries_with_larger_output(self):
+        incomplete={'choices':[{'finish_reason':'length','message':{'content':'{"categories":["Work"],'}}],
+                    'usage':{'prompt_tokens':10,'completion_tokens':1200,'total_tokens':1210}}
+        complete=ai_result();complete['usage']={'prompt_tokens':10,'completion_tokens':20,'total_tokens':30}
+        with patch('mailnotes.core.request_json',side_effect=[incomplete,complete]) as request:
+            self.assertEqual(process([self.mail],self.config,'gmail'),1)
+        self.assertEqual(request.call_count,2)
+        self.assertEqual(request.call_args_list[0].kwargs['data']['max_tokens'],2000)
+        self.assertEqual(request.call_args_list[1].kwargs['data']['max_tokens'],3000)
+
+    def test_ai_response_missing_safety_fields_goes_to_review(self):
+        response={'choices':[{'finish_reason':'stop','message':{'content':json.dumps({'categories':'Work','short_summary':'Short result'})}}]}
+        with patch('mailnotes.core.request_json',return_value=response):
+            self.assertEqual(process([self.mail],self.config,'gmail'),1)
+        row=self.row();self.assertEqual(json.loads(row[0]),['Cần xem lại']);self.assertIn('trả thiếu trường',row[2])
+
     def test_truncated_input_keeps_review_warning(self):
         self.config['summary']['max_input_chars']=20
         with patch('mailnotes.core.request_json',return_value=ai_result()) as request:

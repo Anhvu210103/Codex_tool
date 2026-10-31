@@ -50,7 +50,8 @@ class UsageTests(unittest.TestCase):
         response={'choices':[{'message':{'content':'bad JSON'}}], 'usage':{'prompt_tokens':20,'completion_tokens':10,'total_tokens':30}}
         with patch('mailnotes.core.request_json',return_value=response):
             with self.assertRaises(ValueError):process([self.mail],self.config,'gmail')
-        self.assertEqual(self.admin.usage()['totals']['total_tokens'],30)
+        self.assertEqual(self.admin.usage()['totals']['total_tokens'],60)
+        self.assertEqual(self.admin.usage()['totals']['api_calls'],2)
         with sqlite3.connect(self.root/'gmail/notes.sqlite3') as connection:
             self.assertEqual(connection.execute('SELECT COUNT(*) FROM notes').fetchone()[0],0)
 
