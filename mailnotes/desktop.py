@@ -146,6 +146,10 @@ def serve(root):
             admin.start_scheduler()
             try:
                 server.run()
+            except OSError as error:
+                import errno
+                if error.errno != errno.EBADF or not admin.stop.is_set():
+                    raise
             finally:
                 admin.stop.set()
                 # Let an in-flight document commit before exiting.

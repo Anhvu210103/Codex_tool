@@ -12,8 +12,9 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 import urllib.parse
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from .database import connect
@@ -49,6 +50,18 @@ def create_app(base=None, data_root=None, public_url=None):
     attempts = {}
     attempts_lock = threading.Lock()
     operations = threading.Lock()
+    error_log_lock = threading.Lock()
+
+    def private_error(context, error):
+        reference = datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(3)
+        path = admin.private / 'errors.log'
+        lines = ['\n[' + reference + '] ' + context + ' · ' + type(error).__name__ + ': ' + str(error) + '\n',
+                 ''.join(traceback.format_exception(type(error), error, error.__traceback__))]
+        with error_log_lock:
+            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+            with os.fdopen(descriptor, 'a', encoding='utf-8') as stream:
+                stream.writelines(lines)
+        return error_message(error) + ' Mã lỗi: ' + reference
 
     @app.context_processor
     def asset_versions():
@@ -252,7 +265,7 @@ def create_app(base=None, data_root=None, public_url=None):
                 choice = select_with_ai(None, candidates, kind, key, config['summary']['model'], connection, config['summary']['pricing'],
                                         {**gateway, 'name': config['summary']['provider']})
         except Exception as error:
-            return jsonify(error=error_message(error)), 400
+            return jsonify(error=private_error('GreenNode chọn thao tác Gmail', error)), 400
         return jsonify(choice=choice)
 
     @app.post('/extension/ping')
@@ -313,7 +326,7 @@ def create_app(base=None, data_root=None, public_url=None):
         try:
             result = store_ai_document(file.stream.read(MAX_PDF_BYTES + 1), Path(file.filename or 'Gmail.pdf').name)
         except Exception as error:
-            return jsonify(error=error_message(error)), 400
+            return jsonify(error=private_error('Tiện ích xử lý PDF', error)), 400
         return jsonify(result)
 
     def store_ai_document(data, filename):
@@ -339,7 +352,7 @@ def create_app(base=None, data_root=None, public_url=None):
         try:
             return jsonify(available=True, **store_ai_document(*downloaded))
         except Exception as error:
-            return jsonify(error=error_message(error)), 400
+            return jsonify(error=private_error('Tiện ích nhập PDF đã tải', error)), 400
 
     @app.get('/api/status')
     def status():
@@ -432,7 +445,7 @@ def create_app(base=None, data_root=None, public_url=None):
         except ValueError:
             raise
         except Exception as error:
-            return jsonify(error=error_message(error)), 400
+            return jsonify(error=private_error('Trang quản trị xử lý PDF', error)), 400
         return jsonify(added=added)
 
     @app.post('/api/notes/reprocess')
@@ -443,7 +456,7 @@ def create_app(base=None, data_root=None, public_url=None):
         except ValueError:
             raise
         except Exception as error:
-            return jsonify(error=error_message(error)), 400
+            return jsonify(error=private_error('Trang quản trị đọc lại PDF', error)), 400
         return jsonify(added=added)
 
     @app.post('/api/notes/categories')
