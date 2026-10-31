@@ -29,12 +29,18 @@ jobs:
         include:
           - os: ubuntu-22.04
             artifact: SoGhiChep-Linux-x86_64
+            artifact_path: |
+              SoGhiChep-Linux.tar.gz
+              dist/SoGhiChep-x86_64.AppImage
           - os: macos-15
             artifact: SoGhiChep-macOS-AppleSilicon
+            artifact_path: dist/SoGhiChep.dmg
           - os: macos-15-intel
             artifact: SoGhiChep-macOS-Intel
+            artifact_path: dist/SoGhiChep.dmg
           - os: windows-2025
             artifact: SoGhiChep-Windows-x86_64
+            artifact_path: dist/SoGhiChep-Windows-x86_64/
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -106,9 +112,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: |
-            SoGhiChep-Linux.tar.gz
-            dist/SoGhiChep-x86_64.AppImage
-            dist/SoGhiChep.dmg
-            dist/SoGhiChep-Windows-x86_64.zip
+          path: ${{ matrix.artifact_path }}
           if-no-files-found: error

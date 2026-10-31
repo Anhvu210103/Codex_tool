@@ -1,6 +1,7 @@
 """Create a simple customer ZIP from the tested Windows executable."""
 import argparse
 from pathlib import Path
+import shutil
 import zipfile
 
 
@@ -21,6 +22,12 @@ def main():
              '4. Dữ liệu nằm tại %LOCALAPPDATA%\\SoGhiChep và không nằm trong file EXE.\n'
              '5. Để OCR PDF scan, cài Poppler và thêm pdftoppm.exe vào PATH.\n')
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    # Actions zips the upload itself. Upload this folder so customers only need
+    # to extract once, while retaining a standalone ZIP for other distribution.
+    folder = args.output.with_suffix('')
+    folder.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(args.app, folder / 'SoGhiChep.exe')
+    (folder / 'HUONG-DAN.txt').write_text(guide, encoding='utf-8')
     args.output.unlink(missing_ok=True)
     with zipfile.ZipFile(args.output, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         archive.write(args.app, 'SoGhiChep/SoGhiChep.exe')
