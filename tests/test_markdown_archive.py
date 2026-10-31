@@ -10,7 +10,7 @@ from pypdf import PdfWriter
 from pypdf.generic import DictionaryObject, NameObject, DecodedStreamObject
 
 from mailnotes.admin import Admin, private_json
-from mailnotes.archive import component
+from mailnotes.archive import component, original_markdown_name
 from mailnotes.documents import pdf_message
 from mailnotes.core import process
 from mailnotes.web import create_app
@@ -51,8 +51,9 @@ class MarkdownArchiveTests(unittest.TestCase):
             markdown=next((self.root/'ai/Markdown').glob('*.md'))
             self.assertEqual(sent,markdown.read_text())
             self.assertEqual(markdown.stat().st_mode&0o777,0o600)
-            copies=list((self.root/'ai/Theo-nhom').glob('*/*.md'));self.assertEqual(len(copies),2)
-            self.assertEqual(list((self.root/'ai/Theo-nhom').glob('*/*.pdf')),[])
+            copies=list((self.root/'ai/Theo-nhom').rglob('*.md'));self.assertEqual(len(copies),2)
+            self.assertTrue(all(path.name=='report.md' for path in copies))
+            self.assertEqual(list((self.root/'ai/Theo-nhom').rglob('*.pdf')),[])
             identifier='ai:'+hashlib.sha256(raw).hexdigest();key=hashlib.sha256(identifier.encode()).hexdigest()
             legacy=copies[0].parent/('legacy--'+key[:16]+'--'+hashlib.sha256(raw).hexdigest()[:12]+'.pdf');legacy.write_bytes(raw)
             manifest=self.root/'ai/exports'/(key+'.json');entries=json.loads(manifest.read_text());entries.append(legacy.relative_to(self.root/'ai').as_posix());manifest.write_text(json.dumps(entries))
@@ -65,8 +66,8 @@ class MarkdownArchiveTests(unittest.TestCase):
             self.assertIn('Markdown trên máy',notebook)
             self.assertIn(str(copies[0]).replace('_','\\_'),notebook)
             self.admin.edit_categories('ai',note['id'],['Ngân sách'])
-            self.assertEqual(len(list((self.root/'ai/Theo-nhom').glob('*/*.md'))),1)
-            self.assertEqual(len(list((self.root/'ai/Theo-nhom').glob('*/*.pdf'))),0)
+            self.assertEqual(len(list((self.root/'ai/Theo-nhom').rglob('*.md'))),1)
+            self.assertEqual(len(list((self.root/'ai/Theo-nhom').rglob('*.pdf'))),0)
             self.assertEqual(api.call_count,1)
             self.assertEqual(len(list((self.root/'ai/files').glob('*.pdf'))),1)
 
@@ -77,9 +78,9 @@ class MarkdownArchiveTests(unittest.TestCase):
             self.assertEqual(process([document],config,'ai'),1)
             api.assert_not_called()
         self.assertEqual(self.admin.notes('ai')['notes'][0]['categories'],['Cần xem lại'])
-        self.assertEqual(len(list((self.root/'ai/Can-xem-lai').glob('*.md'))),1)
-        self.assertEqual(len(list((self.root/'ai/Can-xem-lai').glob('*.pdf'))),0)
-        self.assertIn('không chạy OCR',next((self.root/'ai/Can-xem-lai').glob('*.md')).read_text())
+        self.assertEqual(len(list((self.root/'ai/Can-xem-lai').rglob('*.md'))),1)
+        self.assertEqual(len(list((self.root/'ai/Can-xem-lai').rglob('*.pdf'))),0)
+        self.assertIn('không chạy OCR',next((self.root/'ai/Can-xem-lai').rglob('*.md')).read_text())
 
     def test_mixed_pdf_reports_unread_image_pages_and_names_cannot_escape(self):
         config=self.admin.runtime_config('pdf')
@@ -88,6 +89,8 @@ class MarkdownArchiveTests(unittest.TestCase):
         self.assertNotIn('/',component('../../outside'))
         self.assertNotEqual(component('A/B'),component('A\\B'))
         self.assertLess(len(component('Ngân sách nhà nước ' * 40).encode('utf-8')),200)
+        self.assertEqual(original_markdown_name('Công văn số 01.PDF'),'Công văn số 01.md')
+        self.assertEqual(original_markdown_name('../../outside.pdf'),'-..-outside.md')
 
     def test_markdown_download_and_local_folder_action(self):
         config=self.admin.config();config['summary']['mode']='extractive';config['classification_mode']='rules';self.admin.save_settings(config)

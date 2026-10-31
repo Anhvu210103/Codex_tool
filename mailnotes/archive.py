@@ -15,6 +15,15 @@ def component(value):
     return (text or 'Tai-lieu') + '--' + hashlib.sha256(str(value).encode()).hexdigest()[:10]
 
 
+def original_markdown_name(title):
+    text = unicodedata.normalize('NFC', str(title))
+    if text.lower().endswith('.pdf'):
+        text = text[:-4]
+    text = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '-', text).strip(' .')
+    text = text.encode('utf-8')[:180].decode('utf-8', errors='ignore').rstrip(' .')
+    return (text or 'Tai-lieu') + '.md'
+
+
 def write_private(root, relative, text):
     root = Path(root).resolve()
     path = root / relative
@@ -46,9 +55,9 @@ def save_markdown(root, file_hash, text):
 def classified_markdown_paths(root, identifier, title, categories, digest):
     markdown_path(root, digest)  # Validate the stored content hash.
     key = hashlib.sha256(identifier.encode()).hexdigest()[:16]
-    filename = component(title) + '--' + key + '.md'
+    filename = original_markdown_name(title)
     return [(Path(root) / ('Can-xem-lai' if category == 'Cần xem lại' else 'Theo-nhom')
-             / ('' if category == 'Cần xem lại' else component(category)) / filename)
+             / (key if category == 'Cần xem lại' else component(category) + '/' + key) / filename)
             for category in dict.fromkeys(categories)]
 
 
