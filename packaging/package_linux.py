@@ -29,7 +29,7 @@ def main():
     (appdir / 'SoGhiChep.desktop').write_text(
         '[Desktop Entry]\nType=Application\nName=Sổ ghi chép\n'
         'Comment=Đọc tài liệu, phân nhóm và ghi chép tự động\n'
-        'Exec=SoGhiChep\nIcon=SoGhiChep.svg\nTerminal=false\nCategories=Office;\n',
+        'Exec=SoGhiChep\nIcon=SoGhiChep\nTerminal=false\nCategories=Office;\n',
         encoding='utf-8')
     shutil.copy2(ROOT / 'packaging' / 'SoGhiChep.svg', appdir / '.DirIcon')
     apprun = appdir / 'AppRun'
