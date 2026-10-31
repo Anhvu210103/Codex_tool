@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sổ ghi chép — AI Gmail",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "description": "Tự thao tác trên Gmail, quét bù và xử lý mọi PDF đính kèm.",
   "permissions": [
     "activeTab",

@@ -93,6 +93,36 @@ async function openTile(node,cancelled) {
  }
  throw Error(check?.reason||'Không xác định được ô PDF.');
 }
+function revealTile(node) {
+ const r=node.getBoundingClientRect();
+ const x=Math.min(innerWidth-1,Math.max(0,r.left+r.width/2));
+ const y=Math.min(innerHeight-1,Math.max(0,r.top+r.height/2));
+ for(const type of ['mouseover','mouseenter','mousemove'])node.dispatchEvent(new MouseEvent(type,{bubbles:true,view:window,clientX:x,clientY:y}));
+}
+function directDownloadControl(node,name) {
+ if(!node?.isConnected||viewerOpen())return null;
+ // .aZo is one Gmail attachment card. Fall back to .aQH for layouts where
+ // Gmail wraps the card differently, but never search the whole message.
+ const card=node.closest('.aZo')||node.closest('.aQH');
+ if(!card)return null;
+ revealTile(card);
+ const candidates=[];
+ for(const item of card.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"],a')){
+  const names=[item.getAttribute('aria-label'),item.getAttribute('data-tooltip'),item.getAttribute('title'),item.innerText].map(clean);
+  if(!names.some(value=>downloadName.test(value))||names.some(value=>/drive|tất cả|all attachments/i.test(value)))continue;
+  const button=item.closest('button,[role="button"],a,[tabindex="0"]')||item;
+  if(visible(button)&&!downloadButtonDisabled(button))candidates.push(button);
+ }
+ const unique=[...new Set(candidates)];
+ if(unique.length===1)return unique[0];
+ // When Gmail exposes more than one card action, require the filename in its
+ // accessible label so the tool cannot download a neighbouring attachment.
+ const named=unique.filter(button=>label(button).normalize('NFC').includes(clean(name).normalize('NFC')));
+ return named.length===1?named[0]:null;
+}
+async function readyDirectDownload(node,name,cancelled) {
+ return await until(()=>{revealTile(node);return directDownloadControl(node,name);},3000,cancelled);
+}
 async function trace(phase,mail,file,detail='') {
  await send({type:'trace',event:{phase,mail,file:clean(file).slice(0,180),detail:clean(detail).slice(0,180)}}).catch(()=>{});
 }
@@ -236,6 +266,13 @@ async function clickAndWaitDownload(button,cancelled,mail,file) {
   }
  }
 }
+async function clickAndWaitDirect(button,cancelled,mail,file) {
+ const point=clickPoint(button);
+ await send({type:'arm-download',name:file});
+ await send({type:'trusted-click',...point});
+ await trace('bam-tai-truc-tiep',mail,file,'Bấm nút tải trên thẻ đính kèm tại x='+Math.round(point.x)+', y='+Math.round(point.y));
+ return await waitDownload(cancelled);
+}
 async function closeViewer(cancelled,mail,file) {
  if (!viewerOpen()) return;
  const dialog=viewerMarker()?.closest('[role="dialog"]');
@@ -366,15 +403,23 @@ async function run(limit,only=[],automatic=false) {
      try {
       const tile=pdfTiles().find(item=>item.fileKey===attachment.fileKey)||pdfTiles().find(item=>item.index===attachment.index && item.name===attachment.name);
       if (!tile) throw Error('Không tìm lại được ô PDF.');
-      await progress('Thư '+mails+'/'+queue.length+' · PDF '+(files+1)+' · Mở '+attachment.name);
-      await trace('mo-pdf',mails,attachment.name);
-      await openTile(tile.node,cancelled);
-      if (!await until(viewerOpen,10000,cancelled)) throw Error('PDF chưa mở trong Gmail.');
-      const button=await readyDownload(cancelled,mails,attachment.name);
-      if (!button) throw Error('Không thấy nút tải PDF đã sẵn sàng trong trình xem.');
-      const point=clickPoint(button);
-      await trace('tim-nut-tai',mails,attachment.name,'Nút '+button.tagName.toLowerCase()+' · '+(label(button)||'không có nhãn')+' · x='+Math.round(point.x)+', y='+Math.round(point.y));
-      const result=await clickAndWaitDownload(button,cancelled,mails,attachment.name);
+      await progress('Thư '+mails+'/'+queue.length+' · PDF '+(files+1)+' · Tải '+attachment.name);
+      let result=null;
+      const direct=await readyDirectDownload(tile.node,attachment.name,cancelled);
+      if(direct){
+       try{result=await clickAndWaitDirect(direct,cancelled,mails,attachment.name);}
+       catch(error){await trace('tai-truc-tiep-loi',mails,attachment.name,error.message+' · chuyển sang trình xem PDF');}
+      }
+      if(!result){
+       await trace('mo-pdf',mails,attachment.name,direct?'Tải trực tiếp chưa bắt đầu':'Thẻ đính kèm không có nút tải trực tiếp');
+       await openTile(tile.node,cancelled);
+       if (!await until(viewerOpen,10000,cancelled)) throw Error('PDF chưa mở trong Gmail.');
+       const button=await readyDownload(cancelled,mails,attachment.name);
+       if (!button) throw Error('Không thấy nút tải PDF đã sẵn sàng trong trình xem.');
+       const point=clickPoint(button);
+       await trace('tim-nut-tai',mails,attachment.name,'Nút '+button.tagName.toLowerCase()+' · '+(label(button)||'không có nhãn')+' · x='+Math.round(point.x)+', y='+Math.round(point.y));
+       result=await clickAndWaitDownload(button,cancelled,mails,attachment.name);
+      }
       if (key) await send({type:'pdf-record',...identity,fileKey});
       await send({type:'clear-failure',key,fileIndex:attachment.index,name:attachment.name,fileKey});
       for(let index=pendingFailures.length-1;index>=0;index--)if(pendingFailures[index].key===key&&(pendingFailures[index].fileKey?pendingFailures[index].fileKey===fileKey:pendingFailures[index].fileIndex===attachment.index&&pendingFailures[index].name===attachment.name))pendingFailures.splice(index,1);
@@ -382,7 +427,7 @@ async function run(limit,only=[],automatic=false) {
       files++;await trace('da-luu',mails,attachment.name,result.added===0?'đã có trong sổ':'mới');
       await progress('Đã xử lý '+files+' PDF từ '+mails+' thư. Mới nhất: '+result.filename+(result.added===0?' (đã có trong Sổ ghi chép → AI thao tác, không tạo dòng mới)':' (xem tại Sổ ghi chép → AI thao tác)'));
      } catch (error) {errors++;mailFailed=true;faults.push(attachment.name+': '+error.message);await rememberFailure('process-pdf',{...entry,key},error,attachment);await trace('loi',mails,attachment.name,error.message);await progress('Bỏ qua PDF lỗi, tiếp tục file sau: '+attachment.name+' — '+error.message);}
-     try{await closeViewer(cancelled,mails,attachment.name);}catch(error){errors++;mailFailed=true;faults.push(attachment.name+': '+error.message);await rememberFailure('close-viewer',{...entry,key},error,attachment);await trace('loi-dong-pdf',mails,attachment.name,error.message);}
+     if(viewerOpen())try{await closeViewer(cancelled,mails,attachment.name);}catch(error){errors++;mailFailed=true;faults.push(attachment.name+': '+error.message);await rememberFailure('close-viewer',{...entry,key},error,attachment);await trace('loi-dong-pdf',mails,attachment.name,error.message);}
     }
     if(key && !mailFailed && tiles.every(item=>recordedFiles.has(item.fileKey)||recordedFiles.has(item.legacyKey))) await send({type:'mail-complete',...identity});
    }
