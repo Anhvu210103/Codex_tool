@@ -31,6 +31,8 @@ jobs:
             artifact: SoGhiChep-macOS-AppleSilicon
           - os: macos-15-intel
             artifact: SoGhiChep-macOS-Intel
+          - os: windows-2025
+            artifact: SoGhiChep-Windows-x86_64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -91,6 +93,9 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: python packaging/package_macos.py
+      - name: Build Windows customer ZIP
+        if: runner.os == 'Windows'
+        run: python packaging/package_windows.py
       - name: Remove temporary Apple keychain
         if: runner.os == 'macOS' && always()
         run: |
@@ -103,4 +108,5 @@ jobs:
             SoGhiChep-Linux.tar.gz
             dist/SoGhiChep-x86_64.AppImage
             dist/SoGhiChep.dmg
+            dist/SoGhiChep-Windows-x86_64.zip
           if-no-files-found: error

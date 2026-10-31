@@ -2,7 +2,7 @@
 
 ## Trước ngày cài
 
-- [ ] Chốt hệ điều hành và chip máy khách; tải đúng gói Linux, Mac Intel hoặc Mac Apple Silicon.
+- [ ] Chốt hệ điều hành và chip máy khách; tải đúng gói Linux, Windows 64-bit, Mac Intel hoặc Mac Apple Silicon.
 - [ ] Bản phát hành và tiện ích cùng phiên bản; tiện ích hiện **v0.9.1**.
 - [ ] Chạy `scripts/release-check.sh` thành công và lưu mã commit đã bàn giao.
 - [ ] Không có `.local/`, `.env`, API key, OAuth JSON, token hoặc dữ liệu khách trong gói/Git.

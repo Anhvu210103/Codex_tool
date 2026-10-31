@@ -272,7 +272,7 @@ def create_app(base=None, data_root=None, public_url=None):
     def extension_ping():
         import sys
         return jsonify(app='mailnotes-extension', protocol=1,
-                       capabilities=['linux-local-pdf'] if sys.platform == 'linux' else [],
+                       capabilities=['local-download-pdf'] if sys.platform in ('linux', 'darwin', 'win32') else [],
                        history_generation=read_json(admin.private / 'extension-history.json', {'generation': 0}).get('generation', 0))
 
     @app.post('/extension/automation-state')
@@ -502,14 +502,17 @@ def create_app(base=None, data_root=None, public_url=None):
             raise ValueError('Chọn nguồn Gmail, PDF tải lên hoặc AI thao tác.')
         root = admin.root / source
         local = parsed.hostname in ('localhost', '127.0.0.1') and request.remote_addr in ('127.0.0.1', '::1')
-        can_open = local and sys.platform in ('linux', 'darwin')
+        can_open = local and sys.platform in ('linux', 'darwin', 'win32')
         if request.method == 'POST':
             if not can_open:
                 raise ValueError('Chỉ mở thư mục trực tiếp khi tool chạy trên cùng máy.')
             root.mkdir(parents=True, exist_ok=True)
             try:
-                subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', str(root)],
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if sys.platform == 'win32':
+                    os.startfile(root)
+                else:
+                    subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', str(root)],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except OSError:
                 raise ValueError('Chưa mở được trình quản lý file. Hãy sao chép đường dẫn bên dưới để mở thủ công.') from None
         return jsonify(path=str(root), can_open=can_open)
@@ -521,7 +524,7 @@ def create_app(base=None, data_root=None, public_url=None):
         from .folder_inbox import inbox_directory
         root = inbox_directory();root.mkdir(parents=True,exist_ok=True,mode=0o700)
         local = parsed.hostname in ('localhost', '127.0.0.1') and request.remote_addr in ('127.0.0.1', '::1')
-        can_open = local and sys.platform in ('linux', 'darwin')
+        can_open = local and sys.platform in ('linux', 'darwin', 'win32')
         if request.method == 'GET':
             return jsonify(path=str(root),can_open=can_open)
         action = payload().get('action')
@@ -533,7 +536,10 @@ def create_app(base=None, data_root=None, public_url=None):
             if not can_open:
                 raise ValueError('Chỉ mở thư mục trực tiếp khi tool chạy trên cùng máy.')
             try:
-                subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open',str(root)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+                if sys.platform == 'win32':
+                    os.startfile(root)
+                else:
+                    subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open',str(root)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             except OSError:
                 raise ValueError('Chưa mở được thư mục. Hãy sao chép đường dẫn hiển thị.') from None
             return jsonify(ok=True)

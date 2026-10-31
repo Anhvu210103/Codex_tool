@@ -22,6 +22,7 @@ class ExtensionTests(unittest.TestCase):
 
     def test_bridge_requires_pair_token_and_extension_origin(self):
         ping=self.client.post('/extension/ping',json={},headers=self.headers)
+        self.assertIn('local-download-pdf', ping.get_json()['capabilities'])
         self.assertEqual(ping.status_code,200)
         self.assertEqual(ping.get_json()['app'],'mailnotes-extension')
         self.assertEqual(ping.get_json()['protocol'],1)

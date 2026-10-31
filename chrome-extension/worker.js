@@ -202,7 +202,7 @@ async function handleDownload(item){
   if(claimedDownloads.has(item.id))return;claimedDownloads.add(item.id);if(claimedDownloads.size>100)claimedDownloads.delete(claimedDownloads.values().next().value);
   await chrome.storage.local.set({status:'Đang chuyển PDF về tool...'});
   const {capabilities}=await chrome.storage.local.get('capabilities');let result;
-  if(capabilities?.includes('linux-local-pdf')&&item.filename){result=await api('/extension/import-local',{path:item.filename});if(!result.available)result=null;}
+  if((capabilities?.includes('local-download-pdf')||capabilities?.includes('linux-local-pdf'))&&item.filename){result=await api('/extension/import-local',{path:item.filename});if(!result.available)result=null;}
   if(!result){
    if(gmailBlob)throw Error('Chrome lưu PDF dưới dạng blob; hãy chọn file vừa tải trong tiện ích để đưa vào sổ.');
    const response=await fetch(url.href,{credentials:'include'});if(!response.ok)throw Error('Không đọc lại được file tải xuống. Chọn PDF bằng tay trong tiện ích.');

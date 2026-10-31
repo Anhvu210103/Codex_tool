@@ -1,6 +1,6 @@
-# Ứng dụng bấm mở — Linux và macOS
+# Ứng dụng bấm mở — Linux, Windows và macOS
 
-Hai hệ điều hành dùng cùng quy trình nghiệp vụ và cấu trúc tài liệu: [chi tiết Linux/macOS](../deploy/linux-macos.md). Bản mã nguồn trên Mac có launcher `Mo-So-Ghi-Chep.command`, dùng lại cùng `.venv` và `.local` như Linux.
+Ba hệ điều hành dùng cùng quy trình nghiệp vụ và cấu trúc tài liệu: [chi tiết desktop](../deploy/linux-macos.md), [Windows](../deploy/windows.md) và [iMac](../deploy/macos.md). Bản mã nguồn trên Mac có launcher `Mo-So-Ghi-Chep.command`, dùng lại cùng `.venv` và `.local` như Linux.
 
 Ứng dụng có sẵn Python và thư viện, tự chạy dịch vụ nội bộ rồi mở trình duyệt mặc định. Không cần nhập lệnh mỗi lần dùng. Giao diện vẫn là trang quản trị trong trình duyệt, không phải cửa sổ webview riêng.
 
@@ -11,6 +11,7 @@ Trong repository → **Actions → Build desktop apps**, mở một lượt ch�
 - **SoGhiChep-Linux-x86_64**: cho Linux Intel/AMD 64-bit. Giải nén artifact, cấp quyền chạy cho `SoGhiChep-x86_64.AppImage` rồi bấm mở. Có `SoGhiChep-Linux.tar.gz` làm phương án dự phòng cho máy không chạy được AppImage.
 - **SoGhiChep-macOS-AppleSilicon**: cho Mac M1/M2/M3/M4 và chip Apple Silicon tương thích.
 - **SoGhiChep-macOS-Intel**: cho Mac dùng CPU Intel.
+- **SoGhiChep-Windows-x86_64**: cho Windows 10/11 64-bit. Giải nén ZIP vào thư mục cố định rồi bấm đúp `SoGhiChep.exe`.
 
 Mac: giải nén artifact, mở `SoGhiChep.dmg`, kéo `SoGhiChep.app` vào Applications rồi mở. Khi CI chưa được cấp Apple secrets, DMG chỉ ký ad-hoc để kiểm thử và macOS có thể yêu cầu xác nhận trong System Settings → Privacy & Security. Khi có Developer ID và thông tin notarization, cùng workflow tự ký hardened runtime, gửi Apple kiểm tra và staple vé vào DMG. Không tắt Gatekeeper.
 
@@ -39,13 +40,14 @@ Không chạy đồng thời phiên web/CLI cũ và launcher dùng cùng dữ li
 
 - Bản app Linux: `~/.local/share/so-ghi-chep/` (hoặc `$XDG_DATA_HOME/so-ghi-chep/`).
 - Bản app Mac: `~/Library/Application Support/SoGhiChep/`.
+- Bản app Windows: `%LOCALAPPDATA%\SoGhiChep`.
 - Launcher mã nguồn: `.local/` trong repository, giữ nguyên dữ liệu cũ.
 
 Thay file executable hoặc `.app` không xóa dữ liệu. Nếu chuyển từ source sang app đóng gói, dừng cả hai, sao lưu và **chép nội dung `.local/` vào thư mục dữ liệu app tương ứng** bằng trình quản lý file, giữ cấu trúc thư mục. Không ghi đè thư mục đã có dữ liệu khác khi chưa sao lưu. Không chép `.venv/` vào đó. Linux bật Show Hidden Files (Ctrl+H) để thấy `.local`; Mac dùng Finder → Go → Go to Folder để mở đường dẫn.
 
 Có thể dùng MAILNOTES_DATA_DIR để chọn thư mục dữ liệu riêng khi triển khai có quản lý. Không gửi data/token/key qua chat. Nhật ký khởi động nằm ở `admin/desktop.log` trong thư mục dữ liệu; chỉ chia sẻ lỗi đã loại bỏ thông tin riêng.
 
-GreenNode / VNG Cloud nhận chữ từ Markdown đã chuyển từ PDF. Bản scan được chuyển thành ảnh bằng Poppler (`pdftoppm`) rồi thử OCR qua model đã chọn. Docker đã kèm Poppler; app và launcher mã nguồn cần cài `poppler-utils` trên Linux hoặc `brew install poppler` trên Mac trước khi dùng OCR. Nếu thiếu Poppler, model không nhận ảnh hoặc OCR thất bại thì tài liệu vào Cần xem lại. Không cần Tesseract. Chứng chỉ CA công khai được đóng gói, giữ TLS verification; SSL_CERT_FILE do người dùng cấu hình được tôn trọng.
+GreenNode / VNG Cloud nhận chữ từ Markdown đã chuyển từ PDF. Bản scan được chuyển thành ảnh bằng Poppler (`pdftoppm`) rồi thử OCR qua model đã chọn. Docker đã kèm Poppler; app và launcher mã nguồn cần cài `poppler-utils` trên Linux, `brew install poppler` trên Mac hoặc bản Poppler Windows có `pdftoppm.exe` trong PATH trước khi dùng OCR. Nếu thiếu Poppler, model không nhận ảnh hoặc OCR thất bại thì tài liệu vào Cần xem lại. Không cần Tesseract. Chứng chỉ CA công khai được đóng gói, giữ TLS verification; SSL_CERT_FILE do người dùng cấu hình được tôn trọng.
 
 ## Build cho người phát triển
 
@@ -59,6 +61,6 @@ python3 -m venv .venv
 .venv/bin/python packaging/smoke_app.py
 ```
 
-Linux tạo `dist/SoGhiChep`, sau đó `packaging/package_linux.py` tạo AppImage bằng appimagetool và runtime đều đã kiểm tra SHA-256. macOS tạo `dist/SoGhiChep.app`, sau đó `packaging/package_macos.py` tạo và kiểm tra `dist/SoGhiChep.dmg`. Không cross-build Mac từ Linux. CI dùng Ubuntu 22.04 để có nền glibc cũ hơn; bản Linux build tại môi trường cloud hiện tại chỉ được kiểm chứng trên chính môi trường đó, không cam kết chạy mọi distro/CPU. OAuth Gmail thật, GreenNode thật và bản macOS vẫn cần kiểm thử trên máy đích có credentials hợp lệ.
+Linux tạo `dist/SoGhiChep`, sau đó `packaging/package_linux.py` tạo AppImage bằng appimagetool và runtime đều đã kiểm tra SHA-256. Windows tạo `dist/SoGhiChep.exe` và ZIP bàn giao. macOS tạo `dist/SoGhiChep.app`, sau đó `packaging/package_macos.py` tạo và kiểm tra `dist/SoGhiChep.dmg`. Không cross-build Mac từ Linux. CI dùng Ubuntu 22.04 để có nền glibc cũ hơn; bản Linux build tại môi trường cloud hiện tại chỉ được kiểm chứng trên chính môi trường đó, không cam kết chạy mọi distro/CPU. OAuth Gmail thật, GreenNode thật và bản macOS vẫn cần kiểm thử trên máy đích có credentials hợp lệ.
 
 Triển khai máy chủ bằng Docker là lựa chọn riêng, xem [hướng dẫn Docker](../deploy/docker.md). Docker không thay thế DMG trên máy khách vì không mở trực tiếp Finder và cần Docker Desktop.

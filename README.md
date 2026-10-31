@@ -8,7 +8,7 @@ Mở `Mo-So-Ghi-Chep.sh` trong thư mục đã cài `.venv`. Tool mở trang qu�
 
 Trong **Cài đặt**, lưu GreenNode / VNG Cloud API key và xác nhận đồng ý gửi nội dung tài liệu. Model mặc định là `deepseek/deepseek-v4.1-flash-thirdparty`. Xem lại **Nhóm tài liệu**. Để thử luồng ổn định nhất, trên **Tổng quan** bấm **Mở thư mục PDF**, chép một PDF có chữ vào đó rồi bấm **Quét thư mục**. Mở **Sổ ghi chép → Thư mục nhận PDF** để xem kết quả. Sau đó bật **Tự quét thư mục** với chu kỳ phù hợp. PDF đã xử lý được chuyển vào `Da-xu-ly`; PDF lỗi ở lại để thử lại. Có thể tải PDF trực tiếp ở Sổ ghi chép khi chỉ muốn thử một file.
 
-PDF scan cần Poppler (`pdftoppm`) trên máy để chuyển trang thành ảnh trước khi thử gửi model GreenNode / VNG Cloud OCR. Trên Ubuntu/Debian cài `sudo apt install poppler-utils`; trên Mac cài `brew install poppler`. Model mặc định chưa được xác nhận nhận ảnh, nên PDF scan sẽ vào **Cần xem lại** nếu OCR thất bại. Mục **Token & chi phí** hiển thị số đo API và tiền ước tính, không thay thế hóa đơn nhà cung cấp.
+PDF scan cần Poppler (`pdftoppm`) trên máy để chuyển trang thành ảnh trước khi thử gửi model GreenNode / VNG Cloud OCR. Trên Ubuntu/Debian cài `sudo apt install poppler-utils`; trên Mac cài `brew install poppler`; trên Windows cài bản Poppler có `pdftoppm.exe` trong PATH. Model mặc định chưa được xác nhận nhận ảnh, nên PDF scan sẽ vào **Cần xem lại** nếu OCR thất bại. Mục **Token & chi phí** hiển thị số đo API và tiền ước tính, không thay thế hóa đơn nhà cung cấp. Xem hướng dẫn riêng cho [Windows](deploy/windows.md) và [iMac](deploy/macos.md).
 
 ## Gmail và website
 

@@ -29,7 +29,7 @@ const saved = {added: 1, filename: 'report.pdf', categories: ['Ngân sách'], fo
 global.fetch = async (url, options) => {
   requests.push(url);
   if (url.startsWith('https://mail.google.com')) return new Response(new Blob(['%PDF-test'], {type: 'application/pdf'}));
-  if (url.endsWith('/extension/ping')) return new Response(JSON.stringify({app:'mailnotes-extension',protocol:1,capabilities:['linux-local-pdf']}),{headers:{'content-type':'application/json'}});
+  if (url.endsWith('/extension/ping')) return new Response(JSON.stringify({app:'mailnotes-extension',protocol:1,capabilities:['local-download-pdf']}),{headers:{'content-type':'application/json'}});
   if (url.endsWith('/extension/automation-state')) return new Response(JSON.stringify(JSON.parse(options.body).action==='load'?{failures:[],scan_cursors:{},auto_enabled_at:null}:{ok:true}),{headers:{'content-type':'application/json'}});
   if (url.endsWith('/extension/import-local')) {
     assert(['/Downloads/report.pdf','/Downloads/first.pdf','/Downloads/second.pdf','/Downloads/wanted.pdf','/Downloads/Itinerary_5RFR45.pdf'].includes(JSON.parse(options.body).path));
@@ -60,7 +60,7 @@ function begin(id, capabilities = [], expectedName = 'report.pdf') {
   assert(local.status.includes('Ngân sách'));
   assert(session.run.pending.result);
 
-  begin(8, ['linux-local-pdf']);
+  begin(8, ['local-download-pdf']);
   activeTab = 2; // Gmail viewer can move focus before Chrome reports the download.
   item.filename = '/Downloads/report.pdf'; item.state = 'complete';
   await listeners.created({...item});
@@ -70,7 +70,7 @@ function begin(id, capabilities = [], expectedName = 'report.pdf') {
   assert(local.status.includes('/data/ai'));
   assert(session.run.pending.result);
 
-  begin(9, ['linux-local-pdf']); localAvailable = false;
+  begin(9, ['local-download-pdf']); localAvailable = false;
   item.filename = '/Downloads/report.pdf'; item.state = 'complete';
   await listeners.created({...item});
   assert.equal(requests.length, 3, 'Unsupported local path must fall back to the attachment URL');
@@ -79,7 +79,7 @@ function begin(id, capabilities = [], expectedName = 'report.pdf') {
   await listeners.changed({id: 10, state: {current: 'interrupted'}});
   assert.equal(requests.length, 0); assert(session.run.pending.error);
   assert(session.run.pending.error.includes('thất bại'));
-  begin(11, ['linux-local-pdf'], 'first.pdf'); localAvailable = true;
+  begin(11, ['local-download-pdf'], 'first.pdf'); localAvailable = true;
   item.filename = '/Downloads/first.pdf'; item.state = 'complete';
   await listeners.created({...item});
   assert.equal(session.run.pending.result.filename, 'report.pdf');
@@ -90,7 +90,7 @@ function begin(id, capabilities = [], expectedName = 'report.pdf') {
   assert.equal(session.run.pending.downloadId, 12);
   assert(session.run.pending.result);
   assert(session.run, 'Processing one PDF must keep the run alive for the next PDF');
-  begin(14, ['linux-local-pdf'], 'wanted.pdf');
+  begin(14, ['local-download-pdf'], 'wanted.pdf');
   item.filename='/Downloads/unrelated.pdf';item.state='complete';
   await listeners.created({...item});
   assert.equal(session.run.pending.downloadId,null,'A Gmail download with another PDF name must not be attached to this job');
@@ -98,7 +98,7 @@ function begin(id, capabilities = [], expectedName = 'report.pdf') {
   await listeners.created({...item});
   assert.equal(session.run.pending.downloadId,15);
   assert(session.run.pending.result);
-  begin(16,['linux-local-pdf'],'Itinerary_5RFR45 .pdf');
+  begin(16,['local-download-pdf'],'Itinerary_5RFR45 .pdf');
   item={id:16,url:'https://mail.google.com/mail/u/0/?view=att',referrer:'',filename:'/Downloads/Itinerary_5RFR45.pdf',mime:'application/pdf',state:'complete'};
   await listeners.created({...item});
   assert.equal(session.run.pending.downloadId,16,'Chrome removing whitespace before .pdf must not hide a real Gmail download');

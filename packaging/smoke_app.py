@@ -19,7 +19,7 @@ from pypdf.generic import DictionaryObject, NameObject, DecodedStreamObject
 ROOT = Path(__file__).resolve().parent.parent
 APP = Path(os.environ['MAILNOTES_SMOKE_APP']) if os.environ.get('MAILNOTES_SMOKE_APP') else (
     ROOT / 'dist' / 'SoGhiChep.app' / 'Contents' / 'MacOS' / 'SoGhiChep'
-    if sys.platform == 'darwin' else ROOT / 'dist' / 'SoGhiChep')
+    if sys.platform == 'darwin' else ROOT / 'dist' / ('SoGhiChep.exe' if sys.platform == 'win32' else 'SoGhiChep'))
 
 
 def verify_workflow(opener, base, session, data):
@@ -63,15 +63,15 @@ def verify_workflow(opener, base, session, data):
         manifest=json.loads(archive.read('SoGhiChep-AI-Gmail/manifest.json'))
         if manifest['manifest_version']!=3:
             raise RuntimeError('Packaged extension missing')
-    if sys.platform == 'linux':
+    if sys.platform in ('linux', 'darwin', 'win32'):
         downloads=data/'Downloads';downloads.mkdir(exist_ok=True)
         local_pdf=downloads/'browser.pdf';local_pdf.write_bytes(text_pdf)
         token=json.loads(request('/api/extension/pair',{}))['token']
         result=json.loads(request('/extension/import-local',{'path':str(local_pdf)},extra_headers={
             'Origin':'chrome-extension://'+'a'*32,'Authorization':'Bearer '+token}))
         if not result.get('available') or result['categories']!=['Nhóm kiểm thử'] or not list((data/'ai/Theo-nhom').rglob('*.md')):
-            raise RuntimeError('Packaged Linux local download import failed')
-        print('Packaged Linux local PDF -> AI source -> grouped Markdown passed')
+            raise RuntimeError('Packaged desktop local download import failed')
+        print('Packaged desktop PDF download -> AI source -> grouped Markdown passed')
     print('Packaged workflow passed: PDF -> Markdown -> groups, scan review, Chrome extension')
 
 
@@ -83,6 +83,7 @@ def main():
         data = Path(directory)
         environment = os.environ.copy()
         environment['MAILNOTES_DATA_DIR'] = directory
+        environment['MAILNOTES_DOWNLOAD_DIR'] = str(data/'Downloads')
         environment.pop('MAILNOTES_ADMIN_PASSWORD', None)
         if sys.platform == 'linux':
             config_dir=data/'config';config_dir.mkdir()

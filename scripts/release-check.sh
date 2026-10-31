@@ -18,4 +18,4 @@ node tests/extension_download.cjs
 "$PYTHON" packaging/smoke_extension_ui.py
 "$PYTHON" packaging/smoke_extension_download.py
 
-echo "Go-live checks passed. Gmail thật, GreenNode thật và máy Mac khách vẫn cần nghiệm thu theo deploy/GO-LIVE.md."
+echo "Go-live checks passed. Gmail thật, GreenNode thật và máy Windows/iMac khách vẫn cần nghiệm thu theo deploy/GO-LIVE.md."

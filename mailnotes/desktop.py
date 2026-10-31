@@ -1,7 +1,6 @@
-"""Click-to-open launcher for Linux and macOS; never exposes the server remotely."""
+"""Click-to-open launcher for Linux, Windows and macOS; loopback only."""
 import argparse
 import contextlib
-import fcntl
 import json
 import os
 from pathlib import Path
@@ -12,6 +11,11 @@ import sys
 import time
 import urllib.request
 import webbrowser
+
+if os.name == 'nt':
+    import msvcrt
+else:
+    import fcntl
 
 
 def resource_root():
@@ -26,6 +30,8 @@ def data_directory():
         return resource_root() / '.local'
     if sys.platform == 'darwin':
         return Path.home() / 'Library/Application Support/SoGhiChep'
+    if sys.platform == 'win32':
+        return Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData/Local')) / 'SoGhiChep'
     return Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share')) / 'so-ghi-chep'
 
 
@@ -62,9 +68,24 @@ def instance_lock(root):
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     descriptor = os.open(directory / 'desktop.lock', os.O_RDWR | os.O_CREAT, 0o600)
     try:
-        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if os.name == 'nt':
+            if os.fstat(descriptor).st_size == 0:
+                os.write(descriptor, b'0')
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            try:
+                msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+            except OSError as error:
+                raise BlockingIOError('Ứng dụng đã chạy.') from error
+        else:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         yield
     finally:
+        if os.name == 'nt':
+            try:
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+            except OSError:
+                pass
         os.close(descriptor)
 
 
@@ -73,6 +94,9 @@ def notify(message):
         if sys.platform == 'darwin':
             # Fixed AppleScript: message is an argv value, never injected as code.
             subprocess.run(['/usr/bin/osascript', '-e', 'on run argv\ndisplay alert "Sổ ghi chép" message (item 1 of argv)\nend run', message], timeout=30, capture_output=True)
+        elif sys.platform == 'win32':
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(None, message, 'Sổ ghi chép', 0x10)
         elif __import__('shutil').which('zenity'):
             subprocess.run(['zenity', '--error', '--title=Sổ ghi chép', '--text=' + message], timeout=60, capture_output=True)
         else:
@@ -174,9 +198,9 @@ def launch(root):
     with os.fdopen(descriptor, 'ab', buffering=0) as log:
         environment = os.environ.copy()
         environment['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
+        options = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if sys.platform == 'win32' else {'start_new_session': True}
         child = subprocess.Popen(command() + ['--serve'], cwd=str(root if getattr(sys, 'frozen', False) else resource_root()), env=environment,
-                                 stdin=subprocess.DEVNULL, stdout=log, stderr=log,
-                                 start_new_session=True)
+                                 stdin=subprocess.DEVNULL, stdout=log, stderr=log, **options)
     deadline = time.monotonic() + 35
     while time.monotonic() < deadline:
         url = running_instance(root)

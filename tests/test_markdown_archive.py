@@ -110,3 +110,7 @@ class MarkdownArchiveTests(unittest.TestCase):
                 response=client.post('/api/archive?source=ai',json={},headers={'X-CSRF-Token':csrf})
                 self.assertEqual(response.status_code,200)
                 self.assertEqual(opened.call_args.args[0],[command,str(self.root/'ai')])
+        with patch('sys.platform','win32'),patch('os.startfile',create=True) as opened:
+            response=client.post('/api/archive?source=ai',json={},headers={'X-CSRF-Token':csrf})
+            self.assertEqual(response.status_code,200)
+            opened.assert_called_once_with(self.root/'ai')

@@ -1,4 +1,4 @@
-"""Read only a selected completed PDF from the Linux user's Downloads directory."""
+"""Read only a selected completed PDF from the desktop Downloads directory."""
 import os
 from pathlib import Path
 import shlex
@@ -9,7 +9,12 @@ from .documents import MAX_PDF_BYTES
 
 
 def download_directory():
+    configured = os.environ.get('MAILNOTES_DOWNLOAD_DIR')
+    if configured:
+        return Path(configured).expanduser().resolve()
     home = Path.home()
+    if sys.platform in ('win32', 'darwin'):
+        return (home / 'Downloads').resolve()
     config = Path(os.environ.get('XDG_CONFIG_HOME', home / '.config')) / 'user-dirs.dirs'
     try:
         for line in config.read_text(encoding='utf-8').splitlines():
@@ -27,7 +32,7 @@ def download_directory():
 
 
 def read_download(value):
-    if sys.platform != 'linux' or not isinstance(value, str) or len(value) > 4096:
+    if sys.platform not in ('linux', 'darwin', 'win32') or not isinstance(value, str) or len(value) > 4096:
         return None
     requested = Path(value)
     if not requested.is_absolute() or requested.suffix.lower() != '.pdf':
@@ -37,7 +42,7 @@ def read_download(value):
         path = requested.resolve(strict=True)
         if not path.is_relative_to(root) or path.suffix.lower() != '.pdf':
             return None
-        descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0) | getattr(os, 'O_NOFOLLOW', 0))
         with os.fdopen(descriptor, 'rb') as stream:
             info = os.fstat(stream.fileno())
             if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_PDF_BYTES:

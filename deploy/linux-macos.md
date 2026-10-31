@@ -1,8 +1,8 @@
-# Cùng một quy trình trên Linux và macOS
+# Cùng một quy trình trên Linux, Windows và macOS
 
-Linux, Mac Intel và Mac Apple Silicon dùng cùng mã xử lý, giao diện, tiện ích Chrome và định dạng dữ liệu. Đây là sự thống nhất quy trình; dữ liệu của các máy chưa tự đồng bộ qua Internet.
+Linux, Windows 10/11, Mac Intel và Mac Apple Silicon dùng cùng mã xử lý, giao diện, tiện ích Chrome và định dạng dữ liệu. Đây là sự thống nhất quy trình; dữ liệu của các máy chưa tự đồng bộ qua Internet.
 
-| Bước | Linux và macOS |
+| Bước | Linux, Windows và macOS |
 | --- | --- |
 | Mở tool | Bấm ứng dụng Sổ ghi chép, tool mở giao diện quản trị. |
 | Cài AI | Lưu GreenNode / VNG Cloud API key, kiểm tra model và nhóm. Cấu hình gửi dữ liệu được bật sẵn cho nhà cung cấp này. |
@@ -14,25 +14,25 @@ Linux, Mac Intel và Mac Apple Silicon dùng cùng mã xử lý, giao diện, ti
 | Sửa nhóm | Sửa trong sổ, bản Markdown theo nhóm cập nhật theo, không gọi AI lại. |
 | Tắt | Bấm Tắt tool. Đóng tab không tắt dịch vụ; máy ngủ hoặc tắt thì việc xử lý ngừng. |
 
-Gmail API vẫn là nguồn riêng có thể kiểm tra theo lịch đã lưu trên cả hai hệ điều hành. Tiện ích xử lý thủ công tối đa 20 thư đang hiện; khi bật lịch, tiện ích quét ngay rồi chạy mỗi 30 phút, tối đa 100 thư mỗi trang và 20 trang mỗi lượt.
+Gmail API vẫn là nguồn riêng có thể kiểm tra theo lịch đã lưu trên cả ba hệ điều hành. Tiện ích xử lý thủ công tối đa 20 thư đang hiện; khi bật lịch, tiện ích quét ngay rồi chạy mỗi 30 phút, tối đa 100 thư mỗi trang và 20 trang mỗi lượt.
 
 ## Khác biệt do hệ điều hành
 
-| Hạng mục | Linux | macOS |
-| --- | --- | --- |
-| App đóng gói | SoGhiChep-Linux-x86_64 | SoGhiChep-macOS-Intel hoặc SoGhiChep-macOS-AppleSilicon |
-| Dữ liệu app mặc định | `~/.local/share/so-ghi-chep/` hoặc XDG_DATA_HOME | `~/Library/Application Support/SoGhiChep/` |
-| Mở thư mục | Trình quản lý file mặc định qua xdg-open | Finder qua open |
-| Mã nguồn đã cài .venv | Mo-So-Ghi-Chep.sh | Mo-So-Ghi-Chep.command |
+| Hạng mục | Linux | Windows | macOS |
+| --- | --- | --- | --- |
+| App đóng gói | SoGhiChep-Linux-x86_64 | SoGhiChep-Windows-x86_64 | SoGhiChep-macOS-Intel hoặc SoGhiChep-macOS-AppleSilicon |
+| Dữ liệu app mặc định | `~/.local/share/so-ghi-chep/` hoặc XDG_DATA_HOME | `%LOCALAPPDATA%\SoGhiChep` | `~/Library/Application Support/SoGhiChep/` |
+| Mở thư mục | Trình quản lý file qua xdg-open | File Explorer | Finder qua open |
+| Mã nguồn đã cài .venv | Mo-So-Ghi-Chep.sh | Ưu tiên app `.exe` | Mo-So-Ghi-Chep.command |
 
-Bản mã nguồn dùng `.local/` trong thư mục repository trên cả hai hệ điều hành. Mọi nguồn có cấu trúc giống nhau: `ai/`, `gmail/`, `pdf/`, `folder/`; bên trong có `files/`, `Markdown/`, `Theo-nhom/`, `Can-xem-lai/` và SQLite. Thay app không thay dữ liệu. Mã ghép nối và địa chỉ/cổng được cấu hình riêng cho từng máy. Dùng Chrome cho tiện ích; Safari/Firefox chưa được hỗ trợ.
+Bản mã nguồn dùng `.local/` trong thư mục repository. Mọi nguồn có cấu trúc giống nhau: `ai/`, `gmail/`, `pdf/`, `folder/`; bên trong có `files/`, `Markdown/`, `Theo-nhom/`, `Can-xem-lai/` và SQLite. Thay app không thay dữ liệu. Mã ghép nối và địa chỉ/cổng được cấu hình riêng cho từng máy. Dùng Chrome cho tiện ích; Safari/Firefox chưa được hỗ trợ.
 
 Mac app thử nghiệm chưa ký Developer ID/notarize nên có thể cần người dùng xác nhận trong Privacy & Security theo cơ chế của macOS. Không tắt Gatekeeper. Phải chọn bản theo chip và kiểm tra trên phiên bản macOS thực tế của khách.
 
 ## Xác nhận tính đồng nhất
 
-CI dùng cùng bộ kiểm thử trên Ubuntu, Mac Intel và Apple Silicon. Sau khi build, mỗi job khởi động chính app đã đóng gói với dữ liệu tạm, kiểm tra đăng nhập, PDF chữ → Markdown/nhóm, PDF scan → Cần xem lại và ZIP tiện ích. Phép thử không gọi GreenNode thật, không đăng nhập Gmail khách và không mở Finder/file manager. Các bước đó vẫn cần kiểm chứng trên máy khách với quyền truy cập hợp lệ. Không coi cấu hình CI là kết quả CI đã thành công.
+CI dùng cùng bộ kiểm thử trên Ubuntu, Windows, Mac Intel và Apple Silicon. Sau khi build, mỗi job khởi động chính app đã đóng gói với dữ liệu tạm, kiểm tra đăng nhập, PDF chữ → Markdown/nhóm, PDF scan → Cần xem lại và ZIP tiện ích. Phép thử không gọi GreenNode thật, không đăng nhập Gmail khách và không mở trình quản lý file. Các bước đó vẫn cần kiểm chứng trên máy khách với quyền truy cập hợp lệ. Không coi cấu hình CI là kết quả CI đã thành công.
 
 ## Phương án tải PDF thủ công
 
-Trên cả Linux và macOS, trang **Cài đặt → Thư mục nhận PDF thủ công** hiển thị đường dẫn `Downloads/So-Ghi-Chep-Inbox` của người dùng đang chạy tool. Khách tải PDF vào đây khi connector website không hoạt động. Có thể quét ngay hoặc bật quét theo chu kỳ. Giữ Chrome tải file hoàn tất trước khi quét; các file `.crdownload`, symlink, PDF đang thay đổi, quá dung lượng hoặc sai định dạng không được nhập. PDF đã xử lý được chuyển vào thư mục con `Da-xu-ly`.
+Trên cả ba hệ điều hành, trang **Cài đặt → Thư mục nhận PDF thủ công** hiển thị đường dẫn `Downloads/So-Ghi-Chep-Inbox` của người dùng đang chạy tool. Khách tải PDF vào đây khi connector website không hoạt động. Có thể quét ngay hoặc bật quét theo chu kỳ. Giữ Chrome tải file hoàn tất trước khi quét; các file `.crdownload`, symlink, PDF đang thay đổi, quá dung lượng hoặc sai định dạng không được nhập. PDF đã xử lý được chuyển vào thư mục con `Da-xu-ly`.
