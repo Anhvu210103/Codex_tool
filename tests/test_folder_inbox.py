@@ -93,6 +93,9 @@ class FolderInboxTests(unittest.TestCase):
                 for _ in range(150):
                     if admin.notes('folder')['total'] == 1:break
                     time.sleep(.02)
+                for _ in range(150):
+                    if not admin.status()['folder_inbox']['running']:break
+                    time.sleep(.02)
                 admin.stop.set();admin.scheduler.join(timeout=2)
             self.assertEqual(admin.notes('folder')['total'],1)
             self.assertFalse(pdf.exists())

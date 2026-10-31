@@ -31,7 +31,8 @@ def data_directory():
     if sys.platform == 'darwin':
         return Path.home() / 'Library/Application Support/SoGhiChep'
     if sys.platform == 'win32':
-        return Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData/Local')) / 'SoGhiChep'
+        local = os.environ.get('LOCALAPPDATA')
+        return Path(local) / 'SoGhiChep' if local else Path.home() / 'AppData/Local/SoGhiChep'
     return Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share')) / 'so-ghi-chep'
 
 
