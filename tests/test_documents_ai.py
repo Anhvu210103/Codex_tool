@@ -169,7 +169,7 @@ class DocumentAITests(unittest.TestCase):
         headers={'X-CSRF-Token':setup.get_json()['csrf']}
         blocked=client.post('/api/pdf',data={'file':(io.BytesIO(sample_pdf()),'report.pdf')},headers=headers)
         self.assertEqual(blocked.status_code,400)
-        self.assertIn('đồng ý',blocked.get_json()['error'])
+        self.assertIn('API key',blocked.get_json()['error'])
         settings=client.get('/api/settings').get_json()
         settings['classification_mode']='rules';settings['summary']['mode']='extractive'
         self.assertEqual(client.post('/api/settings',json=settings,headers=headers).status_code,200)

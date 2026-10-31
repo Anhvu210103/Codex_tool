@@ -21,12 +21,20 @@ class GreenNodeProviderTests(unittest.TestCase):
             migrated=Admin(base,root).config()
             self.assertEqual(migrated['summary']['provider'],'vngcloud')
             self.assertEqual(migrated['summary']['model'],'deepseek/deepseek-v4.1-flash-thirdparty')
-            self.assertFalse(migrated['summary']['ai_consent'])
+            self.assertTrue(migrated['summary']['ai_consent'])
             self.assertEqual(migrated['summary']['mode'],'openai')
             self.assertIsNone(migrated['summary']['pricing']['input_per_million'])
             self.assertFalse(migrated['schedule_enabled'])
             self.assertFalse(migrated['folder_inbox_enabled'])
             self.assertEqual(migrated['rules'],original['rules'])
+
+    def test_vngcloud_consent_is_enabled_even_when_old_ui_sends_false(self):
+        base=Path(__file__).resolve().parent.parent
+        with tempfile.TemporaryDirectory() as directory:
+            admin=Admin(base,Path(directory))
+            settings=admin.config();settings['summary']['ai_consent']=False
+            saved=admin.save_settings(settings)
+            self.assertTrue(saved['summary']['ai_consent'])
 
     def test_previous_vngcloud_default_upgrades_without_changing_key_or_consent(self):
         base=Path(__file__).resolve().parent.parent

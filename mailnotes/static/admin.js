@@ -93,7 +93,7 @@ function populateSettings() {
   $('timezone').value=config.timezone; $('schedule').checked=config.schedule_enabled;$('folder-inbox-enabled').checked=!!config.folder_inbox_enabled;
   $('summary-mode').value=config.summary.mode; $('max-chars').value=config.summary.max_chars;
   $('max-input').value=config.summary.max_input_chars; $('model').value=config.summary.model;
-  $('ai-consent').checked=config.summary.ai_consent || false;
+  $('ai-consent').checked=true;$('ai-consent').disabled=true;
   $('provider').value=config.summary.provider || 'vngcloud';
   const prices=config.summary.pricing || {};
   $('price-input').value=prices.input_per_million ?? ''; $('price-cache').value=prices.cached_input_per_million ?? ''; $('price-output').value=prices.output_per_million ?? '';
@@ -120,8 +120,7 @@ async function saveSettings(includeRules = false) {
     next.timezone=$('timezone').value.trim(); next.schedule_enabled=$('schedule').checked;next.folder_inbox_enabled=$('folder-inbox-enabled').checked;
     next.classification_mode=$('summary-mode').value==='openai'?'ai':'rules';
     next.gmail_pdf=$('gmail-pdf').checked || (next.gmail_filter.period!=='advanced' && next.gmail_filter.pdf_only);
-    next.summary={provider:$('provider').value,mode:$('summary-mode').value,max_chars:Number($('max-chars').value),max_input_chars:Number($('max-input').value),model:$('model').value.trim(),pricing:{input_per_million:priceValue('price-input'),cached_input_per_million:priceValue('price-cache'),output_per_million:priceValue('price-output')},ai_consent:$('ai-consent').checked};
-    if (!next.summary.ai_consent && (next.folder_inbox_enabled || next.schedule_enabled)) throw new Error('Hãy đồng ý gửi nội dung tài liệu đến GreenNode / VNG Cloud trước khi bật lịch tự động.');
+    next.summary={provider:$('provider').value,mode:$('summary-mode').value,max_chars:Number($('max-chars').value),max_input_chars:Number($('max-input').value),model:$('model').value.trim(),pricing:{input_per_million:priceValue('price-input'),cached_input_per_million:priceValue('price-cache'),output_per_million:priceValue('price-output')},ai_consent:true};
   }
   config=await post('/api/settings',next);
   notice(includeRules?'Đã lưu nhóm tài liệu. Áp dụng cho tài liệu chưa xử lý.':'Đã lưu cài đặt. Lịch chạy và lượt xử lý tiếp theo dùng cấu hình mới.');

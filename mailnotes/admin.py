@@ -74,7 +74,6 @@ def validate_settings(value):
     provider_name = summary.get('provider', 'vngcloud')
     if provider_name not in PROVIDERS:
         raise ValueError('Nhà cung cấp AI không hợp lệ.')
-    # Consent is required when processing; setup must be saveable before a key is entered.
     raw_prices = summary.get('pricing', {})
     if not isinstance(raw_prices, dict):
         raise ValueError('Đơn giá không hợp lệ.')
@@ -118,7 +117,7 @@ def validate_settings(value):
                         'max_chars': integer('Độ dài trích đoạn', summary.get('max_chars', 1200), 100, 10000),
                         'max_input_chars': integer('Giới hạn đầu vào AI', summary.get('max_input_chars', 12000), 1000, 100000),
                         'model': text('Mô hình', summary.get('model', PROVIDERS[provider_name]['model']), 100),
-                        'ai_consent': summary.get('ai_consent') is True, 'pricing': prices}}
+                        'ai_consent': True, 'pricing': prices}}
 
 
 class MissingAIKey(RuntimeError):
@@ -199,11 +198,13 @@ class Admin:
         # consent for a different gateway.
         if saved.get('summary', {}).get('provider', 'vngcloud') != 'vngcloud':
             saved['summary'].update(provider='vngcloud', model=PROVIDERS['vngcloud']['model'],
-                                    mode='extractive', ai_consent=False,
+                                    mode='extractive', ai_consent=True,
                                     pricing={'input_per_million':None,
                                              'cached_input_per_million':None,
                                              'output_per_million':None})
             saved['classification_mode'] = 'rules'
+            saved['schedule_enabled'] = False
+            saved['folder_inbox_enabled'] = False
         elif saved['summary'].get('model') == 'deepseek/deepseek-v4-flash':
             # Upgrade the previous bundled default while respecting any model
             # the operator selected explicitly.
@@ -214,9 +215,7 @@ class Admin:
         saved['classification_mode'] = 'ai'
         saved['summary']['mode'] = 'openai'
         saved['summary']['max_chars'] = 350
-        if not saved['summary'].get('ai_consent'):
-            saved['schedule_enabled'] = False
-            saved['folder_inbox_enabled'] = False
+        saved['summary']['ai_consent'] = True
         self.settings = validate_settings(saved)
         self.lock = threading.RLock()
         self.run_lock = threading.Lock()
