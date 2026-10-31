@@ -11,7 +11,7 @@ from pypdf import PdfWriter
 from pypdf.generic import DictionaryObject, NameObject, DecodedStreamObject
 
 from mailnotes.core import process
-from mailnotes.documents import pdf_text, pdf_message
+from mailnotes.documents import pdf_text, pdf_message, normalize_document_text, broken_text_layer
 from mailnotes.gmail import messages
 from mailnotes.web import create_app
 
@@ -99,6 +99,14 @@ class DocumentAITests(unittest.TestCase):
         with patch('mailnotes.core.request_json',side_effect=AssertionError('must not send blank scan to AI')):
             self.assertEqual(process([scan],self.config,'pdf'),1)
         self.assertTrue((self.root/'files'/ (document['file_hash']+'.pdf')).exists())
+
+    def test_vietnamese_unicode_spacing_and_broken_font_detection(self):
+        self.assertEqual(normalize_document_text('  Công\u00a0văn  \r\n\r\n  nội   dung  '),'Công văn\n\nnội dung')
+        damaged=('T r ong kỷ nguy ên AI, t ốc độ thự c thi v à hiệu quả v ận hành '
+                 'đang tr ở thành lợi thế cạnh tr anh quan tr ọng của mọi doanh nghiệp. '
+                 'T uy nhiên, việc sử dụng nhiều công cụ riêng lẻ cho tr ao đổi và quản lý công việc.')
+        self.assertTrue(broken_text_layer(damaged))
+        self.assertFalse(broken_text_layer('Trong kỷ nguyên AI, tốc độ thực thi và hiệu quả vận hành giúp doanh nghiệp quản lý công việc rõ ràng hơn. ' * 3))
 
     def test_scan_uses_deepseek_ocr_before_classification(self):
         config=dict(self.config);config['pdf_ocr']=True;config['summary']={**config['summary'],'ai_consent':True}
