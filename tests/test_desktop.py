@@ -12,7 +12,7 @@ from mailnotes.web import create_app
 
 class DesktopTests(unittest.TestCase):
     def setUp(self):
-        self.temporary=tempfile.TemporaryDirectory();self.root=Path(self.temporary.name)
+        self.temporary=tempfile.TemporaryDirectory();self.root=Path(self.temporary.name).resolve()
 
     def tearDown(self):self.temporary.cleanup()
 

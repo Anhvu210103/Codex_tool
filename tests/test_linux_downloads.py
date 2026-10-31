@@ -28,7 +28,7 @@ class LinuxDownloadTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             home=Path(directory);(home/'.config').mkdir()
             (home/'.config/user-dirs.dirs').write_text('XDG_DOWNLOAD_DIR="$HOME/My downloads"\n')
-            with patch('pathlib.Path.home',return_value=home),patch.dict('os.environ',{'XDG_CONFIG_HOME':str(home/'.config')}):
+            with patch('sys.platform','linux'),patch('pathlib.Path.home',return_value=home),patch.dict('os.environ',{'XDG_CONFIG_HOME':str(home/'.config')}):
                 self.assertEqual(download_directory(),(home/'My downloads').resolve())
 
     def test_windows_and_macos_use_the_desktop_download_folder(self):

@@ -29,7 +29,7 @@ def pdf(text=None, mixed=False):
 
 class MarkdownArchiveTests(unittest.TestCase):
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name)
+        self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name).resolve()
         self.admin=Admin(Path(__file__).resolve().parent.parent,self.root)
         config=self.admin.config();config['rules']=[{'category':name,'description':'Test','keywords':[]} for name in ('Kinh tế','Ngân sách')]
         config['classification_mode']='ai';config['summary'].update(mode='openai',ai_consent=True)

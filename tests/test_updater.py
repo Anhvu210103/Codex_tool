@@ -92,6 +92,9 @@ class UpdateWebTests(unittest.TestCase):
             headers={'X-CSRF-Token':csrf}
             self.assertEqual(client.post('/api/desktop/update',json={},headers=headers).status_code,400)
             app.extensions['desktop_shutdown']=lambda:None
+            if not updater.sys.platform.startswith('linux'):
+                self.assertEqual(client.post('/api/desktop/update',json={},headers=headers).status_code,400)
+                return
             with app.extensions['admin'].run_lock:
                 self.assertEqual(client.post('/api/desktop/update',json={},headers=headers).status_code,409)
             with patch('mailnotes.web.subprocess.Popen') as launch:
