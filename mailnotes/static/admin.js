@@ -173,6 +173,8 @@ async function loadNotes() {
   if($('archive-card')){$('archive-card').hidden=!info;if(info){$('archive-path').textContent=info.path;$('open-archive').hidden=!info.can_open;}}
   currentNotes=data;
   updateOptions($('notes-day'),data.days,'Tất cả ngày'); updateOptions($('notes-category'),data.categories,'Tất cả nhóm');
+  const table=$('notes-body').closest('table'),heading=table.querySelector('thead tr');
+  if(!heading.querySelector('[data-delete-column]')){const th=document.createElement('th');th.dataset.deleteColumn='yes';th.textContent='Thao tác';heading.append(th);}
   $('notes-body').replaceChildren(); $('notes-empty').hidden=data.notes.length>0;
   for (const note of data.notes) {
     const row=document.createElement('tr');
@@ -188,7 +190,9 @@ async function loadNotes() {
     const files=document.createElement('td');
     for(const item of note.local_pdf_paths||[]){const entry=document.createElement('div');entry.className='local-file';const group=document.createElement('small');group.textContent=item.category;const path=document.createElement('code');path.textContent=item.path;entry.append(group,path);files.append(entry);}
     if(!files.childNodes.length && note.original_pdf_path){const group=document.createElement('small');group.textContent='PDF gốc';const path=document.createElement('code');path.textContent=note.original_pdf_path;files.append(group,path);}
-    row.append(time,title,categories,content,source,files);$('notes-body').append(row);
+    const actions=document.createElement('td');const remove=document.createElement('button');remove.className='quiet danger';remove.textContent='Xóa';
+    remove.addEventListener('click',async()=>{if(!confirm('Xóa tài liệu này khỏi sổ và các thư mục phân loại?'))return;remove.disabled=true;try{await post('/api/notes/delete',{source:note.source,id:note.id});notice('Đã xóa tài liệu. Nếu đây là nguồn AI thao tác, tiện ích sẽ tự cập nhật lịch sử ở lượt quét sau.');await loadNotes();}catch(error){notice(error.message,true);remove.disabled=false;}});actions.append(remove);
+    row.append(time,title,categories,content,source,files,actions);$('notes-body').append(row);
   }
   $('notes-count').textContent=(data.total>500?'Hiển thị 500 / ':'')+data.total+' ghi chép';
   $('export').disabled=!$('notes-day').value;
@@ -212,6 +216,7 @@ async function boot() {
     $('auth-form').dataset.setup=info.needs_setup?'yes':'no';return;
   }
   for(const id of ['notes-source','dashboard-source']){const select=$(id);if(select&&!select.querySelector('option[value="folder"]')){const option=document.createElement('option');option.value='folder';option.textContent='Thư mục nhận PDF';select.append(option);}}
+  if(!$('clear-notes')){const button=document.createElement('button');button.id='clear-notes';button.className='quiet danger';button.textContent='Xóa tài liệu nguồn này';$('notebook').querySelector('.page-heading').append(button);button.addEventListener('click',async()=>{const source=$('notes-source').value,label=$('notes-source').selectedOptions[0]?.textContent||source;if(!confirm('Xóa TOÀN BỘ tài liệu của nguồn “'+label+'”? Các file PDF, Markdown và lịch sử nhận diện trùng của nguồn này sẽ được đặt lại.'))return;button.disabled=true;try{const result=await post('/api/notes/clear',{source});notice('Đã xóa '+result.deleted+' tài liệu. Tiện ích Gmail sẽ đọc lại chúng như tài liệu mới ở lượt sau.');await loadNotes();}catch(error){notice(error.message,true);}finally{button.disabled=false;}});}
   config=await api('/api/settings'); populateSettings(); simplifySettings();
   const inbox=await api('/api/folder-inbox');$('folder-inbox-path').textContent=inbox.path;$('open-folder-inbox').disabled=!inbox.can_open;$('overview-folder').disabled=!inbox.can_open;
   const selectedSource=initialSource();

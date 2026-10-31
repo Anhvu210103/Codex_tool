@@ -109,3 +109,19 @@ class ExtensionTests(unittest.TestCase):
         self.assertEqual(result.get_json()['source'],'ai')
         self.assertEqual(result.get_json()['categories'],['Cần xem lại'])
         self.assertEqual(self.client.get('/api/notes?source=ai').get_json()['total'],1)
+
+    def test_delete_and_clear_ai_documents_reset_extension_history(self):
+        writer=PdfWriter();writer.add_blank_page(width=600,height=800);pdf=io.BytesIO();writer.write(pdf);data=pdf.getvalue()
+        first=self.client.post('/extension/pdf',data={'file':(io.BytesIO(data),'one.pdf')},headers=self.headers)
+        self.assertEqual(first.status_code,200)
+        note=self.client.get('/api/notes?source=ai').get_json()['notes'][0]
+        generation=self.client.post('/extension/ping',json={},headers=self.headers).get_json()['history_generation']
+        deleted=self.client.post('/api/notes/delete',json={'source':'ai','id':note['id']},headers={'X-CSRF-Token':self.csrf})
+        self.assertEqual(deleted.get_json()['deleted'],1)
+        self.assertEqual(self.client.get('/api/notes?source=ai').get_json()['total'],0)
+        self.assertGreater(self.client.post('/extension/ping',json={},headers=self.headers).get_json()['history_generation'],generation)
+        again=self.client.post('/extension/pdf',data={'file':(io.BytesIO(data),'one.pdf')},headers=self.headers)
+        self.assertEqual(again.get_json()['added'],1)
+        cleared=self.client.post('/api/notes/clear',json={'source':'ai'},headers={'X-CSRF-Token':self.csrf})
+        self.assertEqual(cleared.get_json()['deleted'],1)
+        self.assertEqual(self.client.get('/api/notes?source=ai').get_json()['total'],0)

@@ -104,20 +104,22 @@ function directDownloadControl(node,name) {
  // .aZo is one Gmail attachment card. Fall back to .aQH for layouts where
  // Gmail wraps the card differently, but never search the whole message.
  const card=node.closest('.aZo')||node.closest('.aQH');
- if(!card)return null;
- revealTile(card);
- const candidates=[];
- for(const item of card.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"],a')){
+ if(card)revealTile(card);
+ const candidates=new Map();
+ const scope=card||document;
+ for(const item of scope.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"],a')){
   const names=[item.getAttribute('aria-label'),item.getAttribute('data-tooltip'),item.getAttribute('title'),item.innerText].map(clean);
   if(!names.some(value=>downloadName.test(value))||names.some(value=>/drive|tất cả|all attachments/i.test(value)))continue;
+  if(!card&&!names.some(value=>value.normalize('NFC').includes(clean(name).normalize('NFC'))))continue;
   const button=item.closest('button,[role="button"],a,[tabindex="0"]')||item;
-  if(visible(button)&&!downloadButtonDisabled(button))candidates.push(button);
+  if(visible(button)&&!downloadButtonDisabled(button))candidates.set(button,[...(candidates.get(button)||[]),...names]);
  }
- const unique=[...new Set(candidates)];
+ const unique=[...candidates.keys()];
  if(unique.length===1)return unique[0];
  // When Gmail exposes more than one card action, require the filename in its
  // accessible label so the tool cannot download a neighbouring attachment.
- const named=unique.filter(button=>label(button).normalize('NFC').includes(clean(name).normalize('NFC')));
+ const expected=clean(name).normalize('NFC');
+ const named=unique.filter(button=>candidates.get(button).some(value=>value.normalize('NFC').includes(expected)));
  return named.length===1?named[0]:null;
 }
 async function readyDirectDownload(node,name,cancelled) {
@@ -220,7 +222,7 @@ async function waitDownload(cancelled) {
   const state = await send({type:'download-state'});
   if (state.error) throw Error(state.error);
   if (state.result) return state.result;
-  if (!state.downloadId && Date.now()-started>=12000) throw Error('Chrome chưa bắt đầu tải PDF sau 12 giây. Mở Báo cáo lần chạy để xem nút đã bấm và phản hồi của Chrome.');
+  if (!state.downloadId && Date.now()-started>=30000) throw Error('Chrome chưa bắt đầu tải PDF sau 30 giây. Mở Báo cáo lần chạy để xem nút đã bấm và phản hồi của Chrome.');
   await pause(500);
  }
  throw Error('Chưa nhận được PDF từ Chrome trong 2 phút.');
@@ -260,8 +262,8 @@ async function clickAndWaitDownload(button,cancelled,mail,file) {
    await pause(3200);
    const state=await send({type:'download-state'});
    if(state.error)throw Error(state.error);
-   if(state.result){await trace('tai-den-tre',mail,file,'Chrome bắt đầu tải sau 12 giây');return state.result;}
-   if(state.downloadId){await trace('tai-den-tre',mail,file,'Chrome đang tải sau 12 giây');return await waitDownload(cancelled);}
+   if(state.result){await trace('tai-den-tre',mail,file,'Chrome bắt đầu tải sau thời gian chờ đầu tiên');return state.result;}
+   if(state.downloadId){await trace('tai-den-tre',mail,file,'Chrome đang tải sau thời gian chờ đầu tiên');return await waitDownload(cancelled);}
    if(!viewerOpen())throw Error('Trình xem PDF đã đóng trước khi thử tải lại.');
    button=await readyDownload(cancelled,mail,file);
    if(!button)throw Error('Nút tải PDF chưa sẵn sàng để thử lại.');

@@ -54,6 +54,23 @@ def classified_pdf_paths(root, identifier, title, categories, digest):
             for category in dict.fromkeys(categories)]
 
 
+def remove_document_export(root, identifier):
+    root = Path(root).resolve()
+    key = hashlib.sha256(identifier.encode()).hexdigest()
+    manifest = root / 'exports' / (key + '.json')
+    try:
+        exported = json.loads(manifest.read_text(encoding='utf-8')) if manifest.is_file() else []
+    except (OSError, ValueError, TypeError):
+        exported = []
+    for relative in exported if isinstance(exported, list) else []:
+        candidate = root / str(relative)
+        if (candidate.resolve().is_relative_to(root)
+                and Path(relative).parts and Path(relative).parts[0] in ('Theo-nhom', 'Can-xem-lai')
+                and candidate.is_file()):
+            candidate.unlink()
+    manifest.unlink(missing_ok=True)
+
+
 def copy_private_pdf(source, root, relative):
     root = Path(root).resolve()
     target = root / relative

@@ -259,7 +259,8 @@ def create_app(base=None, data_root=None, public_url=None):
     def extension_ping():
         import sys
         return jsonify(app='mailnotes-extension', protocol=1,
-                       capabilities=['linux-local-pdf'] if sys.platform == 'linux' else [])
+                       capabilities=['linux-local-pdf'] if sys.platform == 'linux' else [],
+                       history_generation=read_json(admin.private / 'extension-history.json', {'generation': 0}).get('generation', 0))
 
     @app.post('/extension/automation-state')
     def extension_automation_state():
@@ -450,6 +451,15 @@ def create_app(base=None, data_root=None, public_url=None):
         data = payload()
         admin.edit_categories(data.get('source'), data.get('id'), data.get('categories'))
         return jsonify(ok=True)
+
+    @app.post('/api/notes/delete')
+    def delete_note():
+        data = payload()
+        return jsonify(deleted=admin.delete_note(data.get('source'), data.get('id')))
+
+    @app.post('/api/notes/clear')
+    def clear_notes():
+        return jsonify(deleted=admin.clear_documents(payload().get('source')))
 
     @app.get('/api/document')
     def document():

@@ -9,6 +9,7 @@ import json
 import math
 import os
 import secrets
+import shutil
 import sqlite3
 import threading
 import time
@@ -422,6 +423,71 @@ class Admin:
                 render_notes(connection, database.parent / 'notebooks', self.config()['timezone'])
                 from .archive import render_archive
                 render_archive(connection, database.parent)
+
+    def _reset_extension_history(self):
+        path = self.private / 'extension-history.json'
+        generation = int(read_json(path, {'generation': 0}).get('generation', 0)) + 1
+        private_json(path, {'generation': generation})
+        return generation
+
+    def delete_note(self, source, identifier):
+        if source not in ('gmail', 'pdf', 'ai', 'folder') or not isinstance(identifier, str) or len(identifier) > 300:
+            raise ValueError('Tài liệu cần xóa không hợp lệ.')
+        if not self.run_lock.acquire(blocking=False):
+            raise ValueError('Đang xử lý tài liệu. Chờ hoàn tất rồi xóa.')
+        try:
+            database = self.root / source / 'notes.sqlite3'
+            if not database.exists():
+                raise ValueError('Không tìm thấy tài liệu.')
+            root = database.parent
+            with connect(database) as connection:
+                ensure_schema(connection)
+                row = connection.execute('SELECT file_hash FROM notes WHERE id=?', (identifier,)).fetchone()
+                if not row:
+                    raise ValueError('Không tìm thấy tài liệu.')
+                digest = row[0]
+                connection.execute('DELETE FROM notes WHERE id=?', (identifier,))
+                still_used = bool(digest and connection.execute('SELECT 1 FROM notes WHERE file_hash=? LIMIT 1', (digest,)).fetchone())
+                connection.commit()
+                from .archive import remove_document_export, render_archive
+                remove_document_export(root, identifier)
+                if digest and not still_used:
+                    (root / 'files' / (digest + '.pdf')).unlink(missing_ok=True)
+                    (root / 'Markdown' / (digest + '.md')).unlink(missing_ok=True)
+                shutil.rmtree(root / 'notebooks', ignore_errors=True)
+                render_notes(connection, root / 'notebooks', self.config()['timezone'])
+                render_archive(connection, root)
+            if source == 'ai':
+                self._reset_extension_history()
+            return 1
+        finally:
+            self.run_lock.release()
+
+    def clear_documents(self, source):
+        if source not in ('gmail', 'pdf', 'ai', 'folder'):
+            raise ValueError('Nguồn tài liệu không hợp lệ.')
+        if not self.run_lock.acquire(blocking=False):
+            raise ValueError('Đang xử lý tài liệu. Chờ hoàn tất rồi xóa.')
+        try:
+            root = self.root / source
+            database = root / 'notes.sqlite3'
+            removed = 0
+            if database.exists():
+                with connect(database) as connection:
+                    ensure_schema(connection)
+                    removed = connection.execute('SELECT COUNT(*) FROM notes').fetchone()[0]
+                    connection.execute('DELETE FROM notes')
+                    if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ai_cache'").fetchone():
+                        connection.execute('DELETE FROM ai_cache')
+                    connection.commit()
+            for name in ('files', 'Markdown', 'Theo-nhom', 'Can-xem-lai', 'exports', 'notebooks'):
+                shutil.rmtree(root / name, ignore_errors=True)
+            (root / 'notebooks').mkdir(parents=True, exist_ok=True, mode=0o700)
+            if source == 'ai':
+                self._reset_extension_history()
+            return removed
+        finally:
+            self.run_lock.release()
 
     def start_run(self, source=None):
         if not self.run_lock.acquire(blocking=False):
