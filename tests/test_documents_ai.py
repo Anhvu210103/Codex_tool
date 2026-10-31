@@ -12,6 +12,7 @@ from pypdf import PdfWriter
 from pypdf.generic import DictionaryObject, NameObject, DecodedStreamObject
 
 from mailnotes.core import process
+from mailnotes.database import connect
 from mailnotes.documents import pdf_text, pdf_message, normalize_document_text, broken_text_layer
 from mailnotes.gmail import messages
 from mailnotes.web import create_app
@@ -46,7 +47,7 @@ class DocumentAITests(unittest.TestCase):
         self.temporary.cleanup()
 
     def row(self):
-        with sqlite3.connect(self.root/'notes.sqlite3') as connection:
+        with connect(self.root/'notes.sqlite3') as connection:
             return connection.execute('SELECT categories,summary,review_reason FROM notes ORDER BY id').fetchone()
 
     def test_single_ai_call_returns_multiple_groups_summary_and_cache(self):
@@ -67,7 +68,7 @@ class DocumentAITests(unittest.TestCase):
                 config={**self.config,'data_dir':directory}
                 with patch('mailnotes.core.request_json',return_value=result):
                     process([self.mail],config,'gmail')
-                with sqlite3.connect(Path(directory)/'notes.sqlite3') as connection:
+                with connect(Path(directory)/'notes.sqlite3') as connection:
                     groups=json.loads(connection.execute('SELECT categories FROM notes').fetchone()[0])
                 self.assertEqual(groups,['Cần xem lại'])
 
@@ -167,12 +168,12 @@ class DocumentAITests(unittest.TestCase):
             self.assertEqual(request.call_count-calls,2) # list + details, no PDF download
 
     def test_legacy_schema_migration_preserves_old_notes(self):
-        with sqlite3.connect(self.root/'notes.sqlite3') as connection:
+        with connect(self.root/'notes.sqlite3') as connection:
             connection.execute('CREATE TABLE notes (id TEXT PRIMARY KEY, sender TEXT, subject TEXT, categories TEXT, summary TEXT, received_at TEXT, day TEXT, source TEXT, content_hash TEXT)')
             connection.execute('INSERT INTO notes VALUES (?,?,?,?,?,?,?,?,?)', ('gmail:old','sender','Old note','["Work"]','Saved summary',self.mail['received_at'],'2026-10-14','gmail','hash'))
         with patch('mailnotes.core.request_json',return_value=ai_result()):
             process([self.mail],self.config,'gmail')
-        with sqlite3.connect(self.root/'notes.sqlite3') as connection:
+        with connect(self.root/'notes.sqlite3') as connection:
             self.assertEqual(connection.execute('SELECT summary FROM notes WHERE id="gmail:old"').fetchone()[0],'Saved summary')
             self.assertEqual(connection.execute('SELECT COUNT(*) FROM notes').fetchone()[0],2)
 
@@ -185,7 +186,7 @@ class DocumentAITests(unittest.TestCase):
         with patch('mailnotes.core.request_json',return_value=ai_result(['New'])) as request:
             self.assertEqual(process([document],self.config,'pdf'),1)
             self.assertEqual(request.call_count,1)
-        with sqlite3.connect(self.root/'notes.sqlite3') as connection:
+        with connect(self.root/'notes.sqlite3') as connection:
             self.assertEqual(connection.execute('SELECT COUNT(*) FROM notes').fetchone()[0],1)
         self.assertEqual(json.loads(self.row()[0]),['New'])
 

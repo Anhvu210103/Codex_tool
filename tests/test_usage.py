@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from mailnotes.admin import Admin, private_json
 from mailnotes.core import process
+from mailnotes.database import connect
 from mailnotes.web import create_app
 from test_documents_ai import ai_result, sample_pdf
 
@@ -52,7 +53,7 @@ class UsageTests(unittest.TestCase):
             with self.assertRaises(ValueError):process([self.mail],self.config,'gmail')
         self.assertEqual(self.admin.usage()['totals']['total_tokens'],60)
         self.assertEqual(self.admin.usage()['totals']['api_calls'],2)
-        with sqlite3.connect(self.root/'gmail/notes.sqlite3') as connection:
+        with connect(self.root/'gmail/notes.sqlite3') as connection:
             self.assertEqual(connection.execute('SELECT COUNT(*) FROM notes').fetchone()[0],0)
 
     def test_gmail_reads_attachment_content_and_accounts_usage(self):

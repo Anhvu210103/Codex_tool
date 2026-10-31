@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from mailnotes.admin import Admin
+from mailnotes.database import connect
 from mailnotes.core import ensure_schema
 from mailnotes.usage import record_usage
 from mailnotes.web import create_app
@@ -21,7 +22,7 @@ class DashboardTests(unittest.TestCase):
 
     def test_counts_include_all_notes_review_updates_and_recent_bounded(self):
         directory=self.root/'pdf';directory.mkdir()
-        with sqlite3.connect(directory/'notes.sqlite3') as connection:
+        with connect(directory/'notes.sqlite3') as connection:
             ensure_schema(connection)
             for index in range(510):
                 categories=['Work','Cần xem lại'] if index%100==0 else ['Work']
@@ -41,7 +42,7 @@ class DashboardTests(unittest.TestCase):
         directory=self.root/'gmail';directory.mkdir()
         rates={'input_per_million':2,'cached_input_per_million':.2,'output_per_million':8}
         response={'usage':{'prompt_tokens':1000,'prompt_cache_hit_tokens':200,'completion_tokens':100,'total_tokens':1100}}
-        with sqlite3.connect(directory/'notes.sqlite3') as connection:
+        with connect(directory/'notes.sqlite3') as connection:
             ensure_schema(connection)
             for index,stamp in enumerate(['2026-10-13T16:59:59+00:00','2026-10-13T17:00:00+00:00','2026-10-14T17:00:00+00:00']):
                 record_usage(connection,response if index<2 else {},'deepseek','deepseek-chat',str(index),rates)

@@ -64,7 +64,7 @@ class MarkdownArchiveTests(unittest.TestCase):
             self.assertEqual({item['path'] for item in note['local_markdown_paths']},{str(path) for path in copies})
             notebook=next((self.root/'ai/notebooks').glob('*.md')).read_text()
             self.assertIn('Markdown trên máy',notebook)
-            self.assertIn(str(copies[0]).replace('_','\\_'),notebook)
+            self.assertIn(str(copies[0]).replace('\\','\\\\').replace('_','\\_'),notebook)
             self.admin.edit_categories('ai',note['id'],['Ngân sách'])
             self.assertEqual(len(list((self.root/'ai/Theo-nhom').rglob('*.md'))),1)
             self.assertEqual(len(list((self.root/'ai/Theo-nhom').rglob('*.pdf'))),0)
