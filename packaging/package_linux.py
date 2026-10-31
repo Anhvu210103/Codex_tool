@@ -29,11 +29,17 @@ def main():
     (appdir / 'SoGhiChep.desktop').write_text(
         '[Desktop Entry]\nType=Application\nName=Sổ ghi chép\n'
         'Comment=Đọc tài liệu, phân nhóm và ghi chép tự động\n'
-        'Exec=SoGhiChep\nIcon=SoGhiChep\nTerminal=false\nCategories=Office;\n',
+        'Exec=SoGhiChep\nIcon=SoGhiChep.svg\nTerminal=false\nCategories=Office;\n',
         encoding='utf-8')
+    shutil.copy2(ROOT / 'packaging' / 'SoGhiChep.svg', appdir / '.DirIcon')
     apprun = appdir / 'AppRun'
     apprun.write_text('#!/bin/sh\nHERE="$(dirname "$(readlink -f "$0")")"\nexec "$HERE/usr/bin/SoGhiChep" "$@"\n', encoding='utf-8')
     apprun.chmod(0o755)
+    # AppImage contents must remain readable when the build runner uses a
+    # restrictive umask (the hosted runner currently creates directories 0700).
+    for path in [appdir, *appdir.rglob('*')]:
+        mode = path.stat().st_mode
+        path.chmod(mode | 0o055 if path.is_dir() else mode | 0o044)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.unlink(missing_ok=True)
     environment = {**os.environ, 'ARCH':'x86_64', 'APPIMAGE_EXTRACT_AND_RUN':'1'}
