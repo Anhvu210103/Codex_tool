@@ -1,4 +1,4 @@
-# Tiện ích Sổ ghi chép Gmail — 0.8.8
+# Tiện ích Sổ ghi chép Gmail — 0.8.9
 
 Tiện ích tự bấm trên Gmail đang đăng nhập trong Chrome để tải PDF vào Sổ ghi chép. Giao diện dùng chữ 18px, nút tối thiểu 50px, trạng thái nằm đầu cửa sổ. Phiên bản luôn hiện ở đầu để kiểm tra đã nạp đúng bản mới.
 
@@ -21,7 +21,7 @@ Trạng thái đầu cửa sổ tóm tắt lượt đang chạy. Thông báo đ�
 
 ## Cập nhật bản đã cài
 
-Tải ZIP tiện ích mới trong Cài đặt của tool, giải nén vào thư mục cố định. Mở `chrome://extensions`, nạp đúng thư mục có `manifest.json` hoặc thay nội dung thư mục Chrome đang dùng rồi bấm **Reload**. Đầu popup phải hiện **v0.8.8**. Chỉ Reload một thư mục cũ trong Downloads không tải mã mới. Không cần tạo mã ghép nối lại nếu vẫn dùng cùng tiện ích và cùng tool; khi nạp thành một tiện ích mới thì ghép nối lại.
+Tải ZIP tiện ích mới trong Cài đặt của tool, giải nén vào thư mục cố định. Mở `chrome://extensions`, nạp đúng thư mục có `manifest.json` hoặc thay nội dung thư mục Chrome đang dùng rồi bấm **Reload**. Đầu popup phải hiện **v0.8.9**. Chỉ Reload một thư mục cũ trong Downloads không tải mã mới. Không cần tạo mã ghép nối lại nếu vẫn dùng cùng tiện ích và cùng tool; khi nạp thành một tiện ích mới thì ghép nối lại.
 
 ## Cơ chế và giới hạn
 
@@ -48,3 +48,5 @@ Bản 0.8.6 tự mở lại đúng email đang xử lý khi Gmail không đóng 
 Bản 0.8.7 nhận đúng nút tải theo tên file trong email có nhiều loại tệp, chờ Chrome lâu hơn với file phản hồi chậm và tự đặt lại lịch sử đã xử lý sau khi quản trị viên xóa tài liệu nguồn AI thao tác trong Sổ ghi chép.
 
 Bản 0.8.8 khôi phục cơ chế nhận diện nút tải trực tiếp đã chạy ổn định ở 0.8.6, đồng thời giữ thời gian chờ dài và cơ chế đặt lại lịch sử của 0.8.7.
+
+Bản 0.8.9 ẩn lớp phủ trình xem PDF như phương án cuối sau khi nút Đóng và phím Esc đều không phản hồi, để lượt quét tiếp tục mà không tải lại file đã lưu.

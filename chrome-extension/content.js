@@ -310,6 +310,16 @@ async function restoreMailAfterViewer(mailURL,listURL,cancelled,mail,file) {
  try{await closeViewer(cancelled,mail,file);if(!viewerOpen())return true;}
  catch(error){await trace('phuc-hoi-thu',mail,file,error.message+' · mở lại thư đang xử lý');}
  if(cancelled())return false;
+ const marker=viewerMarker();let overlay=null,node=marker;
+ while(node&&node!==document.body){
+  const r=node.getBoundingClientRect();
+  if(r.width>=innerWidth*.75&&r.height>=innerHeight*.65){overlay=node;break;}
+  node=node.parentElement;
+ }
+ if(overlay){
+  overlay.style.setProperty('display','none','important');overlay.setAttribute('aria-hidden','true');
+  if(await until(()=>!viewerOpen(),1500,cancelled)){await trace('an-trinh-xem',mail,file,'Gmail không đóng trình xem; đã ẩn lớp phủ để tiếp tục');return true;}
+ }
  let mailTarget,listTarget;
  try{mailTarget=new URL(mailURL);listTarget=new URL(listURL);}catch{return false;}
  if(mailTarget.origin!==location.origin||mailTarget.pathname!==location.pathname||!mailTarget.hash||!listTarget.hash||mailTarget.hash===listTarget.hash)return false;
