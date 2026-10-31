@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+import os
 import sqlite3
 import tempfile
 import unittest
@@ -214,5 +215,5 @@ class DocumentAITests(unittest.TestCase):
         self.assertEqual(invalid.status_code,400)
         private=app.extensions['admin'].private
         client.post('/api/ai-key',json={'provider':'deepseek','key':'test-deepseek-secret'},headers=headers)
-        self.assertEqual((private/'deepseek-key.json').stat().st_mode&0o777,0o600)
+        if os.name != 'nt':self.assertEqual((private/'deepseek-key.json').stat().st_mode&0o777,0o600)
         self.assertNotIn('test-deepseek-secret',client.get('/api/settings').get_data(as_text=True))

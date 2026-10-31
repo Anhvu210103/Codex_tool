@@ -50,7 +50,7 @@ class MarkdownArchiveTests(unittest.TestCase):
             sent=json.loads(api.call_args.kwargs['data']['messages'][1]['content'])['document']
             markdown=next((self.root/'ai/Markdown').glob('*.md'))
             self.assertEqual(sent,markdown.read_text().strip())
-            self.assertEqual(markdown.stat().st_mode&0o777,0o600)
+            if __import__('os').name != 'nt':self.assertEqual(markdown.stat().st_mode&0o777,0o600)
             copies=list((self.root/'ai/Theo-nhom').rglob('*.md'));self.assertEqual(len(copies),2)
             self.assertTrue(all(path.name=='report.md' for path in copies))
             self.assertEqual(list((self.root/'ai/Theo-nhom').rglob('*.pdf')),[])

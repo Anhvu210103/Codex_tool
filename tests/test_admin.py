@@ -124,7 +124,7 @@ class AdminTests(unittest.TestCase):
         config=self.admin.config();config['summary']['provider']='vngcloud';self.admin.save_settings(config)
         key='test-secret-do-not-return'
         self.assertEqual(self.post('/api/ai-key',{'key':key}).status_code,200)
-        self.assertEqual((self.admin.private/'vngcloud-key.json').stat().st_mode & 0o777,0o600)
+        if os.name != 'nt':self.assertEqual((self.admin.private/'vngcloud-key.json').stat().st_mode & 0o777,0o600)
         for path in ['/api/status','/api/settings','/api/gmail/info']:
             self.assertNotIn(key,self.client.get(path).get_data(as_text=True))
         self.assertTrue(self.client.get('/api/status').get_json()['ai_key_configured'])

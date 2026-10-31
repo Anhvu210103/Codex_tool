@@ -92,7 +92,7 @@ def render_archive(connection, root):
         categories = list(dict.fromkeys(json.loads(raw_groups)))
         markdown_paths = classified_markdown_paths(root, identifier, title, categories, digest)
         manifest = root / 'exports' / (key + '.json')
-        previous = json.loads(manifest.read_text()) if manifest.exists() else []
+        previous = json.loads(manifest.read_text(encoding='utf-8')) if manifest.exists() else []
         exported = []
         for category, markdown_output in zip(categories, markdown_paths):
             relative = markdown_output.relative_to(root)

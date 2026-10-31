@@ -21,6 +21,8 @@ permissions:
   contents: read
 jobs:
   build:
+    env:
+      PYTHONUTF8: '1'
     strategy:
       fail-fast: false
       matrix:

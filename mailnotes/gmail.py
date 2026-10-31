@@ -37,7 +37,7 @@ def save_token(path, token):
 
 
 def client_config(path):
-    data = json.loads(Path(path).read_text())
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
     client = data.get('installed') or data.get('web')
     if not isinstance(client, dict) or not client.get('client_id') or not client.get('client_secret'):
         raise ValueError('Invalid OAuth application credentials file')
@@ -89,7 +89,7 @@ def authorize(credentials, token_path):
 
 
 def access_token(credentials, token_path):
-    token = json.loads(Path(token_path).read_text())
+    token = json.loads(Path(token_path).read_text(encoding='utf-8'))
     if token.get('expires_at', 0) <= time.time() + 60:
         client = client_config(credentials)
         fresh = form_request('https://oauth2.googleapis.com/token', {

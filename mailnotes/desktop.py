@@ -47,7 +47,7 @@ def state_path(root):
 
 def running_instance(root):
     try:
-        state = json.loads(state_path(root).read_text())
+        state = json.loads(state_path(root).read_text(encoding='utf-8'))
         port = state['port']
         if type(port) is not int or not 1024 <= port <= 65535:
             return None
@@ -139,7 +139,7 @@ def serve(root):
             instance = secrets.token_urlsafe(24)
             # Bind before starting work. Reuse the previous port for OAuth callbacks.
             try:
-                preferred = json.loads(state_path(root).read_text())['port']
+                preferred = json.loads(state_path(root).read_text(encoding='utf-8'))['port']
             except (OSError, ValueError, KeyError):
                 preferred = 8080
             candidates = list(dict.fromkeys([preferred, *range(8080, 8091)]))
