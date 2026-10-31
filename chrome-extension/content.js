@@ -238,13 +238,21 @@ async function clickAndWaitDownload(button,cancelled,mail,file) {
 }
 async function closeViewer(cancelled,mail,file) {
  if (!viewerOpen()) return;
- const close = [...document.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"]')]
-  .find(node => visible(node) && /^(đóng|close)(?:\b|$)/i.test(label(node)));
+ const dialog=viewerMarker()?.closest('[role="dialog"]');
+ const close = [...new Set([...document.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"]')]
+  .filter(node => visible(node) && /^(đóng|close)(?:\b|$)/i.test(label(node)))
+  .map(node => node.closest('button,[role="button"],a,[tabindex="0"]') || node))]
+  .filter(node => !dialog || dialog.contains(node))
+  .sort((left,right) => {
+   const a=left.getBoundingClientRect(),b=right.getBoundingClientRect();
+   return (a.top+a.left)-(b.top+b.left);
+  })[0];
  if (close) {
   try {
-   await send({type:'trusted-click',...clickPoint(close)});
-   await trace('dong-pdf',mail,file,'Đã bấm nút đóng bằng chuột Chrome');
-   if (await until(() => !viewerOpen(),2000,cancelled)) return;
+   const point=clickPoint(close);
+   await send({type:'trusted-click',...point});
+   await trace('dong-pdf',mail,file,'Đã bấm '+(label(close)||'nút đóng')+' tại x='+Math.round(point.x)+', y='+Math.round(point.y));
+   if (await until(() => !viewerOpen(),3500,cancelled)) return;
   } catch (error) {await trace('dong-pdf-loi',mail,file,error.message);}
  }
  if (cancelled()) return;
@@ -257,12 +265,37 @@ async function backToList(listURL,cancelled) {
  const back = [...document.querySelectorAll('[aria-label],[data-tooltip],[title],[role="button"]')]
   .find(node => visible(node) && /quay lại|\bback\b/i.test(label(node)) && !dangerous.test(label(node)));
  if (back) {
-  await send({type:'trusted-click',...clickPoint(back)});
-  if (await until(() => mailRows().some(item=>visible(item.node)),4000,cancelled)) return true;
+  try {
+   await send({type:'trusted-click',...clickPoint(back)});
+   if (await until(() => mailRows().some(item=>visible(item.node)),4000,cancelled)) return true;
+  } catch (error) {await trace('quay-lai-loi',0,'',error.message);}
  }
- if (location.href === listURL || cancelled()) return false;
- history.back();
- return !!await until(() => mailRows().some(item=>visible(item.node)),7000,cancelled);
+ if (cancelled()) return false;
+ const target=new URL(listURL);
+ // Gmail is a single-page app. Restore the exact saved search route instead
+ // of relying only on the viewer's Close button or browser history.
+ if(target.origin===location.origin && target.pathname===location.pathname && target.hash && location.hash!==target.hash){
+  await trace('quay-lai-danh-sach',0,'','Khôi phục bộ lọc Gmail đã mở');
+  location.hash=target.hash;
+  if(await until(() => mailRows().some(item=>visible(item.node)),10000,cancelled))return true;
+ }
+ if(cancelled())return false;
+ if(location.href!==listURL){
+  history.back();
+  if(await until(() => mailRows().some(item=>visible(item.node)),7000,cancelled))return true;
+ }
+ // Gmail can show the right URL while its message view remains mounted. A
+ // short route bounce forces the saved result list to render again.
+ if(!cancelled() && target.hash && location.hash===target.hash){
+  await trace('tai-lai-danh-sach',0,'','Đúng URL tìm kiếm nhưng Gmail chưa hiện hàng thư; mở lại bộ lọc');
+  location.hash='#all';
+  await pause(500);
+  location.hash=target.hash;
+  if(await until(() => mailRows().some(item=>visible(item.node)),12000,cancelled))return true;
+ }
+ const empty=/không tìm thấy (?:thư|cuộc trò chuyện|cuộc hội thoại) nào|không có (?:kết quả|thư nào|cuộc trò chuyện nào)|no conversations found|no results found|your search did not match/i.test(document.body.innerText);
+ await trace('quay-lai-that-bai',0,'','URL: '+location.hash.slice(0,85)+' · .zA: '+document.querySelectorAll('.zA').length+' · tìm kiếm trống: '+empty);
+ return false;
 }
 function nextPageButton(){
  for(const node of document.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"]')){

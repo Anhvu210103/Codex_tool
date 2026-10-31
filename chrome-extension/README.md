@@ -1,4 +1,4 @@
-# Tiện ích Sổ ghi chép Gmail — 0.8.3
+# Tiện ích Sổ ghi chép Gmail — 0.8.4
 
 Tiện ích tự bấm trên Gmail đang đăng nhập trong Chrome để tải PDF vào Sổ ghi chép. Giao diện dùng chữ 18px, nút tối thiểu 50px, trạng thái nằm đầu cửa sổ. Phiên bản luôn hiện ở đầu để kiểm tra đã nạp đúng bản mới.
 
@@ -21,7 +21,7 @@ Trạng thái đầu cửa sổ tóm tắt lượt đang chạy. Thông báo đ�
 
 ## Cập nhật bản đã cài
 
-Tải ZIP tiện ích mới trong Cài đặt của tool, giải nén vào thư mục cố định. Mở `chrome://extensions`, nạp đúng thư mục có `manifest.json` hoặc thay nội dung thư mục Chrome đang dùng rồi bấm **Reload**. Đầu popup phải hiện **v0.8.3**. Chỉ Reload một thư mục cũ trong Downloads không tải mã mới. Không cần tạo mã ghép nối lại nếu vẫn dùng cùng tiện ích và cùng tool; khi nạp thành một tiện ích mới thì ghép nối lại.
+Tải ZIP tiện ích mới trong Cài đặt của tool, giải nén vào thư mục cố định. Mở `chrome://extensions`, nạp đúng thư mục có `manifest.json` hoặc thay nội dung thư mục Chrome đang dùng rồi bấm **Reload**. Đầu popup phải hiện **v0.8.4**. Chỉ Reload một thư mục cũ trong Downloads không tải mã mới. Không cần tạo mã ghép nối lại nếu vẫn dùng cùng tiện ích và cùng tool; khi nạp thành một tiện ích mới thì ghép nối lại.
 
 ## Cơ chế và giới hạn
 
@@ -38,3 +38,5 @@ Bản 0.8.1 cố định chiều rộng popup 440px, sửa lỗi cửa sổ Chro
 Bản 0.8.2 sửa nhận diện nút tải PDF: không buộc nút vào tọa độ sát mép phải, đọc nhãn trên biểu tượng con, bỏ nút bị che/chưa bật và chờ tối đa 12 giây. Nếu không chọn được, báo cáo có các dòng `chan-doan-tai`, `nut-tai-bi-loai` hoặc `toolbar-pdf`. Không bấm khi có nhiều nút tải chưa phân biệt được. Kiểm thử DOM: `python packaging/smoke_extension_download.py` (cần Playwright/Chromium; không thay kiểm thử Gmail thật).
 
 Bản 0.8.3 sửa lỗi biến chưa được định nghĩa trong nhánh xử lý PDF của 0.8.2. Kiểm thử luồng `mở thư → mở PDF → chọn nút tải → ghi kết quả → đóng trình xem` có thể chạy bằng `python -m unittest tests.test_extension_scan_flow`.
+
+Bản 0.8.4 ưu tiên đúng nút Đóng của trình xem và khôi phục trực tiếp bộ lọc Gmail đã mở khi nút Đóng hoặc phím Esc không phản hồi.
