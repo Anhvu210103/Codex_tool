@@ -93,6 +93,8 @@ def main():
         with (data / 'app.log').open('wb') as log:
             child = subprocess.Popen([str(APP), '--serve'], env=environment,
                                      stdin=subprocess.DEVNULL, stdout=log, stderr=log)
+            base = None
+            session = None
             try:
                 deadline = time.monotonic() + 60
                 while time.monotonic() < deadline:
@@ -131,12 +133,30 @@ def main():
                         print(f'{relative}: {path.read_text(encoding="utf-8", errors="replace")[-6000:]}', flush=True)
                 raise
             finally:
-                child.terminate()
+                # The one-file EXE has a bootloader parent and an application
+                # child. Terminating only the parent leaves Windows file locks
+                # behind, so stop the application through its authenticated API.
+                if child.poll() is None and base and session:
+                    try:
+                        stop = urllib.request.Request(base + '/api/desktop/stop', data=b'{}', headers={
+                            'Content-Type': 'application/json', 'X-CSRF-Token': session['csrf']})
+                        with opener.open(stop, timeout=5) as response:
+                            response.read()
+                    except (OSError, ValueError, KeyError):
+                        pass
                 try:
                     child.wait(timeout=10)
                 except subprocess.TimeoutExpired:
-                    child.kill()
-                    child.wait()
+                    if sys.platform == 'win32':
+                        subprocess.run(['taskkill', '/PID', str(child.pid), '/T', '/F'],
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+                    else:
+                        child.terminate()
+                    try:
+                        child.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        child.kill()
+                        child.wait(timeout=10)
 
 
 if __name__ == '__main__':
