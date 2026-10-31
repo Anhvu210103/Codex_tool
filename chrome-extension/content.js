@@ -104,22 +104,20 @@ function directDownloadControl(node,name) {
  // .aZo is one Gmail attachment card. Fall back to .aQH for layouts where
  // Gmail wraps the card differently, but never search the whole message.
  const card=node.closest('.aZo')||node.closest('.aQH');
- if(card)revealTile(card);
- const candidates=new Map();
- const scope=card||document;
- for(const item of scope.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"],a')){
+ if(!card)return null;
+ revealTile(card);
+ const candidates=[];
+ for(const item of card.querySelectorAll('[aria-label],[data-tooltip],[title],button,[role="button"],a')){
   const names=[item.getAttribute('aria-label'),item.getAttribute('data-tooltip'),item.getAttribute('title'),item.innerText].map(clean);
   if(!names.some(value=>downloadName.test(value))||names.some(value=>/drive|tất cả|all attachments/i.test(value)))continue;
-  if(!card&&!names.some(value=>value.normalize('NFC').includes(clean(name).normalize('NFC'))))continue;
   const button=item.closest('button,[role="button"],a,[tabindex="0"]')||item;
-  if(visible(button)&&!downloadButtonDisabled(button))candidates.set(button,[...(candidates.get(button)||[]),...names]);
+  if(visible(button)&&!downloadButtonDisabled(button))candidates.push(button);
  }
- const unique=[...candidates.keys()];
+ const unique=[...new Set(candidates)];
  if(unique.length===1)return unique[0];
  // When Gmail exposes more than one card action, require the filename in its
  // accessible label so the tool cannot download a neighbouring attachment.
- const expected=clean(name).normalize('NFC');
- const named=unique.filter(button=>candidates.get(button).some(value=>value.normalize('NFC').includes(expected)));
+ const named=unique.filter(button=>label(button).normalize('NFC').includes(clean(name).normalize('NFC')));
  return named.length===1?named[0]:null;
 }
 async function readyDirectDownload(node,name,cancelled) {
