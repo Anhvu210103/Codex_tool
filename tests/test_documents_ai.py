@@ -112,6 +112,8 @@ class DocumentAITests(unittest.TestCase):
             self.assertEqual(request.call_count,1)
         writer=PdfWriter();writer.add_blank_page(width=600,height=800);output=io.BytesIO();writer.write(output)
         scan=pdf_message(output.getvalue(),'scan.pdf',self.config,id='scan',sender='Upload',received_at=self.mail['received_at'])
+        self.assertFalse(scan['body'])
+        self.assertIn('Chưa đọc được chữ',(self.root/'Markdown'/(scan['file_hash']+'.md')).read_text(encoding='utf-8'))
         with patch('mailnotes.core.request_json',side_effect=AssertionError('must not send blank scan to AI')):
             self.assertEqual(process([scan],self.config,'pdf'),1)
         self.assertTrue((self.root/'files'/ (document['file_hash']+'.pdf')).exists())

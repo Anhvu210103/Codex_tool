@@ -160,5 +160,5 @@ def pdf_message(data, filename, config, **metadata):
         record_ocr_response, gateway['endpoint'])
     digest = save_pdf(data, config['data_dir'])
     from .archive import save_markdown
-    markdown = save_markdown(config['data_dir'], digest, text)
-    return {**metadata, 'subject': filename[:250], 'body': markdown.read_text(encoding='utf-8'), 'review_reason': warning, 'file_hash': digest}
+    save_markdown(config['data_dir'], digest, text or 'Chưa đọc được chữ từ PDF. Cần kiểm tra file gốc hoặc thử Đọc lại tài liệu.')
+    return {**metadata, 'subject': filename[:250], 'body': text, 'review_reason': warning, 'file_hash': digest}

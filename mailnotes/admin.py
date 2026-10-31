@@ -612,6 +612,11 @@ class Admin:
             if source != 'demo':
                 from .archive import classified_markdown_paths, render_archive
                 old_rows = migration.execute('SELECT id,subject,categories,file_hash FROM notes WHERE file_hash IS NOT NULL AND file_hash != ""').fetchall()
+                from .archive import markdown_path, save_markdown
+                for _,_,_,digest in old_rows:
+                    original_markdown=markdown_path(database.parent,digest)
+                    if original_markdown.is_file() and not original_markdown.read_text(encoding='utf-8').strip():
+                        save_markdown(database.parent,digest,'Chưa đọc được chữ từ PDF. Cần kiểm tra file gốc hoặc thử Đọc lại tài liệu.')
                 legacy_pdf_exports = any(path.suffix == '.json' and '.pdf"' in path.read_text(encoding='utf-8', errors='ignore')
                                          for path in (database.parent / 'exports').glob('*.json'))
                 missing = legacy_pdf_exports or any((database.parent / 'files' / (digest + '.pdf')).is_file()
