@@ -12,11 +12,13 @@ class LinuxDownloadTests(unittest.TestCase):
             home=Path(directory);downloads=home/'Downloads';downloads.mkdir()
             target=downloads/'report.pdf';target.write_bytes(b'%PDF-test')
             outside=home/'private.pdf';outside.write_bytes(b'%PDF-private')
-            (downloads/'link.pdf').symlink_to(outside)
+            link=downloads/'link.pdf'
+            try:link.symlink_to(outside)
+            except OSError:link=None
             with patch('sys.platform','linux'),patch('mailnotes.linux_downloads.download_directory',return_value=downloads):
                 self.assertEqual(read_download(str(target)),(b'%PDF-test','report.pdf'))
                 self.assertIsNone(read_download(str(outside)))
-                self.assertIsNone(read_download(str(downloads/'link.pdf')))
+                if link is not None:self.assertIsNone(read_download(str(link)))
                 self.assertIsNone(read_download('report.pdf'))
                 self.assertIsNone(read_download(str(downloads/'missing.pdf')))
                 target.write_bytes(b'<html>Not PDF</html>')

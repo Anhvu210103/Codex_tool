@@ -27,7 +27,9 @@ class FolderInboxTests(unittest.TestCase):
             fresh=root/'fresh.pdf';fresh.write_bytes(b'%PDF-new')
             fake=root/'fake.pdf';fake.write_bytes(b'not-pdf');os.utime(fake,(old,old))
             outside=root.parent/'outside-folder-inbox.pdf';outside.write_bytes(b'%PDF-outside')
-            link=root/'link.pdf';link.symlink_to(outside)
+            link=root/'link.pdf'
+            try:link.symlink_to(outside)
+            except OSError:link=None
             ready,errors=ready_pdfs(root,now=time.time())
             self.assertEqual([(item[0].name,item[1]) for item in ready],[('Văn bản.pdf',b'%PDF-test')])
             self.assertEqual(errors,[{'file':'fake.pdf','error':'Tệp có đuôi PDF nhưng nội dung không phải PDF hợp lệ.'}])

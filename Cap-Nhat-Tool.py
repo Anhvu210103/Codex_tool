@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Linux source updater. Standard library only; never replaces private data."""
 import ast
-import fcntl
+try:
+    import fcntl
+except ImportError:  # Windows imports this module in the cross-platform test suite.
+    fcntl = None
 import io
 import os
 from pathlib import Path, PurePosixPath
@@ -61,8 +64,15 @@ def install(root, stage, files, backup):
     try:
         for relative in files:
             target = root / relative
-            # Refuse links in existing installation, including parent directories.
-            if any(p.is_symlink() for p in [target, *target.parents] if p != root.parent):
+            # Refuse links inside the installation. Do not inspect ancestors
+            # above root: macOS maps /var through /private/var, which is a
+            # system link and does not let an archive escape this checkout.
+            current = root
+            candidates = [root]
+            for part in relative.parts:
+                current = current / part
+                candidates.append(current)
+            if any(path.is_symlink() for path in candidates):
                 raise ValueError('Thư mục mã nguồn chứa liên kết; dừng để bảo vệ dữ liệu.')
             existed = target.exists()
             if existed:

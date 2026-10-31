@@ -35,8 +35,8 @@ jobs:
             artifact: SoGhiChep-Windows-x86_64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements-build.txt
@@ -53,8 +53,8 @@ jobs:
       - name: Build Linux AppImage
         if: runner.os == 'Linux'
         env:
-          APPIMAGETOOL_SHA256: 95cbe7cce9717fce90c484e34052ee7c7f1d7635b33c12525b4776826a7d29b6
-          APPIMAGE_RUNTIME_SHA256: 156f4bdbde9c52d01814600013e0a273f0118dc2de98975f3c8c63427ec79074
+          APPIMAGETOOL_SHA256: 793fca0ce4bcc309dc65d3f66669f58e3755643e4dadbe03932e7b436128494f
+          APPIMAGE_RUNTIME_SHA256: 617aa77314d57c8b8e4fae9c3f0b35af7b30d5529cb69e98f64f92510ed98a46
         run: |
           curl --fail --location --retry 3 --output "$RUNNER_TEMP/appimagetool" https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           curl --fail --location --retry 3 --output "$RUNNER_TEMP/runtime-x86_64" https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64

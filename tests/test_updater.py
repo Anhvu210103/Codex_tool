@@ -62,10 +62,24 @@ class UpdaterTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)/'root';root.mkdir();stage=Path(d)/'stage';stage.mkdir();backup=Path(d)/'backup';backup.mkdir()
             outside=Path(d)/'private';outside.write_text('private')
-            (root/'config.json').symlink_to(outside)
+            try:(root/'config.json').symlink_to(outside)
+            except OSError:self.skipTest('Symlink creation is not available on this runner')
             (stage/'config.json').write_text('new')
             with self.assertRaises(ValueError):updater.install(root,stage,[Path('config.json')],backup)
             self.assertEqual(outside.read_text(),'private')
+
+    def test_system_symlink_above_root_does_not_block_update(self):
+        with tempfile.TemporaryDirectory() as d:
+            real=Path(d)/'real';real.mkdir();alias=Path(d)/'alias'
+            try:alias.symlink_to(real,target_is_directory=True)
+            except OSError:self.skipTest('Symlink creation is not available on this runner')
+            root=alias/'root';root.mkdir();stage=Path(d)/'stage';stage.mkdir();backup=Path(d)/'backup';backup.mkdir()
+            for directory,value in ((root,'old'),(stage,'new')):
+                (directory/'config.json').write_text(value)
+                (directory/'requirements-web.txt').write_text('same')
+            with patch.object(updater.subprocess,'run'):
+                updater.install(root,stage,[Path('config.json'),Path('requirements-web.txt')],backup)
+            self.assertEqual((root/'config.json').read_text(),'new')
 
 class UpdateWebTests(unittest.TestCase):
     def test_update_requires_login_and_desktop_and_idle(self):
