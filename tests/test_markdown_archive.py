@@ -1,4 +1,5 @@
 import io
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -51,20 +52,21 @@ class MarkdownArchiveTests(unittest.TestCase):
             self.assertEqual(sent,markdown.read_text())
             self.assertEqual(markdown.stat().st_mode&0o777,0o600)
             copies=list((self.root/'ai/Theo-nhom').glob('*/*.md'));self.assertEqual(len(copies),2)
-            pdf_copies=list((self.root/'ai/Theo-nhom').glob('*/*.pdf'));self.assertEqual(len(pdf_copies),2)
-            self.assertTrue(all(path.read_bytes()==raw for path in pdf_copies))
-            pdf_copies[0].unlink()  # Existing installs gain grouped PDFs on first notebook read.
+            self.assertEqual(list((self.root/'ai/Theo-nhom').glob('*/*.pdf')),[])
+            identifier='ai:'+hashlib.sha256(raw).hexdigest();key=hashlib.sha256(identifier.encode()).hexdigest()
+            legacy=copies[0].parent/('legacy--'+key[:16]+'--'+hashlib.sha256(raw).hexdigest()[:12]+'.pdf');legacy.write_bytes(raw)
+            manifest=self.root/'ai/exports'/(key+'.json');entries=json.loads(manifest.read_text());entries.append(legacy.relative_to(self.root/'ai').as_posix());manifest.write_text(json.dumps(entries))
             self.assertIn('Submit report',copies[0].read_text())
             self.assertIn('monthly statistics',copies[0].read_text())
             note=self.admin.notes('ai')['notes'][0]
-            self.assertTrue(pdf_copies[0].is_file())
-            self.assertEqual({item['path'] for item in note['local_pdf_paths']},{str(path) for path in pdf_copies})
+            self.assertFalse(legacy.exists())
+            self.assertEqual({item['path'] for item in note['local_markdown_paths']},{str(path) for path in copies})
             notebook=next((self.root/'ai/notebooks').glob('*.md')).read_text()
-            self.assertIn('PDF trên máy',notebook)
-            self.assertIn(str(pdf_copies[0]).replace('_','\\_'),notebook)
+            self.assertIn('Markdown trên máy',notebook)
+            self.assertIn(str(copies[0]).replace('_','\\_'),notebook)
             self.admin.edit_categories('ai',note['id'],['Ngân sách'])
             self.assertEqual(len(list((self.root/'ai/Theo-nhom').glob('*/*.md'))),1)
-            self.assertEqual(len(list((self.root/'ai/Theo-nhom').glob('*/*.pdf'))),1)
+            self.assertEqual(len(list((self.root/'ai/Theo-nhom').glob('*/*.pdf'))),0)
             self.assertEqual(api.call_count,1)
             self.assertEqual(len(list((self.root/'ai/files').glob('*.pdf'))),1)
 
@@ -76,7 +78,7 @@ class MarkdownArchiveTests(unittest.TestCase):
             api.assert_not_called()
         self.assertEqual(self.admin.notes('ai')['notes'][0]['categories'],['Cần xem lại'])
         self.assertEqual(len(list((self.root/'ai/Can-xem-lai').glob('*.md'))),1)
-        self.assertEqual(len(list((self.root/'ai/Can-xem-lai').glob('*.pdf'))),1)
+        self.assertEqual(len(list((self.root/'ai/Can-xem-lai').glob('*.pdf'))),0)
         self.assertIn('không chạy OCR',next((self.root/'ai/Can-xem-lai').glob('*.md')).read_text())
 
     def test_mixed_pdf_reports_unread_image_pages_and_names_cannot_escape(self):
@@ -95,8 +97,8 @@ class MarkdownArchiveTests(unittest.TestCase):
         csrf=client.get('/api/session').get_json()['csrf']
         csrf=client.post('/api/setup',json={'password':'test-private-password'},headers={'X-CSRF-Token':csrf}).get_json()['csrf']
         note=client.get('/api/notes?source=ai').get_json()['notes'][0]
-        self.assertGreaterEqual(len(note['local_pdf_paths']),1)
-        self.assertTrue(Path(note['local_pdf_paths'][0]['path']).is_file())
+        self.assertGreaterEqual(len(note['local_markdown_paths']),1)
+        self.assertTrue(Path(note['local_markdown_paths'][0]['path']).is_file())
         response=client.get('/api/document',query_string={'source':'ai','id':note['id'],'format':'markdown'})
         self.assertEqual(response.status_code,200);self.assertIn('Text available',response.get_data(as_text=True));response.close()
         self.assertEqual(client.get('/api/archive?source=../../outside').status_code,400)

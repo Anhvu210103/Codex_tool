@@ -104,7 +104,7 @@ def render_notes(connection, directory, timezone='Asia/Ho_Chi_Minh'):
         rows = connection.execute('SELECT id,sender,subject,categories,summary,received_at,source,origin_id,review_reason,file_hash FROM notes WHERE day=? ORDER BY received_at,id', (day,)).fetchall()
         chunks = [f'# Sổ ghi chép — {day}\n\n',
                   f'{len(rows)} ghi chép · Giờ hiển thị: {timezone}\n\n',
-                  '| Giờ nhận | Tiêu đề | Người gửi | Phân loại | Nội dung ngắn | Nguồn | PDF trên máy |\n',
+                  '| Giờ nhận | Tiêu đề | Người gửi | Phân loại | Nội dung ngắn | Nguồn | Markdown trên máy |\n',
                   '| --- | --- | --- | --- | --- | --- | --- |\n']
         for identifier, sender, subject, categories, summary, received, source, origin_id, review_reason, file_hash in rows:
             local_time = datetime.fromisoformat(received).astimezone(ZoneInfo(timezone)).strftime('%H:%M')
@@ -118,8 +118,8 @@ def render_notes(connection, directory, timezone='Asia/Ho_Chi_Minh'):
             cells = [local_time, subject, sender, ', '.join(json.loads(categories)), summary + ('\nLưu ý: ' + review_reason if review_reason else '')]
             paths = []
             if file_hash:
-                from .archive import classified_pdf_paths
-                paths = classified_pdf_paths(directory.parent, identifier, subject, json.loads(categories), file_hash)
+                from .archive import classified_markdown_paths
+                paths = classified_markdown_paths(directory.parent, identifier, subject, json.loads(categories), file_hash)
             chunks.append('| ' + ' | '.join(table_cell(cell) for cell in cells) + ' | ' + link + ' | '
                           + table_cell('\n'.join(str(path) for path in paths)) + ' |\n')
         target = directory / (day + '.md')

@@ -180,6 +180,10 @@ function downloadControl() {
  // Fail closed on ambiguity rather than download the wrong attachment.
  if(named.length===1)return named[0];
  if(named.length>1)return null;
+ const visibleNamed=downloadCandidates().filter(button=>visible(button)&&safe(button)&&!downloadButtonDisabled(button));
+ // Some Gmail layouts put the viewer toolbar at the left edge or inside a
+ // narrower pane. A single visible, safe Download control is unambiguous.
+ if(visibleNamed.length===1)return visibleNamed[0];
  // Icon-only fallback requires semantic Print and More neighbours, never a
  // guessed screen coordinate. Resizing/reordered toolbars stay supported.
  const controls=[...document.querySelectorAll('button,[role="button"],a[tabindex],div[tabindex="0"]')]
