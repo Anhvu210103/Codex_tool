@@ -18,4 +18,4 @@ Tiện ích Chrome thao tác trên Gmail đang đăng nhập; Gmail API là kế
 
 Dữ liệu, cấu hình, key và sổ của bản chạy từ mã nguồn nằm trong `.local/` của thư mục tool. Không gửi `.local`, `.env`, token, OAuth JSON hoặc API key cho người hỗ trợ. Để cập nhật bản Linux chạy bằng `.sh`, vào **Cài đặt → Cập nhật tool**, chờ mở lại rồi tải lại trang bằng Ctrl+Shift+R. Bản cập nhật giữ nguyên `.local` và `.venv`. Nếu đang dùng app đóng gói, cần thay bản app thay vì bấm cập nhật mã nguồn.
 
-Thông tin build app ở [packaging/README.md](packaging/README.md). Nhà phát triển có thể chạy `python3 -m venv .venv`, cài `requirements-web.txt`, rồi kiểm tra bằng `.venv/bin/python -m unittest discover -s tests -v`. Không cần DeepSeek key để chạy bộ test; các lượt AI trong test được giả lập.
+Thông tin build app ở [packaging/README.md](packaging/README.md). Nhà phát triển có thể chạy `python3 -m venv .venv`, cài `requirements-build.txt`, rồi chạy `scripts/release-check.sh`. Không cần API key thật để chạy bộ test; các lượt AI trong test được giả lập. Trước bàn giao, làm theo [checklist go-live](deploy/GO-LIVE.md).

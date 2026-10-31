@@ -1,4 +1,4 @@
-# Tiện ích Sổ ghi chép Gmail — 0.9.0
+# Tiện ích Sổ ghi chép Gmail — 0.9.1
 
 Tiện ích tự bấm trên Gmail đang đăng nhập trong Chrome để tải PDF vào Sổ ghi chép. Giao diện dùng chữ 18px, nút tối thiểu 50px, trạng thái nằm đầu cửa sổ. Phiên bản luôn hiện ở đầu để kiểm tra đã nạp đúng bản mới.
 
@@ -21,15 +21,15 @@ Trạng thái đầu cửa sổ tóm tắt lượt đang chạy. Thông báo đ�
 
 ## Cập nhật bản đã cài
 
-Tải ZIP tiện ích mới trong Cài đặt của tool, giải nén vào thư mục cố định. Mở `chrome://extensions`, nạp đúng thư mục có `manifest.json` hoặc thay nội dung thư mục Chrome đang dùng rồi bấm **Reload**. Đầu popup phải hiện **v0.9.0**. Chỉ Reload một thư mục cũ trong Downloads không tải mã mới. Không cần tạo mã ghép nối lại nếu vẫn dùng cùng tiện ích và cùng tool; khi nạp thành một tiện ích mới thì ghép nối lại.
+Tải ZIP tiện ích mới trong Cài đặt của tool, giải nén vào thư mục cố định. Mở `chrome://extensions`, nạp đúng thư mục có `manifest.json` hoặc thay nội dung thư mục Chrome đang dùng rồi bấm **Reload**. Đầu popup phải hiện **v0.9.1**. Chỉ Reload một thư mục cũ trong Downloads không tải mã mới. Không cần tạo mã ghép nối lại nếu vẫn dùng cùng tiện ích và cùng tool; khi nạp thành một tiện ích mới thì ghép nối lại.
 
 ## Cơ chế và giới hạn
 
 Mỗi thư được mở để liệt kê mọi PDF. Tiện ích mở lần lượt từng PDF, bấm nút tải của trình xem, chờ Chrome tải xong và tool nhập xong rồi mới chuyển file tiếp theo. PDF đã ghi nhớ không tải lại; các thư khác nhau chứa cùng PDF có thể phải tải để tool kiểm tra mã băm trước khi bỏ qua. Một thư có nhiều PDF được xử lý từng file. Mở thư có thể đánh dấu đã đọc; tiện ích không gửi hoặc xóa email.
 
-Tiện ích kiểm tra lại thư cũ trong phạm vi để không bỏ sót PDF mới, không dừng ngay khi gặp thư đã có. Thao tác dựa vào các nút và nội dung trang Gmail, không dùng DeepSeek để chọn nút; DeepSeek được dùng ở tool khi đọc/phân nhóm/tóm tắt tài liệu. Gmail thay đổi giao diện hoặc phiên đăng nhập hết hạn có thể làm thao tác lỗi. Khi không tiếp tục an toàn được, tiện ích báo lỗi; không coi file đã tải là đã vào sổ.
+Tiện ích kiểm tra lại thư cũ trong phạm vi để không bỏ sót PDF mới, không dừng ngay khi gặp thư đã có. Thao tác dựa vào các nút và nội dung trang Gmail, không dùng AI để chọn nút; GreenNode / VNG Cloud chỉ được dùng ở tool khi đọc, phân nhóm và tóm tắt tài liệu. Gmail thay đổi giao diện hoặc phiên đăng nhập hết hạn có thể làm thao tác lỗi. Khi không tiếp tục an toàn được, tiện ích báo lỗi; không coi file đã tải là đã vào sổ.
 
-Khi file đã về máy mà không tự nhập, chọn PDF tại tiện ích hoặc đưa vào `inbox` của tool. PDF scan chỉ được thử OCR theo cấu hình DeepSeek của tool; cần đối chiếu bản gốc và xác minh API nhận ảnh. Gmail API trong trang Cài đặt là kết nối khác, có lịch riêng.
+Khi file đã về máy mà không tự nhập, chọn PDF tại tiện ích hoặc đưa vào `inbox` của tool. PDF scan chỉ được thử OCR theo model GreenNode / VNG Cloud đã cấu hình; cần đối chiếu bản gốc và xác minh model nhận ảnh. Gmail API trong trang Cài đặt là kết nối khác, có lịch riêng.
 
 Mã ghép nối lưu trong vùng cục bộ của tiện ích; API key lưu tại tool. Bridge chỉ nhận kết nối localhost được ghép nối. Quyền Chrome debugger dùng để gửi thao tác chuột/phím vào tab đang quét. Kiểm thử UI với Chromium không thay thế nghiệm thu Gmail thật và nhiều PDF trên máy khách.
 
@@ -52,3 +52,5 @@ Bản 0.8.8 khôi phục cơ chế nhận diện nút tải trực tiếp đã c
 Bản 0.8.9 ẩn lớp phủ trình xem PDF như phương án cuối sau khi nút Đóng và phím Esc đều không phản hồi, để lượt quét tiếp tục mà không tải lại file đã lưu.
 
 Bản 0.9.0 hỗ trợ toolbar PDF nằm lệch trái hoặc trong khung hẹp khi Gmail chỉ hiển thị đúng một nút Tải xuống an toàn. Kết quả phân loại trên máy chuyển sang Markdown; giao diện chỉ hiển thị đường dẫn `.md`.
+
+Bản 0.9.1 không tải lại PDF khi Chrome đã tải xong nhưng GreenNode hoặc backend trả lỗi; file được giữ trong hàng đợi thử lại. Báo cáo cuối lượt tách rõ PDF mới, PDF đã có và PDF lỗi.

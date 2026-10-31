@@ -21,7 +21,7 @@ Bản này phục vụ **một quản trị viên / một Gmail / một máy ch�
    MAILNOTES_ADMIN_PASSWORD=<mật khẩu riêng ít nhất 12 ký tự>
    ```
 
-   Thay URL và mật khẩu bằng giá trị thật. Biến mật khẩu chỉ dùng khởi tạo khi chưa có file `.local/admin/password.json`; sau đó mật khẩu được quản lý bằng hash PBKDF2, có thể đổi trên web. Không cần đặt `DEEPSEEK_API_KEY` để dùng trích đoạn. API key có thể nhập sau trên web (lưu file riêng quyền 0600).
+   Thay URL và mật khẩu bằng giá trị thật. Biến mật khẩu chỉ dùng khởi tạo khi chưa có file `.local/admin/password.json`; sau đó mật khẩu được quản lý bằng hash PBKDF2, có thể đổi trên web. GreenNode / VNG Cloud API key có thể nhập sau trên web hoặc cung cấp bằng `VNGCLOUD_API_KEY`; key lưu trên web nằm trong file riêng quyền 0600.
 
 4. Dùng mẫu `mailnotes.service` cho systemd, điều chỉnh tài khoản và đường dẫn nếu khác. Reverse proxy HTTPS tới `127.0.0.1:8080` theo `nginx.conf.example`. Chỉ mở cổng HTTPS cho khách, giữ cổng backend nội bộ. Không ghi query string của `/oauth/callback` vào access log.
 5. Quản trị viên kỹ thuật cài và bật service bằng systemd. Kiểm tra truy cập trang đăng nhập qua domain HTTPS. Backend dùng Waitress, không dùng Flask debug server. Giới hạn đăng nhập sai tính theo IP backend; nếu tất cả truy cập qua một proxy, giới hạn 5 lần/5 phút sẽ dùng chung. Có thể thêm rate limit phù hợp ở proxy.
@@ -32,7 +32,7 @@ Bản này phục vụ **một quản trị viên / một Gmail / một máy ch�
 
 - Đổi nguồn mẫu/Gmail, bộ lọc Gmail, chu kỳ, múi giờ; bật/tắt lịch.
 - Thêm/xóa nhóm, từ khóa và điều kiện người gửi. Quy tắc mới áp dụng email chưa xử lý.
-- Chọn rules + trích đoạn miễn phí hoặc AI phân nhóm/tóm tắt chung. Chọn DeepSeek, xác nhận đồng ý gửi nội dung, lưu/xóa key riêng cho từng nhà cung cấp và đặt giới hạn đầu vào.
+- Lưu GreenNode / VNG Cloud API key, kiểm tra model và giới hạn đầu vào. Mỗi tài liệu dùng một luồng AI để phân nhóm và tóm tắt; tài liệu đã xử lý được chống trùng.
 - Bấm Chạy ngay, theo dõi trạng thái/lỗi gần nhất.
 - Tìm ghi chép, lọc ngày/nhóm/nguồn và tải toàn bộ sổ Markdown của một ngày. File tải gồm toàn bộ ngày, không chỉ các hàng đang lọc bằng từ khóa.
 - Kết nối lại Gmail khi quyền hết hạn, ngắt kết nối và đổi mật khẩu quản trị.
@@ -41,7 +41,7 @@ Website mới và thay đổi cơ chế đăng nhập vẫn cần bộ kết n�
 
 ## Dữ liệu và vận hành
 
-Cấu hình web nằm tại `.local/admin/settings.json`, tách khỏi `config.json` của CLI. File nhạy cảm gồm `.local/admin/session.json`, `gmail-client.json`, `gmail-token.json`, `ai-key.json`, `deepseek-key.json` và `password.json`. Không phục vụ `.local/` qua web server, không đưa vào Git hoặc log. API chỉ trả trạng thái có/chưa có secret, không trả lại giá trị. API key và token được lưu trên đĩa máy chủ, chưa có vault hoặc mã hóa ổ đĩa tích hợp; hạn chế tài khoản có quyền đọc và dùng ổ đĩa/backup mã hóa theo yêu cầu khách.
+Cấu hình web nằm tại `.local/admin/settings.json`, tách khỏi `config.json` của CLI. File nhạy cảm gồm `.local/admin/session.json`, `gmail-client.json`, `gmail-token.json`, `vngcloud-key.json`, các file key cũ và `password.json`. Không phục vụ `.local/` qua web server, không đưa vào Git hoặc log. API chỉ trả trạng thái có/chưa có secret, không trả lại giá trị. API key và token được lưu trên đĩa máy chủ, chưa có vault hoặc mã hóa ổ đĩa tích hợp; hạn chế tài khoản có quyền đọc và dùng ổ đĩa/backup mã hóa theo yêu cầu khách.
 
 Dữ liệu mẫu: `.local/demo/`. Dữ liệu Gmail web: `.local/gmail/`. CLI Gmail cũ dùng `.local/notes.sqlite3`; chưa tự di chuyển dữ liệu hoặc token CLI sang web. UI hiển thị tối đa 500 kết quả một lần; file Markdown của ngày chứa đầy đủ. Đổi rules không tự phân loại lại ghi chép cũ. Ngắt Gmail chỉ xóa token cục bộ, không xóa sổ hoặc tự thu hồi quyền trên tài khoản Google; khách có thể thu hồi trong Google Account.
 
@@ -58,11 +58,11 @@ PDF tối đa 20 MB; đọc lớp văn bản tối đa 100 trang/100.000 ký t�
 
 Một request AI trả JSON nhóm + tóm tắt. Nhóm ngoài danh sách, confidence dưới 0.65 (do mô hình tự báo, không phải độ chính xác đã đo), hoặc needs_review sẽ vào Cần xem lại. Cache SQLite gắn với nhà cung cấp, mô hình, prompt, nội dung gửi và mô tả nhóm; tránh gọi lại kết quả giống nhau trong cùng nguồn. Cache không dùng chung giữa Gmail/PDF upload. Khi PDF đã lưu, upload lại không gọi AI. Chọn Xử lý lại PDF đã có nếu cần áp dụng cấu hình phân nhóm mới; thao tác này thay nhóm/tóm tắt đã sửa bằng tay và có thể phát sinh phí. Nếu prompt/input không đổi, cache vẫn được dùng.
 
-DeepSeek dùng endpoint cố định `https://api.deepseek.com/chat/completions`, model mặc định `deepseek-chat`; không cho nhập endpoint tùy ý. Cho phép domain `api.deepseek.com` trong mạng máy chủ. Key nhập qua web hoặc `DEEPSEEK_API_KEY`. Không có key thật trong repo. Giá và quota phụ thuộc tài khoản nhà cung cấp; chưa xác nhận chi phí hay độ chính xác trên tài liệu khách.
+GreenNode / VNG Cloud dùng endpoint cố định `https://maas-llm-aiplatform-hcm.api.vngcloud.vn/v1/chat/completions`, model mặc định `deepseek/deepseek-v4.1-flash-thirdparty`; không cho nhập endpoint tùy ý. Cho phép domain `maas-llm-aiplatform-hcm.api.vngcloud.vn` trong mạng máy chủ. Key nhập qua web hoặc biến `VNGCLOUD_API_KEY`. Không có key thật trong repo. Giá và quota phụ thuộc tài khoản nhà cung cấp; chưa xác nhận chi phí hay độ chính xác trên tài liệu khách.
 
-Luồng hiện tại chuyển PDF có lớp chữ thành Markdown bằng pypdf rồi tự gửi chữ cho DeepSeek. PDF scan được chuyển trang thành ảnh bằng Poppler và thử OCR qua DeepSeek. Nếu API không hỗ trợ ảnh hoặc OCR thất bại, tài liệu vào Cần xem lại và không gửi chữ rỗng để tóm tắt. Không cần Tesseract. Sao lưu các thư mục files/, Markdown/, Theo-nhom/, Can-xem-lai/, exports/ cùng SQLite. Sửa nhóm trong sổ sẽ đồng bộ các bản Markdown theo nhóm.
+Luồng hiện tại chuyển PDF có lớp chữ thành Markdown bằng pypdf rồi tự gửi chữ cho GreenNode / VNG Cloud. PDF scan được chuyển trang thành ảnh bằng Poppler và thử OCR qua model GreenNode / VNG Cloud. Nếu API không hỗ trợ ảnh hoặc OCR thất bại, tài liệu vào Cần xem lại và không gửi chữ rỗng để tóm tắt. Không cần Tesseract. Sao lưu các thư mục files/, Markdown/, Theo-nhom/, Can-xem-lai/, exports/ cùng SQLite. Sửa nhóm trong sổ sẽ đồng bộ các bản Markdown theo nhóm.
 
-PDF scan được thử OCR bằng DeepSeek với API key đã lưu; cần Poppler (`pdftoppm`) để chuyển từng trang thành ảnh. PDF có lớp chữ không gọi OCR. Nếu DeepSeek API không hỗ trợ ảnh, tài liệu vào Cần xem lại. OCR có thể phát sinh thêm token/phí.
+PDF scan được thử OCR qua model GreenNode / VNG Cloud đã chọn; cần Poppler (`pdftoppm`) để chuyển từng trang thành ảnh. PDF có lớp chữ không gọi OCR. Nếu model không hỗ trợ ảnh, tài liệu vào Cần xem lại. OCR có thể phát sinh thêm token/phí.
 
 ## Usage và đơn giá
 

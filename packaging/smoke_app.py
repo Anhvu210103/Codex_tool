@@ -54,10 +54,10 @@ def verify_workflow(opener, base, session, data):
     if len(notes)!=1 or notes[0]['categories']!=['Nhóm kiểm thử']:
         raise RuntimeError('Packaged PDF classification failed')
     markdown=request('/api/document?source=pdf&format=markdown&id='+notes[0]['id']).decode()
-    if 'Local Markdown parity test' not in markdown or not list((data/'pdf/Theo-nhom').glob('*/*.md')):
+    if 'Local Markdown parity test' not in markdown or not list((data/'pdf/Theo-nhom').rglob('*.md')):
         raise RuntimeError('Packaged Markdown archive missing')
     upload(None)
-    if not list((data/'pdf/Can-xem-lai').glob('*.md')):
+    if not list((data/'pdf/Can-xem-lai').rglob('*.md')):
         raise RuntimeError('Packaged scan review missing')
     with zipfile.ZipFile(io.BytesIO(request('/api/extension/download'))) as archive:
         manifest=json.loads(archive.read('SoGhiChep-AI-Gmail/manifest.json'))
@@ -69,7 +69,7 @@ def verify_workflow(opener, base, session, data):
         token=json.loads(request('/api/extension/pair',{}))['token']
         result=json.loads(request('/extension/import-local',{'path':str(local_pdf)},extra_headers={
             'Origin':'chrome-extension://'+'a'*32,'Authorization':'Bearer '+token}))
-        if not result.get('available') or result['categories']!=['Nhóm kiểm thử'] or not list((data/'ai/Theo-nhom').glob('*/*.md')):
+        if not result.get('available') or result['categories']!=['Nhóm kiểm thử'] or not list((data/'ai/Theo-nhom').rglob('*.md')):
             raise RuntimeError('Packaged Linux local download import failed')
         print('Packaged Linux local PDF -> AI source -> grouped Markdown passed')
     print('Packaged workflow passed: PDF -> Markdown -> groups, scan review, Chrome extension')

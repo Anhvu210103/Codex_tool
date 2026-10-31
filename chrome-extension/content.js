@@ -222,7 +222,13 @@ async function waitDownload(cancelled) {
   const elapsed=Math.floor((Date.now()-started)/5000);
   if(elapsed!==reported){reported=elapsed;await progress('Đang chờ Chrome tải PDF và tool lưu vào sổ... '+(elapsed*5)+' giây');}
   const state = await send({type:'download-state'});
-  if (state.error) throw Error(state.error);
+  if (state.error) {
+   const error=Error(state.error);
+   // The PDF already reached Chrome. A backend/AI error must stay in the
+   // retry queue instead of reopening Gmail's viewer and downloading twice.
+   error.downloadStarted=state.downloadId!==null;
+   throw error;
+  }
   if (state.result) return state.result;
   if (!state.downloadId && Date.now()-started>=30000) throw Error('Chrome chưa bắt đầu tải PDF sau 30 giây. Mở Báo cáo lần chạy để xem nút đã bấm và phản hồi của Chrome.');
   await pause(500);
@@ -384,7 +390,7 @@ function nextPageButton(){
 }
 async function run(limit,only=[],automatic=false) {
  stopped=false; const current=++epoch, cancelled=()=>stopped||epoch!==current;
- let mails=0, files=0, errors=0, duplicateMails=0, scanSucceeded=false; const faults=[];
+ let mails=0, files=0, newFiles=0, duplicateFiles=0, errors=0, duplicateMails=0, scanSucceeded=false; const faults=[];
  const rememberFailure=async(stage,entry,error,file=null)=>{const failure={stage,rowIndex:entry.index,key:entry.key||'',text:entry.text||'',fileIndex:file?.index??-1,name:file?.name||'',fileKey:file?.fileKey,error:error.message||String(error)};await send({type:'failure',failure}).catch(()=>{});};
  try {
   await trace('bat-dau',0,'','Tiện ích '+(chrome.runtime.getManifest?.().version||'không rõ phiên bản')+' · '+(automatic?'lịch tự động':'chạy tay'));
@@ -449,7 +455,10 @@ async function run(limit,only=[],automatic=false) {
       const direct=await readyDirectDownload(tile.node,attachment.name,cancelled);
       if(direct){
        try{result=await clickAndWaitDirect(direct,cancelled,mails,attachment.name);}
-       catch(error){await trace('tai-truc-tiep-loi',mails,attachment.name,error.message+' · chuyển sang trình xem PDF');}
+       catch(error){
+        if(error.downloadStarted)throw error;
+        await trace('tai-truc-tiep-loi',mails,attachment.name,error.message+' · chuyển sang trình xem PDF');
+       }
       }
       if(!result){
        await trace('mo-pdf',mails,attachment.name,direct?'Tải trực tiếp chưa bắt đầu':'Thẻ đính kèm không có nút tải trực tiếp');
@@ -465,7 +474,8 @@ async function run(limit,only=[],automatic=false) {
       await send({type:'clear-failure',key,fileIndex:attachment.index,name:attachment.name,fileKey});
       for(let index=pendingFailures.length-1;index>=0;index--)if(pendingFailures[index].key===key&&(pendingFailures[index].fileKey?pendingFailures[index].fileKey===fileKey:pendingFailures[index].fileIndex===attachment.index&&pendingFailures[index].name===attachment.name))pendingFailures.splice(index,1);
       recordedFiles.add(fileKey);
-      files++;await trace('da-luu',mails,attachment.name,result.added===0?'đã có trong sổ':'mới');
+      files++;if(result.added===0)duplicateFiles++;else newFiles++;
+      await trace('da-luu',mails,attachment.name,result.added===0?'đã có trong sổ':'mới');
       await progress('Đã xử lý '+files+' PDF từ '+mails+' thư. Mới nhất: '+result.filename+(result.added===0?' (đã có trong Sổ ghi chép → AI thao tác, không tạo dòng mới)':' (xem tại Sổ ghi chép → AI thao tác)'));
      } catch (error) {errors++;mailFailed=true;faults.push(attachment.name+': '+error.message);await rememberFailure('process-pdf',{...entry,key},error,attachment);await trace('loi',mails,attachment.name,error.message);await progress('Bỏ qua PDF lỗi, tiếp tục file sau: '+attachment.name+' — '+error.message);}
      if(viewerOpen()&&!await restoreMailAfterViewer(mailURL,listURL,cancelled,mails,attachment.name)){
@@ -488,8 +498,8 @@ async function run(limit,only=[],automatic=false) {
   page++;
   }
   if(pageLimitReached){await trace('gioi-han',mails,'','Đã quét 20 trang; còn trang khác cần xem lại');}
-  await trace('hoan-tat',mails,'',files+' PDF đã lưu, '+duplicateMails+' thư đã có, '+errors+' lỗi');
-  await progress('Hoàn tất: '+mails+' thư mở, '+files+' PDF đã lưu, '+duplicateMails+' thư đã có, '+errors+' lỗi.'+(pageLimitReached?'\nĐã chạm giới hạn 20 trang Gmail; kiểm tra báo cáo.':'')+(faults.length?'\nXem Báo cáo lần chạy trong tiện ích để biết từng file lỗi.':''));
+  await trace('hoan-tat',mails,'',newFiles+' PDF mới, '+duplicateFiles+' PDF đã có, '+duplicateMails+' thư bỏ qua, '+errors+' lỗi');
+  await progress('Hoàn tất: '+mails+' thư mở, '+newFiles+' PDF mới, '+duplicateFiles+' PDF đã có, '+errors+' lỗi.'+(pageLimitReached?'\nĐã chạm giới hạn 20 trang Gmail; kiểm tra báo cáo.':'')+(faults.length?'\nXem Báo cáo lần chạy trong tiện ích để biết từng file lỗi.':''));
   scanSucceeded=automatic&&errors===0&&!pageLimitReached;
  } catch (error) {await trace('dung',mails,'',error.message);await progress('Đã lưu '+files+' PDF từ '+mails+' thư. Dừng: '+error.message+'\nMở Báo cáo lần chạy trong tiện ích.').catch(()=>{});}
  finally {if(epoch===current){stopped=true;if(automatic)await send({type:'scan-complete',success:scanSucceeded}).catch(()=>{});await send({type:'finish'}).catch(()=>{});}}

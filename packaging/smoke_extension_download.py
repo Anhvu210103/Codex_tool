@@ -30,7 +30,9 @@ def main():
         check('<button id="download" aria-label="Download" aria-disabled="true" style="left:1200px;top:100px"></button>',None)
         check('<button id="download" aria-label="Download" style="left:1200px;top:100px"></button><div style="position:absolute;left:1190px;top:90px;width:70px;height:70px;background:red"></div>',None)
         check('<button id="download" aria-label="Download all attachments" style="left:1200px;top:100px"></button>',None)
-        check('<button id="download" aria-label="Download" style="left:1200px;top:400px"></button>',None)
+        # A single visible, safe Download control is accepted even when Gmail
+        # places its toolbar lower in a narrow preview pane.
+        check('<button id="download" aria-label="Download" style="left:1200px;top:400px"></button>','download')
         check('<button id="a" aria-label="Download" style="left:1200px;top:100px"></button><button id="b" aria-label="Download" style="left:1250px;top:100px"></button>',None)
         check('<button aria-label="In" style="left:1100px;top:100px"></button><button id="download" style="left:1150px;top:100px"></button><button aria-label="Thêm" style="left:1200px;top:100px"></button>','download')
         check('<button style="left:1100px;top:100px"></button><button id="unknown" style="left:1150px;top:100px"></button><button style="left:1200px;top:100px"></button>',None)

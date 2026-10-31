@@ -5,16 +5,16 @@ Linux, Mac Intel và Mac Apple Silicon dùng cùng mã xử lý, giao diện, ti
 | Bước | Linux và macOS |
 | --- | --- |
 | Mở tool | Bấm ứng dụng Sổ ghi chép, tool mở giao diện quản trị. |
-| Cài AI | Lưu DeepSeek API key, đồng ý gửi chữ tài liệu, chọn model và nhóm. |
+| Cài AI | Lưu GreenNode / VNG Cloud API key, kiểm tra model và nhóm. Cấu hình gửi dữ liệu được bật sẵn cho nhà cung cấp này. |
 | Dùng tiện ích | Tải cùng ZIP tiện ích trong Cài đặt, cài vào Chrome, ghép nối bằng địa chỉ tool và mã trên chính máy đó. |
 | Chạy AI thao tác | Mở Gmail đã đăng nhập bình thường trong Chrome, tìm thư có PDF, bấm Xử lý tối đa 20 thư đang hiện. Có nút Dừng. |
-| Xử lý tài liệu | PDF có chữ → Markdown trên máy → DeepSeek phân nhóm và tóm tắt → ghi sổ; mỗi thư mục nhóm giữ PDF và ghi chú Markdown. |
-| PDF scan | Thử OCR qua DeepSeek; nếu API không nhận ảnh hoặc thất bại thì giữ bản gốc và tạo ghi chú Cần xem lại. Cần Poppler để chuyển PDF thành ảnh, không cần Tesseract. |
-| Xem kết quả | Sổ ghi chép → AI thao tác → xem đường dẫn PDF theo nhóm, Mở thư mục tài liệu hoặc Tải Markdown. |
+| Xử lý tài liệu | PDF có chữ → Markdown trên máy → GreenNode / VNG Cloud phân nhóm và tóm tắt → ghi sổ; mỗi thư mục nhóm giữ bản Markdown. |
+| PDF scan | Thử OCR qua model GreenNode / VNG Cloud; nếu API không nhận ảnh hoặc thất bại thì giữ bản gốc và tạo ghi chú Cần xem lại. Cần Poppler để chuyển PDF thành ảnh, không cần Tesseract. |
+| Xem kết quả | Sổ ghi chép → AI thao tác → xem đường dẫn Markdown theo nhóm, Mở thư mục tài liệu hoặc Tải Markdown. |
 | Sửa nhóm | Sửa trong sổ, bản Markdown theo nhóm cập nhật theo, không gọi AI lại. |
 | Tắt | Bấm Tắt tool. Đóng tab không tắt dịch vụ; máy ngủ hoặc tắt thì việc xử lý ngừng. |
 
-Gmail API vẫn là nguồn riêng có thể kiểm tra theo lịch đã lưu trên cả hai hệ điều hành. Luồng tiện ích hiện xử lý thủ công tối đa 20 thư đang hiện trong Chrome và các PDF tìm thấy trong từng thư; chưa tự quét theo lịch.
+Gmail API vẫn là nguồn riêng có thể kiểm tra theo lịch đã lưu trên cả hai hệ điều hành. Tiện ích xử lý thủ công tối đa 20 thư đang hiện; khi bật lịch, tiện ích quét ngay rồi chạy mỗi 30 phút, tối đa 100 thư mỗi trang và 20 trang mỗi lượt.
 
 ## Khác biệt do hệ điều hành
 
@@ -31,7 +31,7 @@ Mac app thử nghiệm chưa ký Developer ID/notarize nên có thể cần ngư
 
 ## Xác nhận tính đồng nhất
 
-CI dùng cùng bộ kiểm thử trên Ubuntu, Mac Intel và Apple Silicon. Sau khi build, mỗi job khởi động chính app đã đóng gói với dữ liệu tạm, kiểm tra đăng nhập, PDF chữ → Markdown/nhóm, PDF scan → Cần xem lại và ZIP tiện ích. Phép thử không gọi DeepSeek thật, không đăng nhập Gmail khách và không mở Finder/file manager. Các bước đó vẫn cần kiểm chứng trên máy khách với quyền truy cập hợp lệ. Không coi cấu hình CI là kết quả CI đã thành công.
+CI dùng cùng bộ kiểm thử trên Ubuntu, Mac Intel và Apple Silicon. Sau khi build, mỗi job khởi động chính app đã đóng gói với dữ liệu tạm, kiểm tra đăng nhập, PDF chữ → Markdown/nhóm, PDF scan → Cần xem lại và ZIP tiện ích. Phép thử không gọi GreenNode thật, không đăng nhập Gmail khách và không mở Finder/file manager. Các bước đó vẫn cần kiểm chứng trên máy khách với quyền truy cập hợp lệ. Không coi cấu hình CI là kết quả CI đã thành công.
 
 ## Phương án tải PDF thủ công
 

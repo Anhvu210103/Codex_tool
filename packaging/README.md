@@ -45,7 +45,7 @@ Thay file executable hoặc `.app` không xóa dữ liệu. Nếu chuyển từ 
 
 Có thể dùng MAILNOTES_DATA_DIR để chọn thư mục dữ liệu riêng khi triển khai có quản lý. Không gửi data/token/key qua chat. Nhật ký khởi động nằm ở `admin/desktop.log` trong thư mục dữ liệu; chỉ chia sẻ lỗi đã loại bỏ thông tin riêng.
 
-DeepSeek nhận chữ từ Markdown đã chuyển từ PDF. Bản scan được chuyển thành ảnh bằng Poppler (`pdftoppm`) rồi thử OCR qua DeepSeek; cần cài Poppler trên máy nếu dùng bản app hoặc launcher. Nếu API không nhận ảnh hoặc OCR thất bại thì vào Cần xem lại. Không cần Tesseract. PDF có chữ, phân loại và ghi sổ đã được tích hợp. Chứng chỉ CA công khai được đóng gói, giữ TLS verification; SSL_CERT_FILE do người dùng cấu hình được tôn trọng.
+GreenNode / VNG Cloud nhận chữ từ Markdown đã chuyển từ PDF. Bản scan được chuyển thành ảnh bằng Poppler (`pdftoppm`) rồi thử OCR qua model đã chọn. Docker đã kèm Poppler; app và launcher mã nguồn cần cài `poppler-utils` trên Linux hoặc `brew install poppler` trên Mac trước khi dùng OCR. Nếu thiếu Poppler, model không nhận ảnh hoặc OCR thất bại thì tài liệu vào Cần xem lại. Không cần Tesseract. Chứng chỉ CA công khai được đóng gói, giữ TLS verification; SSL_CERT_FILE do người dùng cấu hình được tôn trọng.
 
 ## Build cho người phát triển
 
@@ -59,6 +59,6 @@ python3 -m venv .venv
 .venv/bin/python packaging/smoke_app.py
 ```
 
-Linux tạo `dist/SoGhiChep`, sau đó `packaging/package_linux.py` tạo AppImage bằng appimagetool và runtime đều đã kiểm tra SHA-256. macOS tạo `dist/SoGhiChep.app`, sau đó `packaging/package_macos.py` tạo và kiểm tra `dist/SoGhiChep.dmg`. Không cross-build Mac từ Linux. CI dùng Ubuntu 22.04 để có nền glibc cũ hơn; bản Linux build tại môi trường cloud hiện tại chỉ được kiểm chứng trên chính môi trường đó, không cam kết chạy mọi distro/CPU. OAuth Gmail thật, DeepSeek thật và bản macOS vẫn cần kiểm thử trên máy đích có credentials hợp lệ.
+Linux tạo `dist/SoGhiChep`, sau đó `packaging/package_linux.py` tạo AppImage bằng appimagetool và runtime đều đã kiểm tra SHA-256. macOS tạo `dist/SoGhiChep.app`, sau đó `packaging/package_macos.py` tạo và kiểm tra `dist/SoGhiChep.dmg`. Không cross-build Mac từ Linux. CI dùng Ubuntu 22.04 để có nền glibc cũ hơn; bản Linux build tại môi trường cloud hiện tại chỉ được kiểm chứng trên chính môi trường đó, không cam kết chạy mọi distro/CPU. OAuth Gmail thật, GreenNode thật và bản macOS vẫn cần kiểm thử trên máy đích có credentials hợp lệ.
 
 Triển khai máy chủ bằng Docker là lựa chọn riêng, xem [hướng dẫn Docker](../deploy/docker.md). Docker không thay thế DMG trên máy khách vì không mở trực tiếp Finder và cần Docker Desktop.
