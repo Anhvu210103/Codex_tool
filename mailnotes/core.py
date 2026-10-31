@@ -89,12 +89,21 @@ def table_cell(value):
 
 
 def ensure_schema(connection):
-    connection.execute('CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, sender TEXT, subject TEXT, categories TEXT, summary TEXT, received_at TEXT, day TEXT, source TEXT, content_hash TEXT)')
-    columns = {row[1] for row in connection.execute('PRAGMA table_info(notes)')}
-    for name in ('origin_id', 'review_reason', 'file_hash'):
-        if name not in columns:
-            connection.execute(f'ALTER TABLE notes ADD COLUMN {name} TEXT')
-    connection.commit()
+    # Scanning and the notebook UI can initialize the same database together.
+    # Hold one write transaction across inspection and ALTERs so both callers
+    # cannot decide to add the same legacy column from an outdated snapshot.
+    if not connection.in_transaction:
+        connection.execute('BEGIN IMMEDIATE')
+    try:
+        connection.execute('CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, sender TEXT, subject TEXT, categories TEXT, summary TEXT, received_at TEXT, day TEXT, source TEXT, content_hash TEXT)')
+        columns = {row[1] for row in connection.execute('PRAGMA table_info(notes)')}
+        for name in ('origin_id', 'review_reason', 'file_hash'):
+            if name not in columns:
+                connection.execute(f'ALTER TABLE notes ADD COLUMN {name} TEXT')
+        connection.commit()
+    except BaseException:
+        connection.rollback()
+        raise
 
 
 def render_notes(connection, directory, timezone='Asia/Ho_Chi_Minh'):
