@@ -41,7 +41,7 @@ function render(){
  updateFilter();
 }
 async function refresh(initial=false){
- const [local,session]=await Promise.all([chrome.storage.local.get(['base','token','status','report','autoEnabled','autoFilter','failures']),chrome.storage.session.get('run')]);
+ const [local,session]=await Promise.all([chrome.storage.local.get(['base','token','status','report','autoEnabled','autoFilter','failures','toolVersion']),chrome.storage.session.get('run')]);
  saved=local;run=session.run||null;
  if(initial){
   $('base').value=saved.base||'http://localhost:8080';
@@ -106,7 +106,7 @@ action('upload',async()=>{
 action('open-tool',()=>chrome.tabs.create({url:toolURL($('base').value.trim()||saved.base)}),false);
 action('show-report',()=>{$('report-panel').open=true;$('report-panel').scrollIntoView({block:'start'});},false);
 action('copy-report',async()=>{
- const report=`Sổ ghi chép Gmail ${chrome.runtime.getManifest().version}\nLịch tự động: ${saved.autoEnabled?'bật':'tắt'}\nPhạm vi: ${JSON.stringify(saved.autoFilter||{period:'catchup'})}\n\n${saved.status||'Chưa chạy.'}\n\n${reportText(saved.report)}`;
+ const report=`Sổ ghi chép Gmail ${chrome.runtime.getManifest().version}\nPhiên bản tool: ${saved.toolVersion||'chưa kiểm tra'}\nLịch tự động: ${saved.autoEnabled?'bật':'tắt'}\nPhạm vi: ${JSON.stringify(saved.autoFilter||{period:'catchup'})}\n\n${saved.status||'Chưa chạy.'}\n\n${reportText(saved.report)}`;
  try{await navigator.clipboard.writeText(report);}catch{throw Error('Chưa sao chép được. Bạn có thể chọn nội dung báo cáo bên dưới để sao chép.');}
  $('copy-report').textContent='Đã sao chép báo cáo';
 },false);

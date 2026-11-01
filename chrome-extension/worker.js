@@ -15,7 +15,7 @@ async function api(path,body,override){const config=override||await chrome.stora
 async function syncHistoryGeneration(check){
  const remote=Number(check?.history_generation||0),saved=await chrome.storage.local.get('historyGeneration'),local=saved.historyGeneration;
  if(local!==undefined&&local!==remote)await chrome.storage.local.remove(['processedMails','failures','scanCursors']);
- await chrome.storage.local.set({historyGeneration:remote});
+ await chrome.storage.local.set({historyGeneration:remote,toolVersion:typeof check?.version==='string'?check.version.slice(0,32):'không rõ'});
 }
 function migratedFailures(items){return (items||[]).filter(item=>item&&typeof item==='object').map(item=>({...item,stage:item.stage||'process-pdf',attempts:item.attempts||1,updatedAt:item.updatedAt||item.createdAt||Date.now()}));}
 async function mirrorAutomationState(){const saved=await chrome.storage.local.get(['failures','scanCursors','autoEnabledAt','autoFilter']),failures=migratedFailures(saved.failures),autoFilter=validateAutoFilter(saved.autoFilter);await chrome.storage.local.set({failures,autoFilter});await api('/extension/automation-state',{action:'save',failures,scan_cursors:saved.scanCursors||{},auto_enabled_at:saved.autoEnabledAt||null,auto_filter:autoFilter});}

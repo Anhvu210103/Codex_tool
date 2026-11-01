@@ -3,13 +3,34 @@ import shutil
 import tempfile
 import unittest
 import os
+import json
+import hashlib
 from pathlib import Path
 from unittest.mock import patch
 
 from mailnotes.web import create_app
+from mailnotes.admin import private_json
 
 
 class StartupTests(unittest.TestCase):
+    def test_backend_version_is_frozen_for_the_running_instance_and_matches_extension(self):
+        with tempfile.TemporaryDirectory() as directory:
+            app=create_app(data_root=directory);client=app.test_client()
+            expected=json.loads((Path(__file__).resolve().parents[1]/'chrome-extension/manifest.json').read_text(encoding='utf-8'))['version']
+            self.assertEqual(client.get('/health').get_json()['version'],expected)
+            private_json(app.extensions['admin'].private/'extension-token.json',{'hash':hashlib.sha256(b'test-pair').hexdigest()})
+            ping=client.post('/extension/ping',json={},headers={'Origin':'chrome-extension://'+'a'*32,'Authorization':'Bearer test-pair'})
+            self.assertEqual(ping.get_json()['version'],expected)
+            with patch('mailnotes.web.VERSION','future-unloaded-source'):
+                self.assertEqual(client.get('/health').get_json()['version'],expected)
+                self.assertIn('Sổ ghi chép · v'+expected,client.get('/').get_data(as_text=True))
+
+    def test_updated_template_shows_restart_instruction_for_an_older_backend(self):
+        with tempfile.TemporaryDirectory() as directory:
+            app=create_app(data_root=directory)
+            with app.test_request_context('/'):
+                page=app.jinja_env.get_template('admin.html').render(asset_version='test')
+            self.assertIn('Cần mở lại tool sau cập nhật',page)
     def test_managed_install_can_override_data_directory(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'MAILNOTES_DATA_DIR':directory}):
             app=create_app()

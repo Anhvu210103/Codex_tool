@@ -1,6 +1,6 @@
 [project]
 name = "mailnotes"
-version = "0.1.0"
+version = "0.9.3"
 description = "Rule-based Gmail document notebook"
 requires-python = ">=3.11"
 dependencies = ["pypdf==6.1.1"]

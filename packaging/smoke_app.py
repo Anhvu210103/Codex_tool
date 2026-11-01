@@ -64,6 +64,8 @@ def verify_workflow(opener, base, session, data):
         manifest=json.loads(archive.read('SoGhiChep-AI-Gmail/manifest.json'))
         if manifest['manifest_version']!=3:
             raise RuntimeError('Packaged extension missing')
+        if manifest['version']!=json.loads(request('/health')).get('version'):
+            raise RuntimeError('Packaged backend and Chrome extension have different versions')
     if sys.platform in ('linux', 'darwin', 'win32'):
         downloads=data/'Downloads';downloads.mkdir(exist_ok=True)
         local_pdf=downloads/'browser.pdf';local_pdf.write_bytes(text_pdf)

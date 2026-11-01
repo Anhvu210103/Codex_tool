@@ -19,3 +19,12 @@ Các lệnh debugger được xếp hàng và gắn với thế hệ lượt ch�
 Chromium trong workspace chặn unpacked extensions bằng chính sách quản trị. Không sửa chính sách này; bài kiểm tra native được chạy trên GitHub Actions với Chromium do Playwright cung cấp. Không dùng tài khoản Gmail thật hoặc gọi GreenNode trong bài kiểm tra này.
 
 Bộ kiểm thử Python và các phép thử giao diện của 0.9.2 tiếp tục được chạy. Kết quả native được xác nhận bằng lượt CI của bản chốt.
+
+## Phục hồi và tải lớn
+
+- Cache AI lỗi được thay bằng kết quả hợp lệ ở lần thử lại, không ghi một cache hit miễn phí giả. Phản hồi API sai cấu trúc vẫn được ghi usage đã trả về và không tạo ghi chép sai.
+- Trạng thái đang chạy được ghi trước khi xử lý; khởi động lại nhận ra lượt gián đoạn. Lỗi tạo worker hoặc ghi trạng thái không làm giữ khóa xử lý.
+- Lỗi HTTP bất ngờ trả mã tra cứu và ghi stack trace riêng trong errors.log.
+- Khi tắt máy chủ, Gmail hoàn tất tài liệu hiện tại rồi ngừng lấy tài liệu tiếp theo.
+- Thống kê chi phí đọc lịch sử từng dòng, không nạp snapshot giá và ID tài liệu vào RAM. Phép thử 12.000 dòng với snapshot 2 KB/dòng tái hiện mức cấp phát 33,3 MB trước sửa; bản mới đạt giới hạn dưới 10 MB và vẫn trả đúng 50 lượt gần nhất.
+- Backend và tiện ích có phiên bản đối chiếu; báo cáo tiện ích ghi phiên bản tool đang kết nối. Phiên bản backend giữ nguyên cho tới khi khởi động lại, kể cả khi tệp giao diện trên đĩa đã cập nhật.

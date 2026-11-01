@@ -74,6 +74,9 @@ def main():
                     assert worker.url.endswith('/worker.js'),worker.url
                     keeper=context.pages[0] if context.pages else context.new_page()
                     worker.evaluate('(config)=>chrome.storage.local.set(config)',{'base':origin,'token':token,'capabilities':['local-download-pdf']})
+                    ping=worker.evaluate("()=>api('/extension/ping',{})")
+                    assert ping.get('version')==json.loads((extension/'manifest.json').read_text(encoding='utf-8'))['version']
+                    worker.evaluate('(ping)=>syncHistoryGeneration(ping)',ping)
                     worker.evaluate("()=>{globalThis.nativeDownloadEvents=[];chrome.downloads.onChanged.addListener(change=>{nativeDownloadEvents.push(change);if(nativeDownloadEvents.length>100)nativeDownloadEvents.shift();});}")
                     requests=[]
                     def route(request):

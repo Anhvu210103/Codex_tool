@@ -17,6 +17,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from .database import connect
+from .version import VERSION
 
 from flask import Flask, jsonify, redirect, render_template, request, send_file, session
 
@@ -38,7 +39,7 @@ def create_app(base=None, data_root=None, public_url=None):
         raise ValueError('Public URL must be a plain HTTP(S) origin')
     if parsed.scheme != 'https' and parsed.hostname not in ('localhost', '127.0.0.1', '::1'):
         raise ValueError('Use HTTPS for remote deployment')
-    app.config.update(TEMPLATES_AUTO_RELOAD=True, SECRET_KEY=read_json(secret_path, {})['key'], MAX_CONTENT_LENGTH=22 * 1024 * 1024,
+    app.config.update(APP_VERSION=VERSION,TEMPLATES_AUTO_RELOAD=True, SECRET_KEY=read_json(secret_path, {})['key'], MAX_CONTENT_LENGTH=22 * 1024 * 1024,
                       SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax',
                       SESSION_COOKIE_SECURE=parsed.scheme == 'https', PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
                       TRUSTED_HOSTS=[parsed.hostname, 'localhost', '127.0.0.1'])
@@ -69,7 +70,7 @@ def create_app(base=None, data_root=None, public_url=None):
         digest = hashlib.sha256()
         for name in ('admin.css', 'admin.js'):
             digest.update((static / name).read_bytes())
-        return {'asset_version': digest.hexdigest()[:16]}
+        return {'asset_version': digest.hexdigest()[:16],'app_version':app.config['APP_VERSION']}
 
     def csrf():
         if 'csrf' not in session:
@@ -152,7 +153,7 @@ def create_app(base=None, data_root=None, public_url=None):
 
     @app.get('/health')
     def health():
-        return jsonify(app='mailnotes', instance=app.config.get('DESKTOP_INSTANCE'))
+        return jsonify(app='mailnotes',version=app.config['APP_VERSION'], instance=app.config.get('DESKTOP_INSTANCE'))
 
     @app.get('/')
     def home():
@@ -271,7 +272,7 @@ def create_app(base=None, data_root=None, public_url=None):
     @app.post('/extension/ping')
     def extension_ping():
         import sys
-        return jsonify(app='mailnotes-extension', protocol=1,
+        return jsonify(app='mailnotes-extension', protocol=1,version=app.config['APP_VERSION'],
                        capabilities=['local-download-pdf'] if sys.platform in ('linux', 'darwin', 'win32') else [],
                        history_generation=read_json(admin.private / 'extension-history.json', {'generation': 0}).get('generation', 0))
 
