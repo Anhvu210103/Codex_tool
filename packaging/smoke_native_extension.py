@@ -5,6 +5,7 @@ Requires a Chromium installation that permits unpacked extensions. No Gmail
 account, external provider request, or document from a customer is used.
 """
 import argparse
+import base64
 import hashlib
 import io
 import json
@@ -17,7 +18,6 @@ import threading
 import time
 import traceback
 from unittest.mock import patch
-from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import sync_playwright
 from pypdf import PdfWriter
@@ -33,9 +33,9 @@ PAGE='''<!doctype html><meta charset="utf-8"><title>Synthetic Gmail test</title>
 <style>body{font:20px Arial;padding:60px}.zA{padding:20px;border:1px solid #777;cursor:pointer}.aZo{display:inline-flex;flex-direction:column;width:220px;margin:24px;padding:16px;border:1px solid #777}.aV3{height:90px}a[role=button]{display:block;width:50px;height:50px;padding:8px;background:#ddd}svg{width:30px;height:30px}</style>
 <div id="list"><div class="zA" data-legacy-thread-id="native-thread" data-legacy-message-id="native-message">Office — two PDF attachments for native test</div></div>
 <div id="mail" hidden><button id="back" aria-label="Quay lại danh sách">Back</button>
-<div class="aZo" data-attachment-id="one"><div class="aV3">native-one.pdf</div><a role="button" aria-label="Tải xuống tệp đính kèm native-one.pdf" href="?view=att&fixture=one" download="native-one.pdf"><svg><path d="M15 0v25m-10-10 10 10 10-10" stroke="black" fill="none"/></svg></a></div>
-<div class="aZo" data-attachment-id="two"><div class="aV3">native-two.pdf</div><a role="button" aria-label="Tải xuống tệp đính kèm native-two.pdf" href="?view=att&fixture=two" download="native-two.pdf"><svg><path d="M15 0v25m-10-10 10 10 10-10" stroke="black" fill="none"/></svg></a></div></div>
-<script>document.querySelector('.zA').onclick=()=>{document.querySelector('#list').hidden=true;document.querySelector('#mail').hidden=false;location.hash='search/native/message0000000001';};document.querySelector('#back').onclick=()=>{document.querySelector('#list').hidden=false;document.querySelector('#mail').hidden=true;location.hash='search/native';};</script>'''
+<div class="aZo" data-attachment-id="one"><div class="aV3">native-one.pdf</div><a role="button" data-fixture="one" aria-label="Tải xuống tệp đính kèm native-one.pdf" href="#" download="native-one.pdf"><svg><path d="M15 0v25m-10-10 10 10 10-10" stroke="black" fill="none"/></svg></a></div>
+<div class="aZo" data-attachment-id="two"><div class="aV3">native-two.pdf</div><a role="button" data-fixture="two" aria-label="Tải xuống tệp đính kèm native-two.pdf" href="#" download="native-two.pdf"><svg><path d="M15 0v25m-10-10 10 10 10-10" stroke="black" fill="none"/></svg></a></div></div>
+<script>const documents=__DOCUMENTS__;for(const link of document.querySelectorAll('[data-fixture]')){const bytes=Uint8Array.from(atob(documents[link.dataset.fixture]),character=>character.charCodeAt(0));link.href=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));}document.querySelector('.zA').onclick=()=>{document.querySelector('#list').hidden=true;document.querySelector('#mail').hidden=false;location.hash='search/native/message0000000001';};document.querySelector('#back').onclick=()=>{document.querySelector('#list').hidden=false;document.querySelector('#mail').hidden=true;location.hash='search/native';};</script>'''
 
 
 class QuietHandler(WSGIRequestHandler):
@@ -77,13 +77,11 @@ def main():
                     requests=[]
                     def route(request):
                         requests.append(request.request.url)
-                        query=parse_qs(urlsplit(request.request.url).query)
-                        if query.get('view')==['att']:
-                            name=query.get('fixture',['one'])[0]
-                            request.fulfill(status=200,headers={'Content-Type':'application/pdf','Content-Disposition':f'attachment; filename="native-{name}.pdf"'},body=pdf(name))
-                        else:request.fulfill(status=200,content_type='text/html',body=PAGE)
+                        payload={name:base64.b64encode(pdf(name)).decode('ascii') for name in ('one','two')}
+                        request.fulfill(status=200,content_type='text/html',body=PAGE.replace('__DOCUMENTS__',json.dumps(payload)))
                     context.route('https://mail.google.com/**',route)
                     page=context.new_page();page.goto('https://mail.google.com/mail/u/0/#search/native');page.bring_to_front()
+                    assert page.locator('a[download]').evaluate_all("links=>links.every(link=>link.href.startsWith('blob:https://mail.google.com/'))")
                     cdp=context.new_cdp_session(page)
                     cdp.send('Browser.setDownloadBehavior',{'behavior':'allow','downloadPath':str(downloads),'eventsEnabled':True})
                     tab=worker.evaluate("async()=>{const tabs=await chrome.tabs.query({url:'https://mail.google.com/*'});return tabs[0].id;}")
@@ -108,8 +106,8 @@ def main():
                     duplicate=wait_done()
                     assert admin.notes('ai')['total']==2,duplicate
                     assert len(list(downloads.glob('*.pdf')))==2,'A duplicate run downloaded the same attachments again'
-                    targets=worker.evaluate('()=>chrome.debugger.getTargets()')
-                    assert not any(target.get('tabId')==tab and target.get('attached') for target in targets)
+                    detached=worker.evaluate("async tab=>{try{await chrome.debugger.sendCommand({tabId:tab},'Runtime.evaluate',{expression:'1'});return false;}catch{return true;}}",tab)
+                    assert detached,'The extension still owns the debugger after finishing'
                     worker.evaluate('(tab)=>beginRun({id:tab},1)',tab)
                     page.close()
                     deadline=time.monotonic()+5

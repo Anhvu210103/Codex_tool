@@ -374,7 +374,8 @@ class Admin:
             raise ValueError('Đang có lượt xử lý. Chờ hoàn tất rồi tải PDF.')
         try:
             with self.lock:
-                self.state.update(running=True,last_started=datetime.now(timezone.utc).isoformat(),last_source=source,error=None)
+                self.state.update(running=True,last_started=datetime.now(timezone.utc).isoformat(),last_source=source,last_added=0,error=None)
+                private_json(self.private/'status.json',self.state)
             added = self._process_pdf_locked(data, filename, reprocess, source)
             with self.lock:
                 self.state.update(last_added=added,error=None)
@@ -516,17 +517,25 @@ class Admin:
     def start_run(self, source=None):
         if not self.run_lock.acquire(blocking=False):
             return False
+        prepared=False
         try:
             config = self.config()
             source = source or config['source']
             if source not in ('demo', 'gmail'):
                 raise ValueError('Nguồn không hợp lệ.')
             with self.lock:
-                self.state.update(running=True, last_started=datetime.now(timezone.utc).isoformat(), last_source=source, error=None)
+                self.state.update(running=True, last_started=datetime.now(timezone.utc).isoformat(), last_source=source, last_added=0, error=None)
+                prepared=True
+                private_json(self.private/'status.json',self.state)
             thread = threading.Thread(target=self._run, args=(config, source), daemon=True)
             thread.start()
             return True
-        except Exception:
+        except Exception as error:
+            if prepared:
+                with self.lock:
+                    self.state.update(running=False,last_finished=datetime.now(timezone.utc).isoformat(),last_added=None,error=error_message(error))
+                    try:private_json(self.private/'status.json',self.state)
+                    except OSError:pass
             self.run_lock.release()
             raise
 

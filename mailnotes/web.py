@@ -139,7 +139,8 @@ def create_app(base=None, data_root=None, public_url=None):
 
     @app.errorhandler(500)
     def internal(error):
-        return jsonify(error='Lỗi hệ thống. Kiểm tra cấu hình máy chủ rồi thử lại.'), 500
+        cause=getattr(error,'original_exception',None) or error
+        return jsonify(error=private_error('HTTP '+request.method+' '+request.path,cause)),500
 
     def payload():
         if request.content_length and request.content_length > 128 * 1024:
