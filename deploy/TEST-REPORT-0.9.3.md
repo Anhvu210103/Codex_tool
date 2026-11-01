@@ -4,12 +4,14 @@
 
 Mã nguồn `b797e24`; [CI 41284282268](https://github.com/Anhvu210103/Codex_tool/actions/runs/41284282268) thành công trên cả bốn hệ máy. Bộ kiểm thử Python, Node, 21 tình huống trình duyệt, tích hợp Chrome native và smoke test ứng dụng đóng gói đều đã qua các bước áp dụng tương ứng.
 
-| Gói test | Tải artifact (cần đăng nhập GitHub) |
+| Gói test | Tải gói |
 | --- | --- |
-| Windows x86_64 | [SoGhiChep-Windows-x86_64](https://github.com/Anhvu210103/Codex_tool/actions/runs/41284282268/artifacts/13074089950) |
+| Windows x86_64 | [ZIP công khai, không cần đăng nhập](https://github.com/Anhvu210103/Codex_tool/releases/download/windows-v0.9.3/SoGhiChep-Windows-x86_64.zip) |
 | Linux x86_64 | [SoGhiChep-Linux-x86_64](https://github.com/Anhvu210103/Codex_tool/actions/runs/41284282268/artifacts/13074732880) |
 | Mac Apple Silicon | [SoGhiChep-macOS-AppleSilicon](https://github.com/Anhvu210103/Codex_tool/actions/runs/41284282268/artifacts/13073993305) |
 | Mac Intel | [SoGhiChep-macOS-Intel](https://github.com/Anhvu210103/Codex_tool/actions/runs/41284282268/artifacts/13074209674) |
+
+Windows được phát hành lại từ đúng artifact đã kiểm thử bởi [CI xuất bản 41312888897](https://github.com/Anhvu210103/Codex_tool/actions/runs/41312888897). Link công khai đã được tải thử không có thông tin đăng nhập: HTTP 200, ZIP 14.996.600 byte, CRC/SHA256 hợp lệ, chỉ có `SoGhiChep.exe` x86_64 và `HUONG-DAN.txt`. Artifact Linux/Mac vẫn cần đăng nhập GitHub.
 
 Các phép thử không dùng tài khoản Gmail khách hoặc gọi API GreenNode thật; hai phần này vẫn cần nghiệm thu tại máy khách.
 
