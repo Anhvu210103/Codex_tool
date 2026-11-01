@@ -217,23 +217,27 @@ async function readyDownload(cancelled,mail,file) {
  return null;
 }
 async function waitDownload(cancelled) {
- const started=Date.now(), deadline=started+120000;let reported=-1;
+ // OCR can take 180s, followed by up to two 60s classification attempts.
+ const started=Date.now(), deadline=started+360000;let reported=-1,downloadStarted=false;
  while (!cancelled() && Date.now()<deadline) {
   const elapsed=Math.floor((Date.now()-started)/5000);
   if(elapsed!==reported){reported=elapsed;await progress('Đang chờ Chrome tải PDF và tool lưu vào sổ... '+(elapsed*5)+' giây');}
   const state = await send({type:'download-state'});
+  downloadStarted=downloadStarted||Number.isInteger(state.downloadId);
   if (state.error) {
    const error=Error(state.error);
    // The PDF already reached Chrome. A backend/AI error must stay in the
    // retry queue instead of reopening Gmail's viewer and downloading twice.
-   error.downloadStarted=state.downloadId!==null;
+   error.downloadStarted=downloadStarted;
    throw error;
   }
   if (state.result) return state.result;
-  if (!state.downloadId && Date.now()-started>=30000) throw Error('Chrome chưa bắt đầu tải PDF sau 30 giây. Mở Báo cáo lần chạy để xem nút đã bấm và phản hồi của Chrome.');
+  if (!downloadStarted && Date.now()-started>=30000) throw Error('Chrome chưa bắt đầu tải PDF sau 30 giây. Mở Báo cáo lần chạy để xem nút đã bấm và phản hồi của Chrome.');
   await pause(500);
  }
- throw Error('Chưa nhận được PDF từ Chrome trong 2 phút.');
+ const error=Error(cancelled()?'Đã dừng lượt quét.':downloadStarted?'PDF đã bắt đầu tải nhưng tool chưa trả kết quả sau 6 phút. Kiểm tra sổ và báo cáo trước khi thử lại.':'Chưa nhận được PDF từ Chrome.');
+ error.downloadStarted=downloadStarted;
+ throw error;
 }
 function clickPoint(button) {
  const r=button.getBoundingClientRect();
