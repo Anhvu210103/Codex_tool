@@ -26,6 +26,10 @@ Chromium trong workspace chặn unpacked extensions bằng chính sách quản t
 
 Bộ kiểm thử Python và các phép thử giao diện của 0.9.2 tiếp tục được chạy. Kết quả native được xác nhận bằng lượt CI của bản chốt.
 
+`tests/browser/extension_batch.py` đã chạy thành công 17 tình huống trong trình duyệt: đủ 20 thư/21 PDF, không tải trùng, thêm PDF vào thư cũ, thử lại file lỗi, ô PDF bị che, Chrome không bắt đầu tải sau click, bấm lại có giới hạn, Close bị bỏ qua và dùng Esc, click không tới nút, thư chưa đọc biến mất khỏi kết quả, chuyển trang, tìm kiếm trống, nhận diện thư bằng URL hoặc metadata, và đính kèm hiện muộn. Bộ này được đưa vào release-check và CI để tránh lệch khỏi mã đang phát hành. Worker trong bộ này được giả lập; bài native riêng dùng API Chrome và backend thật.
+
+Kiểm tra cục bộ: 142 bài unittest Python đạt; ba bộ Node về tải file và tranh chấp lượt chạy đạt; popup, 14 trường hợp DOM nút tải, khôi phục content session, giao diện quản trị và 17 tình huống batch đều đạt. OCR qua model và Gmail tài khoản khách vẫn cần nghiệm thu thật.
+
 ## Giới hạn thời gian chờ
 
 Yêu cầu điều khiển từ tiện ích tới localhost có thời hạn 15 giây; chọn thao tác AI có 90 giây; nhập và xử lý PDF có 6 phút. Thời hạn bao gồm đọc thân phản hồi. Lỗi trả thông báo có thể xử lý và luôn giải phóng bộ hẹn giờ; không treo tiện ích vô hạn khi máy chủ ngừng trả dữ liệu.

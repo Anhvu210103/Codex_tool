@@ -61,6 +61,7 @@ jobs:
           python packaging/smoke_extension_download.py
           python packaging/smoke_extension_sessions.py
           python packaging/smoke_admin_ui.py
+          python -u tests/browser/extension_batch.py
           python packaging/smoke_native_extension.py
       - run: python packaging/build.py
       - run: python packaging/smoke_app.py
