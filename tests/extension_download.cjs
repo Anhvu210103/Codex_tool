@@ -32,7 +32,7 @@ global.fetch = async (url, options) => {
   if (url.endsWith('/extension/ping')) return new Response(JSON.stringify({app:'mailnotes-extension',protocol:1,capabilities:['local-download-pdf']}),{headers:{'content-type':'application/json'}});
   if (url.endsWith('/extension/automation-state')) return new Response(JSON.stringify(JSON.parse(options.body).action==='load'?{failures:[],scan_cursors:{},auto_enabled_at:null}:{ok:true}),{headers:{'content-type':'application/json'}});
   if (url.endsWith('/extension/import-local')) {
-    assert(['/Downloads/report.pdf','/Downloads/first.pdf','/Downloads/second.pdf','/Downloads/wanted.pdf','/Downloads/Itinerary_5RFR45.pdf'].includes(JSON.parse(options.body).path));
+    assert(['/Downloads/report.pdf','/Downloads/first.pdf','/Downloads/second.pdf','/Downloads/wanted.pdf','/Downloads/Itinerary_5RFR45.pdf','/Downloads/report (2026) (7).pdf'].includes(JSON.parse(options.body).path));
     return new Response(JSON.stringify({available: localAvailable, ...saved}), {headers: {'content-type': 'application/json'}});
   }
   assert(url.endsWith('/extension/pdf'));
@@ -115,6 +115,12 @@ function begin(id, capabilities = [], expectedName = 'report.pdf') {
   item.filename='/Downloads/report.pdf';item.state='complete';
   await listeners.changed({id:18,filename:{current:item.filename},state:{current:'complete'}});
   assert(session.run.pending.result,'A download seen immediately must still be imported if Chrome reports its filename after 20 seconds');
+  begin(19,['local-download-pdf'],'report (2026).pdf');
+  item.filename='/Downloads/report (2026) (7).pdf';item.state='complete';
+  await listeners.created({...item});
+  assert(session.run.pending.result,'Chrome adding a duplicate suffix must preserve parentheses already present in the original name');
+  assert.equal(downloadNameMatches('/Downloads/report.pdf','report (2026).pdf'),false,'A name without the original parentheses is another document');
+  assert.equal(downloadNameMatches('/Downloads/report (2025).pdf','report (2026).pdf'),false,'Different original numbers must not be treated as Chrome duplicate suffixes');
   begin(13);
   activeTab = 2;
   item.url = 'https://example.org/unrelated.pdf'; item.filename = '/Downloads/unrelated.pdf'; item.state = 'complete';

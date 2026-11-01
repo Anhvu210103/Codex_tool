@@ -240,7 +240,8 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
 const claimedDownloads=new Set();
 const downloadEvents=new Map();
 function queueDownload(id,task){const operation=(downloadEvents.get(id)||Promise.resolve()).catch(()=>{}).then(task);downloadEvents.set(id,operation);const clear=()=>{if(downloadEvents.get(id)===operation)downloadEvents.delete(id);};operation.then(clear,clear);return operation;}
-function comparableName(path){return String(path||'').split(/[\\/]/).pop().normalize('NFC').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').replace(/\s*\(\d+\)(?=\s*\.pdf$)/i,'').replace(/\s+(?=\.pdf$)/i,'').replace(/\s+/g,' ').trim().toLocaleLowerCase('vi');}
+function comparableName(path){return String(path||'').split(/[\\/]/).pop().normalize('NFC').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').replace(/\s+(?=\.pdf$)/i,'').replace(/\s+/g,' ').trim().toLocaleLowerCase('vi');}
+function downloadNameMatches(actual,expected){const a=comparableName(actual),e=comparableName(expected);return a===e||a.replace(/\s*\(\d+\)(?=\.pdf$)/i,'')===e;}
 async function handleDownload(item,expectedRun){
  const {run}=await chrome.storage.session.get('run');let pending=run?.pending;
  if(expectedRun&&!sameRun(run,expectedRun))return;
@@ -258,7 +259,7 @@ async function handleDownload(item,expectedRun){
   if(pending.downloadId===null){
    const candidate=current=>({...current,candidates:[...new Set([...(current.candidates||[]),item.id])]});
    if(!item.filename){await changePending(run,current=>current.downloadId===null?candidate(current):undefined);return;}
-   if(comparableName(item.filename)!==comparableName(pending.expectedName)){const mismatch=comparableName(item.filename);const updated=await changePending(run,current=>current.downloadId===null?{...candidate(current),lastMismatch:mismatch}:undefined);if(updated&&pending.lastMismatch!==mismatch)await appendReport({phase:'chrome-ten-khong-khop',file:(item.filename||'').split(/[\\/]/).pop(),detail:'đang chờ '+pending.expectedName});return;}
+   if(!downloadNameMatches(item.filename,pending.expectedName)){const mismatch=comparableName(item.filename);const updated=await changePending(run,current=>current.downloadId===null?{...candidate(current),lastMismatch:mismatch}:undefined);if(updated&&pending.lastMismatch!==mismatch)await appendReport({phase:'chrome-ten-khong-khop',file:(item.filename||'').split(/[\\/]/).pop(),detail:'đang chờ '+pending.expectedName});return;}
    const claimed=await changePending(run,current=>!current.result&&!current.error&&(current.downloadId===null||current.downloadId===item.id)?{...candidate(current),downloadId:item.id}:undefined);if(!claimed)return;pending=claimed.pending;await appendReport({phase:'chrome-bat-dau',detail:'lượt '+item.id+' · sau '+Math.round((Date.now()-pending.armedAt)/1000)+' giây · '+url.protocol+' · '+url.hostname+' · '+item.state,file:(item.filename||'').split(/[\\/]/).pop()});
   }
   if(item.state==='interrupted'){if(await changePending(run,current=>current.downloadId===item.id&&!current.result?{...current,error:'Chrome báo tải PDF thất bại.'}:undefined))await appendReport({phase:'chrome-loi',detail:'Lượt tải '+item.id+' bị gián đoạn'});return;}

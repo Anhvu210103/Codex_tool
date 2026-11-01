@@ -44,6 +44,8 @@ Thanh công cụ PDF ưu tiên nút có nhãn, sau đó biểu tượng tải n�
 
 Lượt tải đã được nhận diện ngay từ đầu vẫn được theo dõi khi Chrome mất hơn 15 giây để cung cấp tên file. ID tải bằng 0 trong nhánh đến muộn không làm bấm tải lại. Tiện ích gửi tên PDF gốc bên cạnh đường dẫn Downloads để Markdown mới không bị đổi tên theo hậu tố “(1)” của Chrome; backend kiểm tra tên trước khi xử lý.
 
+Tên gốc có ngoặc số, ví dụ `report (2026).pdf`, vẫn khớp khi Chrome lưu thành `report (2026) (7).pdf`. Chỉ bỏ hậu tố phát sinh ở tên thực tải, giữ số trong tên gốc; phép thử âm ngăn gộp `report.pdf` hoặc `report (2025).pdf` thành tài liệu năm 2026.
+
 ## Phục hồi và tải lớn
 
 - Cache AI lỗi được thay bằng kết quả hợp lệ ở lần thử lại, không ghi một cache hit miễn phí giả. Phản hồi API sai cấu trúc vẫn được ghi usage đã trả về và không tạo ghi chép sai.
