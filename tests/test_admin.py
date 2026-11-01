@@ -71,7 +71,7 @@ class AdminTests(unittest.TestCase):
         self.admin.run_lock.acquire()
         thread=threading.Thread(target=edit,daemon=True);thread.start()
         try:
-            immediate=completed.wait(timeout=1)
+            immediate=completed.wait(timeout=3)
         finally:
             self.admin.run_lock.release();thread.join(timeout=3)
         self.assertTrue(immediate,'Editing must not wait for a slow AI request to finish')

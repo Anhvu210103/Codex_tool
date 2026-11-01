@@ -49,6 +49,8 @@ class FolderInboxTests(unittest.TestCase):
                 (root/name).write_bytes(b'%PDF-test')
             with (root/'large.pdf').open('wb') as stream:
                 stream.truncate(21*1024*1024)
+            old=time.time()-10
+            for path in root.iterdir():os.utime(path,(old,old))
             errors=[]
             with patch('mailnotes.folder_inbox.os.open', wraps=os.open) as opened:
                 candidates=iter_ready_pdfs(root,minimum_age=0,errors=errors)
