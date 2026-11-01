@@ -9,6 +9,7 @@ Tái hiện và sửa các nhánh bất đồng bộ sau:
 - Bật lịch chưa xong rồi tắt: bước bật cũ không được ghi đè lựa chọn tắt mới hơn.
 - Bắt đầu lại ngay sau khi hủy một kết nối dở dang: Chrome được nhả kết nối trước khi nhận lượt mới.
 - Dừng một lượt được khôi phục từ storage sau khi worker khởi động lại: phải nhả debugger, kể cả bản đồ sở hữu trong RAM chưa có lượt đó.
+- Tắt lịch hoặc nhận sự kiện ngắt Chrome của lượt cũ trong lúc một lượt chạy tay mới bắt đầu: chỉ dừng đúng lượt đã yêu cầu.
 
 Các lệnh debugger được xếp hàng và gắn với thế hệ lượt chạy. Các thay đổi lịch dùng thế hệ riêng để giữ lựa chọn cuối cùng của người dùng. Kiểm thử: `node tests/extension_lifecycle_race.cjs`.
 
@@ -19,6 +20,10 @@ Các lệnh debugger được xếp hàng và gắn với thế hệ lượt ch�
 Chromium trong workspace chặn unpacked extensions bằng chính sách quản trị. Không sửa chính sách này; bài kiểm tra native được chạy trên GitHub Actions với Chromium do Playwright cung cấp. Không dùng tài khoản Gmail thật hoặc gọi GreenNode trong bài kiểm tra này.
 
 Bộ kiểm thử Python và các phép thử giao diện của 0.9.2 tiếp tục được chạy. Kết quả native được xác nhận bằng lượt CI của bản chốt.
+
+## Giới hạn thời gian chờ
+
+Yêu cầu điều khiển từ tiện ích tới localhost có thời hạn 15 giây; chọn thao tác AI có 90 giây; nhập và xử lý PDF có 6 phút. Thời hạn bao gồm đọc thân phản hồi. Lỗi trả thông báo có thể xử lý và luôn giải phóng bộ hẹn giờ; không treo tiện ích vô hạn khi máy chủ ngừng trả dữ liệu.
 
 ## Phục hồi và tải lớn
 

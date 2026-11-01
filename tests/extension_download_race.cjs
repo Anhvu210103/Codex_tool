@@ -14,7 +14,7 @@ function harness(){
   alarms:{onAlarm:{addListener(){}}},permissions:{async contains(){return true;}},
   debugger:{onDetach:{addListener(){}},async detach(){}},tabs:{async sendMessage(){}},
   downloads:{onCreated:{addListener(fn){listeners.created=fn;}},onChanged:{addListener(){}}}};
- const context={chrome,console,URL,Blob,FormData,TextDecoder,Date,setTimeout,clearTimeout,
+ const context={chrome,console,URL,Blob,FormData,TextDecoder,Date,AbortController,setTimeout,clearTimeout,
   async fetch(){requests++;return new Response(JSON.stringify({available:true,added:1,filename:'report.pdf'}),{headers:{'content-type':'application/json'}});}};
  vm.createContext(context);vm.runInContext(fs.readFileSync('chrome-extension/worker.js','utf8'),context);
  const run=started=>({tab:1,started,pending:{armedAt:started,expectedName:'report.pdf',downloadId:null,candidates:[],result:null,error:null}});

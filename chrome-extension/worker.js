@@ -11,7 +11,27 @@ function changeRun(change){const operation=runWrites.catch(()=>{}).then(async()=
 function changeAuto(generation,change){const operation=autoWrites.catch(()=>{}).then(()=>generation===autoGeneration?change():false);autoWrites=operation.then(()=>{},()=>{});return operation;}
 function changePending(expected,change){return changeRun(current=>{if(!sameRun(current,expected)||!current.pending||current.pending.armedAt!==expected.pending?.armedAt||current.pending.expectedName!==expected.pending?.expectedName)return;const pending=change(current.pending);return pending===undefined?undefined:{...current,pending};});}
 function baseURL(value){let url;try{url=new URL(value);}catch{throw Error('Địa chỉ Sổ ghi chép chưa đúng. Kiểm tra địa chỉ trang đang mở rồi thử lại.');}if(url.protocol!=='http:'||!['localhost','127.0.0.1'].includes(url.hostname)||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw Error('Chỉ dùng địa chỉ tool localhost trên máy này.');return url.origin;}
-async function api(path,body,override){const config=override||await chrome.storage.local.get(['base','token']);if(!config.token)throw Error('Dán mã ghép nối từ Cài đặt tool trước.');const headers={Authorization:'Bearer '+config.token};if(!(body instanceof FormData))headers['Content-Type']='application/json';let response;try{response=await fetch(baseURL(config.base||'http://localhost:8080')+path,{method:'POST',headers,body:body instanceof FormData?body:JSON.stringify(body)});}catch{throw Error('Không kết nối được Sổ ghi chép. Bấm file mở tool trên máy rồi thử lại.');}if(!response.headers.get('content-type')?.includes('application/json'))throw Error('Địa chỉ này trả về trang HTML. Kiểm tra đúng cổng tool, tắt hẳn phiên tool cũ và mở bản mới.');let result;try{result=await response.json();}catch{throw Error('Tool trả dữ liệu không hợp lệ. Mở lại tool rồi thử lại.');}if(!response.ok)throw Error(result.error||'Tool từ chối kết nối.');return result;}
+async function api(path,body,override){
+ const config=override||await chrome.storage.local.get(['base','token']);
+ if(!config.token)throw Error('Dán mã ghép nối từ Cài đặt tool trước.');
+ const headers={Authorization:'Bearer '+config.token};
+ if(!(body instanceof FormData))headers['Content-Type']='application/json';
+ const timeout=['/extension/pdf','/extension/import-local'].includes(path)?360000:path==='/extension/choose'?90000:15000;
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeout);
+ const timeoutError=()=>Error(timeout===360000?'Tool chưa trả kết quả sau 6 phút. PDF có thể vẫn đang xử lý; kiểm tra sổ trước khi thử lại.':'Sổ ghi chép chưa phản hồi. Kiểm tra tool đang mở rồi thử lại.');
+ try{
+  let response;
+  try{response=await fetch(baseURL(config.base||'http://localhost:8080')+path,{method:'POST',headers,body:body instanceof FormData?body:JSON.stringify(body),signal:controller.signal});}
+  catch{throw controller.signal.aborted?timeoutError():Error('Không kết nối được Sổ ghi chép. Bấm file mở tool trên máy rồi thử lại.');}
+  if(!response.headers.get('content-type')?.includes('application/json'))throw Error('Địa chỉ này trả về trang HTML. Kiểm tra đúng cổng tool, tắt hẳn phiên tool cũ và mở bản mới.');
+  let result;
+  try{result=await response.json();}
+  catch{throw controller.signal.aborted?timeoutError():Error('Tool trả dữ liệu không hợp lệ. Mở lại tool rồi thử lại.');}
+  if(!result||typeof result!=='object'||Array.isArray(result))throw Error('Tool trả dữ liệu không hợp lệ. Kiểm tra đúng địa chỉ và phiên bản tool.');
+  if(!response.ok)throw Error(result.error||'Tool từ chối kết nối.');
+  return result;
+ }finally{clearTimeout(timer);}
+}
 async function syncHistoryGeneration(check){
  const remote=Number(check?.history_generation||0),saved=await chrome.storage.local.get('historyGeneration'),local=saved.historyGeneration;
  if(local!==undefined&&local!==remote)await chrome.storage.local.remove(['processedMails','failures','scanCursors']);
@@ -23,7 +43,24 @@ async function restoreAutomationState(config){const remote=await api('/extension
 async function upload(blob,name){if(blob.size>20*1024*1024)throw Error('PDF tối đa 20 MB.');const head=new TextDecoder().decode(await blob.slice(0,5).arrayBuffer());if(head!=='%PDF-')throw Error('Không tải được PDF hợp lệ. Hãy chọn PDF đã tải trong tiện ích.');const form=new FormData();form.append('file',blob,name);return api('/extension/pdf',form);}
 function resultMessage(result){return (result.added===0?'Đã có trong sổ, không tạo dòng mới: ':'Đã lưu mới: ')+(result.filename||'PDF')+'\nMở Sổ ghi chép để xem tài liệu.'+'\nNhóm: '+(result.categories?.join(', ')||'Cần xem lại')+(result.review_reason?'\nCần kiểm tra: '+result.review_reason:'')+(result.local_markdown_paths?.length?'\nMarkdown trên máy:\n'+result.local_markdown_paths.join('\n'):result.folder?'\nThư mục: '+result.folder:'');}
 async function detach(tab,owner,allowRestored=false){return debuggerCommand(async()=>{if(tab!==undefined&&(owner===undefined||debuggerOwners.get(tab)===owner||(allowRestored&&!debuggerOwners.has(tab)))){debuggerOwners.delete(tab);await chrome.debugger.detach({tabId:tab}).catch(()=>{});}});}
-async function stop(preserveManual=false){startGeneration++;if(!preserveManual)manualGeneration++;let stopped;await changeRun(current=>{stopped=current;return null;});if(stopped){await chrome.tabs.sendMessage(stopped.tab,{type:'stop'}).catch(()=>{});const pending=debuggerOperations>0,cleanup=detach(stopped.tab,stopped.generation,true);if(pending)cleanup.catch(()=>{});else await cleanup;}}
+async function stop({preserveManual=false,onlyAutomatic=false,expectedRun=null}={}){
+ const scoped=onlyAutomatic||expectedRun!==null;
+ const invalidate=()=>{startGeneration++;if(!preserveManual)manualGeneration++;};
+ if(!scoped)invalidate();
+ let stopped;
+ await changeRun(current=>{
+  if(onlyAutomatic&&!current?.automatic)return;
+  if(expectedRun&&!sameRun(current,expectedRun))return;
+  if(scoped)invalidate();
+  stopped=current;return null;
+ });
+ if(stopped){
+  await chrome.tabs.sendMessage(stopped.tab,{type:'stop'}).catch(()=>{});
+  const pending=debuggerOperations>0,cleanup=detach(stopped.tab,stopped.generation,true);
+  if(pending)cleanup.catch(()=>{});else await cleanup;
+ }
+ return !!stopped;
+}
 let reportWrites=Promise.resolve();
 function appendReport(event){reportWrites=reportWrites.catch(()=>{}).then(async()=>{const current=(await chrome.storage.local.get('report')).report||[];current.push({time:new Date().toLocaleTimeString('vi-VN'),phase:String(event.phase).slice(0,32),mail:event.mail||0,file:String(event.file||'').slice(0,180),detail:String(event.detail||'').slice(0,180)});await chrome.storage.local.set({report:current.slice(-500)});});return reportWrites;}
 const AUTO_ALARM='mailnotes-gmail-30m';
@@ -84,7 +121,7 @@ async function autoScan(reveal=false){
   const running=(await chrome.storage.session.get('run')).run;
   if(running){
    const tab=await chrome.tabs.get(running.tab).catch(()=>null);
-   if(!tab||Date.now()-running.started>3600000)await stop();
+   if(!tab||Date.now()-running.started>3600000)await stop({preserveManual:true,expectedRun:running});
    else {await appendReport({phase:'lich-bo-qua',detail:'Lượt trước vẫn đang chạy'});return;}
   }
   const check=await api('/extension/ping',{});await syncHistoryGeneration(check);await chrome.storage.local.set({capabilities:check.capabilities||[]});
@@ -115,7 +152,7 @@ async function setAuto(enabled){
   const applied=await changeAuto(generation,async()=>{await chrome.alarms.create(AUTO_ALARM,{periodInMinutes:30});if(generation!==autoGeneration)return false;await chrome.storage.local.set({autoEnabled:true});return true;});
   if(applied&&generation===autoGeneration)await autoScan(true);
  }
- else {await changeAuto(generation,async()=>{await chrome.storage.local.set({autoEnabled:false});await chrome.alarms.clear(AUTO_ALARM);if((await chrome.storage.session.get('run')).run?.automatic)await stop(true);return true;});}
+ else {await changeAuto(generation,async()=>{await chrome.storage.local.set({autoEnabled:false});await chrome.alarms.clear(AUTO_ALARM);await stop({preserveManual:true,onlyAutomatic:true});return true;});}
 }
 chrome.alarms.onAlarm.addListener(alarm=>{if(alarm.name===AUTO_ALARM)return autoScan();});
 async function restoreAlarm(){if((await chrome.storage.local.get('autoEnabled')).autoEnabled)await chrome.alarms.create(AUTO_ALARM,{periodInMinutes:30});}
@@ -130,7 +167,7 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
   if(message.type==='start'){
    if(sender.tab)throw Error('Thao tác chỉ từ tiện ích.');const intent=++manualGeneration;manualStarting=intent;
    try{
-   const check=await api('/extension/ping',{});if(intent!==manualGeneration)throw cancelledStart();await syncHistoryGeneration(check);await chrome.storage.local.set({capabilities:check.capabilities||[]});if(intent!==manualGeneration)throw cancelledStart();await stop(true);const [tab]=await chrome.tabs.query({active:true,currentWindow:true});if(!tab?.url?.startsWith('https://mail.google.com/'))throw Error('Mở tab Gmail rồi bấm lại.');
+   const check=await api('/extension/ping',{});if(intent!==manualGeneration)throw cancelledStart();await syncHistoryGeneration(check);await chrome.storage.local.set({capabilities:check.capabilities||[]});if(intent!==manualGeneration)throw cancelledStart();await stop({preserveManual:true});const [tab]=await chrome.tabs.query({active:true,currentWindow:true});if(!tab?.url?.startsWith('https://mail.google.com/'))throw Error('Mở tab Gmail rồi bấm lại.');
    const only=message.retry?((await chrome.storage.local.get('failures')).failures||[]).filter(item=>item.stage==='process-pdf'):[];if(message.retry&&!only.length)throw Error('Chưa có file PDF lỗi để thử lại. Các lỗi thư/trang sẽ được thử ở lượt quét kế tiếp.');
    if(intent!==manualGeneration)throw cancelledStart();await beginRun(tab,message.limit===1?1:20,only,false,'0',Date.now(),{manualGeneration:intent});return {};
    }finally{if(manualStarting===intent)manualStarting=0;}
@@ -191,7 +228,7 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
    if(run.automatic&&message.success===true){const saved=await chrome.storage.local.get('scanCursors'),cursors=saved.scanCursors||{};cursors[run.accountIndex||'0']=run.scanStartedAt||run.started;await chrome.storage.local.set({scanCursors:cursors});await mirrorAutomationState();}
    return {};
   }
-  if(message.type==='finish'){const removed=await changeRun(current=>sameRun(current,run)?null:undefined);if(removed===null)await detach(run.tab);return {}; }
+  if(message.type==='finish'){const removed=await changeRun(current=>sameRun(current,run)?null:undefined);if(removed===null)await detach(run.tab,run.generation,true);return {}; }
   if(message.type==='arm-download'){if(typeof message.name!=='string'||!message.name.toLowerCase().endsWith('.pdf'))throw Error('Tên PDF chờ tải không hợp lệ.');const updated=await changeRun(current=>sameRun(current,run)?{...current,pending:{armedAt:Date.now(),downloadId:null,candidates:[],expectedName:message.name,result:null,error:null}}:undefined);if(!updated)throw Error('Lượt thử đã dừng/hết hạn.');return {}; }
   if(message.type==='download-state')return run.pending||{};
   if(message.type==='choose')return api('/extension/choose',{kind:message.kind,candidates:message.candidates});
@@ -257,4 +294,4 @@ chrome.downloads.onCreated.addListener(item=>queueDownload(item.id,async()=>{
 }));
 chrome.downloads.onChanged.addListener(change=>queueDownload(change.id,async()=>{if(!change.filename&&!change.mime&&!change.state)return;const {run}=await chrome.storage.session.get('run');const pending=run?.pending;if(!pending)return;if(pending.downloadId!==change.id&&!pending.candidates?.includes(change.id))return;const [item]=await chrome.downloads.search({id:change.id});if(item)await handleDownload(item,run);}));
 
-chrome.debugger.onDetach.addListener(async source=>{const {run}=await chrome.storage.session.get('run');if(run?.tab===source.tabId){await appendReport({phase:'chrome-ngat',detail:'Chrome đã ngắt quyền điều khiển tab'});await chrome.storage.local.set({status:'Chrome đã ngắt quyền điều khiển tab. Thử lại lượt quét.'});await stop();}});
+chrome.debugger.onDetach.addListener(async source=>{const {run}=await chrome.storage.session.get('run');if(run?.tab===source.tabId&&await stop({preserveManual:true,expectedRun:run})){await appendReport({phase:'chrome-ngat',detail:'Chrome đã ngắt quyền điều khiển tab'});await chrome.storage.local.set({status:'Chrome đã ngắt quyền điều khiển tab. Thử lại lượt quét.'});}});
