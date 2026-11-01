@@ -1,5 +1,18 @@
 # Kiểm thử 0.9.3 — 01/11/2026
 
+## Kết quả bản chốt
+
+Mã nguồn `b797e24`; [CI 41284282268](https://github.com/Anhvu210103/Codex_tool/actions/runs/41284282268) thành công trên cả bốn hệ máy. Bộ kiểm thử Python, Node, 21 tình huống trình duyệt, tích hợp Chrome native và smoke test ứng dụng đóng gói đều đã qua các bước áp dụng tương ứng.
+
+| Gói test | Tải artifact (cần đăng nhập GitHub) |
+| --- | --- |
+| Windows x86_64 | [SoGhiChep-Windows-x86_64](https://github.com/Anhvu210103/Codex_tool/actions/runs/41284282268/artifacts/13074089950) |
+| Linux x86_64 | [SoGhiChep-Linux-x86_64](https://github.com/Anhvu210103/Codex_tool/actions/runs/41284282268/artifacts/13074732880) |
+| Mac Apple Silicon | [SoGhiChep-macOS-AppleSilicon](https://github.com/Anhvu210103/Codex_tool/actions/runs/41284282268/artifacts/13073993305) |
+| Mac Intel | [SoGhiChep-macOS-Intel](https://github.com/Anhvu210103/Codex_tool/actions/runs/41284282268/artifacts/13074209674) |
+
+Các phép thử không dùng tài khoản Gmail khách hoặc gọi API GreenNode thật; hai phần này vẫn cần nghiệm thu tại máy khách.
+
 ## Vòng đời tiện ích
 
 Tái hiện và sửa các nhánh bất đồng bộ sau:
