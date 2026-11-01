@@ -21,6 +21,7 @@ permissions:
   contents: read
 jobs:
   build:
+    timeout-minutes: 30
     env:
       PYTHONUTF8: '1'
     strategy:

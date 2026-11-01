@@ -20,6 +20,8 @@ Các lệnh debugger được xếp hàng và gắn với thế hệ lượt ch�
 
 `packaging/smoke_native_extension.py` dùng Chromium với tiện ích thật, API debugger/download/storage thật và server Flask thật. Trang Gmail và PDF là dữ liệu giả lập. Bài kiểm tra gồm 20 thư, 21 PDF (một thư có hai PDF), nhập từ Downloads, lưu 21 Markdown, quét lại không tải trùng, nhả debugger và xử lý đóng tab.
 
+Bổ sung lỗi backend tạm thời cho một PDF ở giữa lượt: phải tiếp tục đủ 20 thư, giữ file lỗi trong hàng đợi, lượt tiếp chỉ tải lại đúng PDF đó và tạo đủ 21 ghi chép. Lượt thứ ba không tải thêm file.
+
 Chromium trong workspace chặn unpacked extensions bằng chính sách quản trị. Không sửa chính sách này; bài kiểm tra native được chạy trên GitHub Actions với Chromium do Playwright cung cấp. Không dùng tài khoản Gmail thật hoặc gọi GreenNode trong bài kiểm tra này.
 
 Bộ kiểm thử Python và các phép thử giao diện của 0.9.2 tiếp tục được chạy. Kết quả native được xác nhận bằng lượt CI của bản chốt.
@@ -40,3 +42,4 @@ Thanh công cụ PDF ưu tiên nút có nhãn, sau đó biểu tượng tải n�
 - Khi tắt máy chủ, Gmail hoàn tất tài liệu hiện tại rồi ngừng lấy tài liệu tiếp theo.
 - Thống kê chi phí đọc lịch sử từng dòng, không nạp snapshot giá và ID tài liệu vào RAM. Phép thử 12.000 dòng với snapshot 2 KB/dòng tái hiện mức cấp phát 33,3 MB trước sửa; bản mới đạt giới hạn dưới 10 MB và vẫn trả đúng 50 lượt gần nhất.
 - Backend và tiện ích có phiên bản đối chiếu; báo cáo tiện ích ghi phiên bản tool đang kết nối. Phiên bản backend giữ nguyên cho tới khi khởi động lại, kể cả khi tệp giao diện trên đĩa đã cập nhật.
+- App mở qua Finder tìm Poppler trong PATH, sau đó ở Homebrew Apple Silicon và Intel. Thiếu chương trình chuyển ảnh báo đúng thiếu Poppler, dừng các trang còn lại trước khi gọi OCR trả phí và vẫn giữ phần chữ đã lấy được.

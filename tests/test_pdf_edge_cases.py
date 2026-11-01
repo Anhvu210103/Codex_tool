@@ -34,6 +34,32 @@ def ocr(content, finish='stop'):
 
 
 class PDFEdgeCasesTests(unittest.TestCase):
+    def test_finder_launch_finds_homebrew_renderer_without_shell_path(self):
+        for executable in ('/opt/homebrew/bin/pdftoppm','/usr/local/bin/pdftoppm'):
+            with self.subTest(executable=executable):
+                def render(command,**kwargs):
+                    self.assertEqual(command[0],executable)
+                    return render_page(command,**kwargs)
+                with patch('mailnotes.documents.sys.platform','darwin'),patch('mailnotes.documents.shutil.which',return_value=None),patch('mailnotes.documents.os.access',return_value=True),patch.object(Path,'is_file',lambda path:str(path)==executable),patch('mailnotes.documents.subprocess.run',side_effect=render),patch('mailnotes.core.request_json',return_value=ocr('Scan content from a Finder-launched Mac application.')):
+                    text,warning=pdf_text(document(None),ocr=True,api_key='test-key',endpoint='https://provider.example')
+                self.assertIn('Finder-launched',text)
+                self.assertNotIn('thất bại',warning)
+
+    def test_explicit_path_renderer_takes_precedence_over_mac_fallback(self):
+        with patch('mailnotes.documents.sys.platform','darwin'),patch('mailnotes.documents.shutil.which',return_value='/custom/pdftoppm'),patch('mailnotes.documents.subprocess.run',side_effect=render_page) as render,patch('mailnotes.core.request_json',return_value=ocr('Custom renderer content.')):
+            text,warning=pdf_text(document(None),ocr=True,api_key='test-key',endpoint='https://provider.example')
+        self.assertEqual(render.call_args.args[0][0],'/custom/pdftoppm')
+        self.assertIn('Custom renderer',text)
+
+    def test_missing_renderer_is_diagnosed_before_any_paid_ocr_call(self):
+        with patch('mailnotes.documents.subprocess.run',side_effect=FileNotFoundError('No renderer')) as render,patch('mailnotes.core.request_json') as request:
+            text,warning=pdf_text(document('Keep the text page.',None,None),ocr=True,api_key='test-key',endpoint='https://provider.example')
+        self.assertIn('Keep the text page',text)
+        self.assertIn('Chưa tìm thấy Poppler',warning)
+        self.assertNotIn('kiểm tra API key',warning)
+        self.assertEqual(render.call_count,1)
+        request.assert_not_called()
+
     def test_partial_pdf_from_interrupted_older_save_is_repaired(self):
         with tempfile.TemporaryDirectory() as directory:
             raw=document('Original PDF content.')

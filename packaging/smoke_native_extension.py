@@ -77,9 +77,16 @@ def main():
         app=create_app(data_root=root/'data',public_url=origin);admin=app.extensions['admin']
         config=admin.config();config.update(classification_mode='rules',rules=[{'category':'Native test','keywords':[]}]);config['summary']['mode']='extractive';admin.save_settings(config)
         token='native-test-pair';private_json(admin.private/'extension-token.json',{'hash':hashlib.sha256(token.encode()).hexdigest()})
+        original_process=admin.process_pdf
+        transient={'pending':True}
+        def process_pdf(data,filename,**kwargs):
+            if filename=='native-mail-4.pdf' and transient['pending']:
+                transient['pending']=False
+                raise ValueError('Synthetic temporary processing failure')
+            return original_process(data,filename,**kwargs)
         thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         try:
-            with patch('mailnotes.linux_downloads.download_directory',return_value=downloads),patch('mailnotes.core.request_json',side_effect=AssertionError('Native extension test must not call AI')),sync_playwright() as playwright:
+            with patch('mailnotes.linux_downloads.download_directory',return_value=downloads),patch('mailnotes.core.request_json',side_effect=AssertionError('Native extension test must not call AI')),patch.object(admin,'process_pdf',side_effect=process_pdf),sync_playwright() as playwright:
                 binary=args.chromium or Path(playwright.chromium.executable_path)
                 if not binary.is_file():
                     raise RuntimeError('Install Playwright Chromium or pass --chromium with a browser that permits unpacked extensions.')
@@ -117,16 +124,25 @@ def main():
                         raise RuntimeError('Native extension did not finish: '+json.dumps(diagnostics,ensure_ascii=False))
                     worker.evaluate('(tab)=>beginRun({id:tab},20)',tab)
                     result=wait_done()
-                    assert admin.notes('ai')['total']==21,result
+                    assert admin.notes('ai')['total']==20,result
                     assert len(list(downloads.glob('*.pdf')))==21,result
-                    assert len(list((admin.root/'ai/Theo-nhom').rglob('*.md')))==21
+                    assert len(list((admin.root/'ai/Theo-nhom').rglob('*.md')))==20
                     assert sum(event['phase']=='mo-thu' for event in result.get('report',[]))==20,result
-                    assert not any(event['phase'] in ('loi','dung') for event in result.get('report',[])),result
+                    assert sum(event['phase']=='loi' for event in result.get('report',[]))==1,result
+                    assert not any(event['phase']=='dung' for event in result.get('report',[])),result
+                    assert len(worker.evaluate("async()=>(await chrome.storage.local.get('failures')).failures"))==1
+                    page.locator('#back').click()
+                    worker.evaluate('(tab)=>beginRun({id:tab},20)',tab)
+                    retried=wait_done()
+                    assert admin.notes('ai')['total']==21,retried
+                    assert len(list((admin.root/'ai/Theo-nhom').rglob('*.md')))==21
+                    assert len(list(downloads.glob('*.pdf')))==22,'Only the failed PDF should be downloaded a second time'
+                    assert worker.evaluate("async()=>(await chrome.storage.local.get('failures')).failures")==[]
                     page.locator('#back').click()
                     worker.evaluate('(tab)=>beginRun({id:tab},20)',tab)
                     duplicate=wait_done()
                     assert admin.notes('ai')['total']==21,duplicate
-                    assert len(list(downloads.glob('*.pdf')))==21,'A duplicate run downloaded the same attachments again'
+                    assert len(list(downloads.glob('*.pdf')))==22,'A duplicate run downloaded the same attachments again'
                     detached=worker.evaluate("async tab=>{try{await chrome.debugger.sendCommand({tabId:tab},'Runtime.evaluate',{expression:'1'});return false;}catch{return true;}}",tab)
                     assert detached,'The extension still owns the debugger after finishing'
                     worker.evaluate('(tab)=>beginRun({id:tab},20)',tab)
@@ -137,7 +153,7 @@ def main():
                     assert not worker.evaluate("async()=>!!(await chrome.storage.session.get('run')).run"),'Closing the tab did not release scan state'
                 finally:context.close()
         finally:server.shutdown();thread.join(timeout=5);server.server_close()
-    print('Native Chrome extension passed: debugger clicks, 20 mails, 21 PDF downloads -> local import -> Markdown, duplicate skip, detach and tab-close recovery (synthetic Gmail, no AI request).')
+    print('Native Chrome extension passed: debugger clicks, 20 mails, 21 PDFs -> local import -> Markdown, one transient failure does not stop the batch and only that PDF is retried, duplicate skip, detach and tab-close recovery (synthetic Gmail, no AI request).')
 
 
 if __name__=='__main__':

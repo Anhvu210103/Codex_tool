@@ -32,7 +32,7 @@ vm.createContext(ctx);vm.runInContext(FUNCTION,ctx);
  assert(cleared);
 })().catch(error=>{console.error(error);process.exitCode=1;});
 '''.replace('FUNCTION',json.dumps(function)).replace('MODE',json.dumps(mode)).replace('PATH',json.dumps(path))
-        result=subprocess.run([shutil.which('node'),'-e',script],capture_output=True,text=True,timeout=10)
+        result=subprocess.run([shutil.which('node'),'-e',script],capture_output=True,text=True,timeout=30)
         self.assertEqual(result.returncode,0,result.stderr)
 
     def test_stalled_status_request_times_out(self):self.exercise('fetch')

@@ -8,6 +8,8 @@ import tempfile
 import time
 import re
 import secrets
+import shutil
+import sys
 import unicodedata
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -18,6 +20,17 @@ MAX_PDF_BYTES = 20 * 1024 * 1024
 OCR_INSTRUCTION = ('Chuyển hình ảnh thành văn bản, toàn bộ nội dung trong hình ảnh, '
                    'không bỏ sót chi tiết, không thêm ý kiến cá nhân, không tóm tắt, '
                    'không thêm thông tin ngoài hình ảnh.')
+
+
+def poppler_executable():
+    executable=shutil.which('pdftoppm')
+    if executable:return executable
+    # Finder does not inherit the user's interactive shell PATH. Homebrew
+    # uses different prefixes on Apple Silicon and Intel Macs.
+    if sys.platform=='darwin':
+        for candidate in ('/opt/homebrew/bin/pdftoppm','/usr/local/bin/pdftoppm'):
+            if Path(candidate).is_file() and os.access(candidate,os.X_OK):return candidate
+    return 'pdftoppm'
 
 
 def normalize_document_text(value):
@@ -76,6 +89,7 @@ def pdf_text(data, ocr=False, api_key=None, model='deepseek/deepseek-v4.1-flash-
     completed = set()
     failed = []
     truncated = []
+    renderer_missing = False
     if targets and ocr and api_key:
         deadline = time.monotonic() + 180
         with tempfile.TemporaryDirectory() as directory:
@@ -89,7 +103,7 @@ def pdf_text(data, ocr=False, api_key=None, model='deepseek/deepseek-v4.1-flash-
                         break
                     prefix = root / f'page-{index + 1}'
                     options = {'creationflags':subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
-                    subprocess.run(['pdftoppm', '-f', str(index + 1), '-l', str(index + 1), '-scale-to', '1800', '-png', str(root / 'input.pdf'), str(prefix)], check=True, timeout=min(60, remaining), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **options)
+                    subprocess.run([poppler_executable(), '-f', str(index + 1), '-l', str(index + 1), '-scale-to', '1800', '-png', str(root / 'input.pdf'), str(prefix)], check=True, timeout=min(60, remaining), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **options)
                     images = list(root.glob(prefix.name + '-*.png'))
                     if len(images) != 1:
                         raise ValueError('Không tạo được ảnh trang PDF.')
@@ -122,13 +136,19 @@ def pdf_text(data, ocr=False, api_key=None, model='deepseek/deepseek-v4.1-flash-
                     completed.add(index)
                     if choice.get('finish_reason') == 'length':
                         truncated.append(index + 1)
+                except FileNotFoundError:
+                    renderer_missing = True
+                    failed.extend(page + 1 for page in targets[:20] if page >= index)
+                    break
                 except (OSError, subprocess.SubprocessError, TimeoutError, ValueError, HTTPError, URLError):
                     failed.append(index + 1)
         if completed:
             warnings.append('Nội dung được OCR qua GreenNode / VNG Cloud; cần đối chiếu bản gốc.')
         if len(targets) > 20:
             warnings.append(f'Chỉ OCR tối đa 20 trang mỗi tài liệu; còn {len(targets) - 20} trang cần kiểm tra.')
-        if failed:
+        if renderer_missing:
+            warnings.append('Chưa tìm thấy Poppler (pdftoppm) để chuyển trang PDF thành ảnh gửi OCR. Cần cài Poppler rồi mở lại tool; phần chữ đã đọc vẫn được giữ.')
+        elif failed:
             warnings.append('OCR qua GreenNode / VNG Cloud thất bại hoặc quá thời gian ở trang ' + ', '.join(map(str, failed)) + '; kiểm tra API key, model hỗ trợ hình ảnh và kết nối mạng.')
         if truncated:
             warnings.append('OCR bị giới hạn đầu ra ở trang ' + ', '.join(map(str, truncated)) + '; nội dung các trang này chưa đầy đủ.')

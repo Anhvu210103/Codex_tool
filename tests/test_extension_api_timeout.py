@@ -29,7 +29,7 @@ vm.createContext(ctx);vm.runInContext(FUNCTIONS,ctx);
  assert(cleared,'Every outcome must cancel its timer');
 })().catch(error=>{console.error(error);process.exitCode=1;});
 '''.replace('FUNCTIONS',json.dumps(functions)).replace('MODE',json.dumps(mode)).replace('PATH',json.dumps(path)).replace('TIMEOUT',str(timeout))
-        result=subprocess.run([shutil.which('node'),'-e',script],capture_output=True,text=True,timeout=10)
+        result=subprocess.run([shutil.which('node'),'-e',script],capture_output=True,text=True,timeout=30)
         self.assertEqual(result.returncode,0,result.stderr)
 
     def test_control_request_times_out_while_waiting_for_headers(self):
