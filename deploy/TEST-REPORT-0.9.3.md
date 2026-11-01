@@ -26,9 +26,11 @@ Chromium trong workspace chặn unpacked extensions bằng chính sách quản t
 
 Bộ kiểm thử Python và các phép thử giao diện của 0.9.2 tiếp tục được chạy. Kết quả native được xác nhận bằng lượt CI của bản chốt.
 
-`tests/browser/extension_batch.py` đã chạy thành công 17 tình huống trong trình duyệt: đủ 20 thư/21 PDF, không tải trùng, thêm PDF vào thư cũ, thử lại file lỗi, ô PDF bị che, Chrome không bắt đầu tải sau click, bấm lại có giới hạn, Close bị bỏ qua và dùng Esc, click không tới nút, thư chưa đọc biến mất khỏi kết quả, chuyển trang, tìm kiếm trống, nhận diện thư bằng URL hoặc metadata, và đính kèm hiện muộn. Bộ này được đưa vào release-check và CI để tránh lệch khỏi mã đang phát hành. Worker trong bộ này được giả lập; bài native riêng dùng API Chrome và backend thật.
+`tests/browser/extension_batch.py` đã chạy thành công 21 tình huống trong trình duyệt: đủ 20 thư/21 PDF, không tải trùng, thêm PDF vào thư cũ, thử lại file lỗi, ô PDF bị che, Chrome không bắt đầu tải sau click, bấm lại có giới hạn, Close bị bỏ qua và dùng Esc, click không tới nút, thư chưa đọc biến mất khỏi kết quả, chuyển trang, tìm kiếm trống, nhận diện thư bằng URL hoặc metadata, đính kèm hiện muộn và bốn nhánh PDF dùng chung metadata của thư. Bộ này được đưa vào release-check và CI để tránh lệch khỏi mã đang phát hành. Worker trong bộ này được giả lập; bài native riêng dùng API Chrome và backend thật.
 
-Kiểm tra cục bộ: 142 bài unittest Python đạt; ba bộ Node về tải file và tranh chấp lượt chạy đạt; popup, 14 trường hợp DOM nút tải, khôi phục content session, giao diện quản trị và 17 tình huống batch đều đạt. OCR qua model và Gmail tài khoản khách vẫn cần nghiệm thu thật.
+Kiểm tra cục bộ: 142 bài unittest Python đạt; ba bộ Node về tải file và tranh chấp lượt chạy đạt; popup, 14 trường hợp DOM nút tải, định danh PDF, khôi phục content session, giao diện quản trị và 21 tình huống batch đều đạt. OCR qua model và Gmail tài khoản khách vẫn cần nghiệm thu thật.
+
+ID của phần tử chứa thư không được dùng làm ID duy nhất cho các PDF bên trong. Khóa mới phân biệt từng tệp, giữ ổn định khi thêm tệp khác, và không đánh dấu tệp lỗi là đã xử lý khi tệp cùng thư thành công. Lịch sử cũ dùng ID chung phải được kiểm tra lại một lần; hash PDF ở backend ngăn tạo ghi chép hoặc gọi AI trùng cho bản đã lưu.
 
 ## Giới hạn thời gian chờ
 

@@ -6,7 +6,7 @@ from playwright.sync_api import sync_playwright
 
 def main():
     source=(Path(__file__).resolve().parents[1]/'chrome-extension/content.js').read_text()
-    source=source.replace("return {run};","globalThis.downloadTest={downloadControl,readyDownload};return {run};")
+    source=source.replace("return {run};","globalThis.downloadTest={downloadControl,readyDownload,pdfTiles};return {run};")
     source=source.rstrip()[:-1]+"\ncreatePilot('dom-test');\n}"
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path=shutil.which('chromium'),headless=True,args=['--no-sandbox'])
@@ -42,9 +42,16 @@ def main():
         check('<button id="download" aria-label="Download" disabled style="left:1200px;top:100px"></button>',None)
         page.evaluate("setTimeout(()=>document.querySelector('#download').disabled=false,500)")
         assert page.evaluate('async()=> (await downloadTest.readyDownload(()=>false,1,"sample.pdf"))?.id')=='download'
+        page.set_content('<div data-message-id="shared-message"><span class="aV3" style="display:block;padding:20px">one.pdf</span><span class="aV3" style="display:block;padding:20px">two.pdf</span></div>')
+        keys=page.evaluate('()=>downloadTest.pdfTiles().map(item=>item.fileKey)')
+        assert len(set(keys))==2,('Two PDFs must not share the ancestor message ID as their attachment key',keys)
+        page.locator('[data-message-id]').evaluate('node=>node.lastElementChild.remove()')
+        assert page.evaluate('()=>downloadTest.pdfTiles()[0].fileKey')==keys[0],'Adding another PDF to a shared message must not change the first PDF identity'
+        page.locator('[data-message-id]').evaluate('node=>node.innerHTML+=\'<span class="aV3" style="display:block;padding:20px">one.pdf</span>\'')
+        assert len(set(page.evaluate('()=>downloadTest.pdfTiles().map(item=>item.fileKey)')))==2,'Same-name PDFs still need separate identities'
         assert not errors,errors
         browser.close()
-    print('Download DOM selection: OK (14 cases; live Gmail not exercised)')
+    print('Download DOM selection: OK (14 control cases and shared PDF identity checks; live Gmail not exercised)')
 
 
 if __name__=='__main__':

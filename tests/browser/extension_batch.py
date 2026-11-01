@@ -2,6 +2,7 @@
 from pathlib import Path
 import shutil
 import json
+import sys
 from playwright.sync_api import sync_playwright
 
 with sync_playwright() as playwright:
@@ -81,226 +82,260 @@ with sync_playwright() as playwright:
       showList();
     }''')
     page.add_script_tag(path=str(Path('chrome-extension/content.js').resolve()))
-    page.evaluate("listener({type:'run-session',runId:String(Math.random()),limit:20})")
-    wait_finished(timeout=150000)
-    events=page.evaluate('events')
-    assert sum(item.startswith('open-mail-') for item in events)==20, events
-    assert sum(item.startswith('download-') for item in events)==21, events
-    assert events.index('download-One.pdf')<events.index('open-pdf-Two.pdf')
-    assert 'wrong-drive' not in events
-    assert 'wrong-middle-download' not in events
-    assert len(page.evaluate('report'))>=20
-    assert page.evaluate('status').startswith('Hoàn tất: 20 thư mở, 21 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
-    print('Browser passed: 20 mails, 21 PDFs including a PDF obscured by its own Drive button')
-    page.evaluate('''() => {events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:20});}''')
-    wait_finished(timeout=60000)
-    assert not any(item.startswith('download-') for item in page.evaluate('events'))
-    assert page.evaluate('status').startswith('Hoàn tất: 20 thư mở, 0 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
-    assert not any(e['phase']=='dung-trung' for e in page.evaluate('report'))
-    print('Browser passed: second scan verifies every visible mail without redownloading')
+    if '--shared-only' not in sys.argv:
+        page.evaluate("listener({type:'run-session',runId:String(Math.random()),limit:20})")
+        wait_finished(timeout=150000)
+        events=page.evaluate('events')
+        assert sum(item.startswith('open-mail-') for item in events)==20, events
+        assert sum(item.startswith('download-') for item in events)==21, events
+        assert events.index('download-One.pdf')<events.index('open-pdf-Two.pdf')
+        assert 'wrong-drive' not in events
+        assert 'wrong-middle-download' not in events
+        assert len(page.evaluate('report'))>=20
+        assert page.evaluate('status').startswith('Hoàn tất: 20 thư mở, 21 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
+        print('Browser passed: 20 mails, 21 PDFs including a PDF obscured by its own Drive button')
+        page.evaluate('''() => {events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:20});}''')
+        wait_finished(timeout=60000)
+        assert not any(item.startswith('download-') for item in page.evaluate('events'))
+        assert page.evaluate('status').startswith('Hoàn tất: 20 thư mở, 0 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
+        assert not any(e['phase']=='dung-trung' for e in page.evaluate('report'))
+        print('Browser passed: second scan verifies every visible mail without redownloading')
+        page.evaluate('''() => {
+          window.stableShowList=showList;
+          showList=()=>{stableShowList();document.querySelectorAll('.zA').forEach(row=>row.textContent+=' · Đã đọc');};
+          events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:20});
+        }''')
+        wait_finished(timeout=60000)
+        assert not any(item.startswith('download-') for item in page.evaluate('events'))
+        assert page.evaluate('status').startswith('Hoàn tất: 20 thư mở, 0 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
+        page.evaluate('''() => {showList=stableShowList;}''')
+        print('Browser passed: changing visible Gmail row text does not re-download saved PDFs')
+        page.evaluate('''() => {
+          processedMails['mail-0'].complete=false;processedMails['mail-1'].complete=false;
+          failures=[{key:'mail-0',fileKey:'["old.pdf",0]'},{key:'mail-1',fileKey:'["old.pdf",0]'}];
+          events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:20,automatic:true});
+        }''')
+        wait_finished(timeout=60000)
+        assert sum(item.startswith('open-mail-') for item in page.evaluate('events'))==20, page.evaluate('events')
+        assert not any(e['phase']=='dung-trung' for e in page.evaluate('report'))
+        page.evaluate('''() => {failures=[];}''')
+        print('Browser passed: automatic scan checks the full result set even when old mails are complete')
+        page.evaluate('''() => {
+          events=[];report=[];finished=false;window.oldShowMail=showMail;
+          showMail=i=>{
+            oldShowMail(i);
+            if(i===0){const tile=document.createElement('span');tile.className='aV3';tile.textContent='New.pdf';tile.style='display:inline-block;padding:20px';tile.onclick=()=>showViewer('New.pdf');document.querySelector('.aZo').before(tile);}
+          };
+          showList();listener({type:'run-session',runId:String(Math.random()),limit:20});
+        }''')
+        wait_finished(timeout=30000)
+        assert 'download-New.pdf' in page.evaluate('events')
+        assert 'download-One.pdf' not in page.evaluate('events')
+        assert 'download-Two.pdf' not in page.evaluate('events')
+        print('Browser passed: new PDF in a processed thread is saved without redownloading its old PDFs')
+        page.evaluate('''() => {
+          showMail=oldShowMail;
+          processedMails['mail-2'].complete=false;processedMails['mail-2'].files=[];
+          failures=[{key:'mail-2',fileIndex:0,name:'Mail-2.pdf'}];
+          events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:20,automatic:true});
+        }''')
+        wait_finished(timeout=30000)
+        assert 'download-Mail-2.pdf' in page.evaluate('events')
+        assert page.evaluate('failures')==[]
+        print('Browser passed: automatic scan reaches failed PDF among already processed mails')
+        page.evaluate('''() => {
+          events=[];report=[];finished=false;processedMails={};showList();
+          window.originalShowMail=showMail;const previous=showMail;
+          showMail=i=>{
+            previous(i);
+            if(i===0){
+              const r=document.querySelector('.aV3').getBoundingClientRect();
+              const blocker=document.createElement('div');blocker.id='external-blocker';
+              blocker.style=`position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;z-index:90;background:#ccc`;
+              document.body.append(blocker);
+            }
+          };
+          document.querySelectorAll('.zA').forEach((row,i)=>row.onclick=()=>showMail(i));
+          listener({type:'run-session',runId:String(Math.random()),limit:1});
+        }''')
+        wait_finished(timeout=30000)
+        assert 'download-One.pdf' not in page.evaluate('events')
+        assert 'download-Two.pdf' in page.evaluate('events')
+        assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 1 PDF mới, 0 PDF đã có, 1 lỗi.'), page.evaluate('status')
+        assert any(e['phase']=='loi' and e['file']=='One.pdf' for e in page.evaluate('report'))
+        assert len(page.evaluate('failures'))==1
+        print('Browser passed: blocked first PDF logged and skipped; second PDF still saved')
+        page.evaluate('''() => {
+          const retry=[...failures];events=[];report=[];finished=false;
+          document.querySelector('#external-blocker')?.remove();
+          showMail=originalShowMail;showList();
+          listener({type:'run-session',runId:String(Math.random()),limit:20,only:retry});
+        }''')
+        wait_finished(timeout=30000)
+        assert 'download-One.pdf' in page.evaluate('events')
+        assert 'download-Two.pdf' not in page.evaluate('events')
+        assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 1 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
+        print('Browser passed: retry processed only the failed PDF')
+        page.evaluate('''() => {
+          processedMails={};suppressDownloadOnce='One.pdf';events=[];report=[];finished=false;showList();
+          listener({type:'run-session',runId:String(Math.random()),limit:1});
+        }''')
+        wait_finished(timeout=45000)
+        assert 'ignored-once-One.pdf' in page.evaluate('events')
+        assert 'download-One.pdf' in page.evaluate('events')
+        assert any(e['phase']=='thu-lai-tai' for e in page.evaluate('report'))
+        assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 2 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
+        print('Browser passed: Chrome download missing after first click is retried once')
+        page.evaluate('''() => {
+          processedMails={};suppressDownload='One.pdf';blockClose='One.pdf';events=[];report=[];finished=false;showList();
+          listener({type:'run-session',runId:String(Math.random()),limit:1});
+        }''')
+        wait_finished(timeout=90000)
+        assert 'ignored-download-One.pdf' in page.evaluate('events')
+        assert 'download-Two.pdf' in page.evaluate('events')
+        assert 'escape-One.pdf' in page.evaluate('events')
+        assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 1 PDF mới, 0 PDF đã có, 1 lỗi.'), page.evaluate('status')
+        assert any(e['phase']=='loi' and 'Chrome chưa bắt đầu tải' in e['detail'] for e in page.evaluate('report'))
+        print('Browser passed: click without Chrome download and ignored Close fall back to Esc, then next PDF continues')
+        page.evaluate('''() => {
+          processedMails={};suppressDownload=null;blockClose=null;suppressClick='One.pdf';
+          events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:1});
+        }''')
+        wait_finished(timeout=30000)
+        assert 'missed-download-One.pdf' in page.evaluate('events')
+        assert 'download-Two.pdf' in page.evaluate('events')
+        assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 1 PDF mới, 0 PDF đã có, 1 lỗi.'), page.evaluate('status')
+        assert any(e['phase']=='loi' and 'không nhận sự kiện click' in e['detail'] for e in page.evaluate('report'))
+        print('Browser passed: missing click is reported immediately and next PDF continues')
+        page.evaluate('''() => {
+          processedMails={};suppressClick=null;suppressDownload=null;blockClose=null;
+          events=[];report=[];finished=false;window.unreadIds=[0,1,2];
+          window.baseShowMail=showMail;
+          showMail=i=>{unreadIds=unreadIds.filter(id=>id!==i);baseShowMail(i);};
+          showList=()=>{
+            document.getElementById('app').innerHTML=unreadIds.map(i=>
+              `<div class="zA" data-legacy-thread-id="unread-${i}" style="padding:14px;width:600px">Thư chưa đọc ${i}: Đã gửi hồ sơ, chuyển tiếp công văn PDF</div>`).join('');
+            document.querySelectorAll('.zA').forEach((row,index)=>row.onclick=()=>showMail(unreadIds[index]));
+          };
+          showList();listener({type:'run-session',runId:String(Math.random()),limit:3});
+        }''')
+        wait_finished(timeout=30000)
+        assert page.evaluate('status').startswith('Hoàn tất: 3 thư mở, 4 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
+        assert sum(item.startswith('open-mail-') for item in page.evaluate('events'))==3
+        assert page.evaluate('unreadIds')==[]
+        print('Browser passed: unread search rows with dangerous words disappear after reading; remaining PDFs still process')
+        page.evaluate('''() => {
+          processedMails={};failures=[];events=[];report=[];finished=false;window.currentPage=0;
+          showMail=baseShowMail;
+          showList=()=>{
+            const ids=currentPage===0?[0,1]:[2];
+            document.getElementById('app').innerHTML=ids.map(i=>
+              `<div class="zA" data-legacy-thread-id="mail-${i}" style="padding:14px;width:600px">Công văn số ${i+1} · PDF đính kèm</div>`).join('')+
+              (currentPage===0?'<button aria-label="Cũ hơn" id="next-page">Cũ hơn</button>':'');
+            document.querySelectorAll('.zA').forEach((row,index)=>row.onclick=()=>showMail(ids[index]));
+            if(currentPage===0)document.querySelector('#next-page').onclick=()=>{currentPage=1;showList();};
+          };
+          showList();listener({type:'run-session',runId:String(Math.random()),limit:100,automatic:true});
+        }''')
+        wait_finished(timeout=30000)
+        assert page.evaluate('currentPage')==1
+        assert sum(item.startswith('open-mail-') for item in page.evaluate('events'))==3
+        assert page.evaluate('status').startswith('Hoàn tất: 3 thư mở, 4 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
+        print('Browser passed: automatic scan advances to the next Gmail results page')
+        page.evaluate('''() => {events=[];report=[];finished=false;document.getElementById('app').innerHTML='<p>Không tìm thấy thư nào phù hợp với tìm kiếm</p>';listener({type:'run-session',runId:String(Math.random()),limit:100,automatic:true});}''')
+        wait_finished(timeout=5000)
+        assert page.evaluate('status')=='Đã kiểm tra Gmail: không có thư PDF mới.'
+        print('Browser passed: an empty Gmail search is a successful no-op')
+        page.evaluate('''() => {
+          processedMails={};failures=[];events=[];report=[];finished=false;
+          showMail=i=>{
+            history.replaceState(null,'','#inbox/FMfcgzAAAA00000'+i);
+            originalShowMail(i);
+          };
+          showList=()=>{
+            history.replaceState(null,'','#inbox');
+            document.getElementById('app').innerHTML=[0,1].map(i=>
+              `<div class="zA" style="padding:14px;width:600px">Công văn số ${i+1} · PDF đính kèm</div>`).join('');
+            document.querySelectorAll('.zA').forEach((row,i)=>row.onclick=()=>showMail(i));
+          };
+          showList();listener({type:'run-session',runId:String(Math.random()),limit:20});
+        }''')
+        wait_finished(timeout=60000)
+        assert sum(item.startswith('download-') for item in page.evaluate('events'))==3
+        assert len(page.evaluate('processedMails'))==2
+        assert all(e['detail'].startswith('ID từ URL') for e in page.evaluate('report') if e['phase']=='kiem-tra-thu')
+        page.evaluate('''() => {events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:20});}''')
+        wait_finished(timeout=30000)
+        assert not any(item.startswith('download-') for item in page.evaluate('events'))
+        assert page.evaluate('status').startswith('Hoàn tất: 2 thư mở, 0 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
+        print('Browser passed: Gmail URL identifies mails when result rows have no thread ID')
+        page.evaluate('''() => {
+          processedMails={};failures=[];events=[];report=[];finished=false;history.replaceState(null,'','#advanced-search/test');
+          showList=()=>{
+            document.getElementById('app').innerHTML='<div class="zA" style="padding:14px;width:600px"><span class="zF" email="office@example.gov.vn">Cơ quan</span><span class="bog">Công văn ổn định</span><span class="xW"><span title="17/10/2026 15:00">15:00</span></span></div>';
+            document.querySelector('.zA').onclick=()=>originalShowMail(0);
+          };
+          showList();listener({type:'run-session',runId:String(Math.random()),limit:1});
+        }''')
+        wait_finished(timeout=30000)
+        assert sum(item.startswith('download-') for item in page.evaluate('events'))==2
+        assert len(page.evaluate('processedMails'))==1
+        page.evaluate('''() => {events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:1});}''')
+        wait_finished(timeout=30000)
+        assert not any(item.startswith('download-') for item in page.evaluate('events'))
+        assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 0 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
+        assert all('ID từ danh sách' in e['detail'] for e in page.evaluate('report') if e['phase']=='kiem-tra-thu')
+        print('Browser passed: sender, subject and full date provide a stable fallback when Gmail exposes no IDs')
+        page.evaluate('''() => {
+          processedMails={};failures=[];events=[];report=[];finished=false;
+          showList=()=>{
+            document.getElementById('app').innerHTML='<div class="zA" data-legacy-thread-id="delayed-mail" style="padding:14px;width:600px">Thư có tệp tải chậm</div>';
+            document.querySelector('.zA').onclick=()=>{
+              document.getElementById('app').innerHTML='<button aria-label="Quay lại" style="padding:15px">Trở về</button><span class="aV3" style="display:inline-block;padding:20px">First.pdf</span>';
+              document.querySelector('button').onclick=event=>{if(event.isTrusted)showList();};
+              document.querySelector('.aV3').onclick=()=>showViewer('First.pdf');
+              setTimeout(()=>{const tile=document.createElement('span');tile.className='aV3';tile.style='display:inline-block;padding:20px';tile.textContent='Late.pdf';tile.onclick=()=>showViewer('Late.pdf');document.getElementById('app').append(tile);},450);
+            };
+          };
+          showList();listener({type:'run-session',runId:String(Math.random()),limit:1});
+        }''')
+        wait_finished(timeout=30000)
+        assert 'download-First.pdf' in page.evaluate('events')
+        assert 'download-Late.pdf' in page.evaluate('events')
+        assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 2 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
+        print('Browser passed: waits for a stable attachment list and includes a PDF rendered late')
     page.evaluate('''() => {
-      window.stableShowList=showList;
-      showList=()=>{stableShowList();document.querySelectorAll('.zA').forEach(row=>row.textContent+=' · Đã đọc');};
-      events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:20});
-    }''')
-    wait_finished(timeout=60000)
-    assert not any(item.startswith('download-') for item in page.evaluate('events'))
-    assert page.evaluate('status').startswith('Hoàn tất: 20 thư mở, 0 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
-    page.evaluate('''() => {showList=stableShowList;}''')
-    print('Browser passed: changing visible Gmail row text does not re-download saved PDFs')
-    page.evaluate('''() => {
-      processedMails['mail-0'].complete=false;processedMails['mail-1'].complete=false;
-      failures=[{key:'mail-0',fileKey:'["old.pdf",0]'},{key:'mail-1',fileKey:'["old.pdf",0]'}];
-      events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:20,automatic:true});
-    }''')
-    wait_finished(timeout=60000)
-    assert sum(item.startswith('open-mail-') for item in page.evaluate('events'))==20, page.evaluate('events')
-    assert not any(e['phase']=='dung-trung' for e in page.evaluate('report'))
-    page.evaluate('''() => {failures=[];}''')
-    print('Browser passed: automatic scan checks the full result set even when old mails are complete')
-    page.evaluate('''() => {
-      events=[];report=[];finished=false;window.oldShowMail=showMail;
-      showMail=i=>{
-        oldShowMail(i);
-        if(i===0){const tile=document.createElement('span');tile.className='aV3';tile.textContent='New.pdf';tile.style='display:inline-block;padding:20px';tile.onclick=()=>showViewer('New.pdf');document.querySelector('.aZo').before(tile);}
-      };
-      showList();listener({type:'run-session',runId:String(Math.random()),limit:20});
-    }''')
-    wait_finished(timeout=30000)
-    assert 'download-New.pdf' in page.evaluate('events')
-    assert 'download-One.pdf' not in page.evaluate('events')
-    assert 'download-Two.pdf' not in page.evaluate('events')
-    print('Browser passed: new PDF in a processed thread is saved without redownloading its old PDFs')
-    page.evaluate('''() => {
-      showMail=oldShowMail;
-      processedMails['mail-2'].complete=false;processedMails['mail-2'].files=[];
-      failures=[{key:'mail-2',fileIndex:0,name:'Mail-2.pdf'}];
-      events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:20,automatic:true});
-    }''')
-    wait_finished(timeout=30000)
-    assert 'download-Mail-2.pdf' in page.evaluate('events')
-    assert page.evaluate('failures')==[]
-    print('Browser passed: automatic scan reaches failed PDF among already processed mails')
-    page.evaluate('''() => {
-      events=[];report=[];finished=false;processedMails={};showList();
-      window.originalShowMail=showMail;const previous=showMail;
-      showMail=i=>{
-        previous(i);
-        if(i===0){
-          const r=document.querySelector('.aV3').getBoundingClientRect();
-          const blocker=document.createElement('div');blocker.id='external-blocker';
-          blocker.style=`position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;z-index:90;background:#ccc`;
-          document.body.append(blocker);
-        }
-      };
-      document.querySelectorAll('.zA').forEach((row,i)=>row.onclick=()=>showMail(i));
-      listener({type:'run-session',runId:String(Math.random()),limit:1});
-    }''')
-    wait_finished(timeout=30000)
-    assert 'download-One.pdf' not in page.evaluate('events')
-    assert 'download-Two.pdf' in page.evaluate('events')
-    assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 1 PDF mới, 0 PDF đã có, 1 lỗi.'), page.evaluate('status')
-    assert any(e['phase']=='loi' and e['file']=='One.pdf' for e in page.evaluate('report'))
-    assert len(page.evaluate('failures'))==1
-    print('Browser passed: blocked first PDF logged and skipped; second PDF still saved')
-    page.evaluate('''() => {
-      const retry=[...failures];events=[];report=[];finished=false;
-      document.querySelector('#external-blocker')?.remove();
-      showMail=originalShowMail;showList();
-      listener({type:'run-session',runId:String(Math.random()),limit:20,only:retry});
-    }''')
-    wait_finished(timeout=30000)
-    assert 'download-One.pdf' in page.evaluate('events')
-    assert 'download-Two.pdf' not in page.evaluate('events')
-    assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 1 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
-    print('Browser passed: retry processed only the failed PDF')
-    page.evaluate('''() => {
-      processedMails={};suppressDownloadOnce='One.pdf';events=[];report=[];finished=false;showList();
-      listener({type:'run-session',runId:String(Math.random()),limit:1});
-    }''')
-    wait_finished(timeout=45000)
-    assert 'ignored-once-One.pdf' in page.evaluate('events')
-    assert 'download-One.pdf' in page.evaluate('events')
-    assert any(e['phase']=='thu-lai-tai' for e in page.evaluate('report'))
-    assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 2 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
-    print('Browser passed: Chrome download missing after first click is retried once')
-    page.evaluate('''() => {
-      processedMails={};suppressDownload='One.pdf';blockClose='One.pdf';events=[];report=[];finished=false;showList();
-      listener({type:'run-session',runId:String(Math.random()),limit:1});
-    }''')
-    wait_finished(timeout=90000)
-    assert 'ignored-download-One.pdf' in page.evaluate('events')
-    assert 'download-Two.pdf' in page.evaluate('events')
-    assert 'escape-One.pdf' in page.evaluate('events')
-    assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 1 PDF mới, 0 PDF đã có, 1 lỗi.'), page.evaluate('status')
-    assert any(e['phase']=='loi' and 'Chrome chưa bắt đầu tải' in e['detail'] for e in page.evaluate('report'))
-    print('Browser passed: click without Chrome download and ignored Close fall back to Esc, then next PDF continues')
-    page.evaluate('''() => {
-      processedMails={};suppressDownload=null;blockClose=null;suppressClick='One.pdf';
-      events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:1});
-    }''')
-    wait_finished(timeout=30000)
-    assert 'missed-download-One.pdf' in page.evaluate('events')
-    assert 'download-Two.pdf' in page.evaluate('events')
-    assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 1 PDF mới, 0 PDF đã có, 1 lỗi.'), page.evaluate('status')
-    assert any(e['phase']=='loi' and 'không nhận sự kiện click' in e['detail'] for e in page.evaluate('report'))
-    print('Browser passed: missing click is reported immediately and next PDF continues')
-    page.evaluate('''() => {
-      processedMails={};suppressClick=null;suppressDownload=null;blockClose=null;
-      events=[];report=[];finished=false;window.unreadIds=[0,1,2];
-      window.baseShowMail=showMail;
-      showMail=i=>{unreadIds=unreadIds.filter(id=>id!==i);baseShowMail(i);};
+      processedMails={};failures=[];events=[];report=[];finished=false;sharedNames=['Shared-A.pdf','Shared-B.pdf'];suppressClick=null;
       showList=()=>{
-        document.getElementById('app').innerHTML=unreadIds.map(i=>
-          `<div class="zA" data-legacy-thread-id="unread-${i}" style="padding:14px;width:600px">Thư chưa đọc ${i}: Đã gửi hồ sơ, chuyển tiếp công văn PDF</div>`).join('');
-        document.querySelectorAll('.zA').forEach((row,index)=>row.onclick=()=>showMail(unreadIds[index]));
-      };
-      showList();listener({type:'run-session',runId:String(Math.random()),limit:3});
-    }''')
-    wait_finished(timeout=30000)
-    assert page.evaluate('status').startswith('Hoàn tất: 3 thư mở, 4 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
-    assert sum(item.startswith('open-mail-') for item in page.evaluate('events'))==3
-    assert page.evaluate('unreadIds')==[]
-    print('Browser passed: unread search rows with dangerous words disappear after reading; remaining PDFs still process')
-    page.evaluate('''() => {
-      processedMails={};failures=[];events=[];report=[];finished=false;window.currentPage=0;
-      showMail=baseShowMail;
-      showList=()=>{
-        const ids=currentPage===0?[0,1]:[2];
-        document.getElementById('app').innerHTML=ids.map(i=>
-          `<div class="zA" data-legacy-thread-id="mail-${i}" style="padding:14px;width:600px">Công văn số ${i+1} · PDF đính kèm</div>`).join('')+
-          (currentPage===0?'<button aria-label="Cũ hơn" id="next-page">Cũ hơn</button>':'');
-        document.querySelectorAll('.zA').forEach((row,index)=>row.onclick=()=>showMail(ids[index]));
-        if(currentPage===0)document.querySelector('#next-page').onclick=()=>{currentPage=1;showList();};
-      };
-      showList();listener({type:'run-session',runId:String(Math.random()),limit:100,automatic:true});
-    }''')
-    wait_finished(timeout=30000)
-    assert page.evaluate('currentPage')==1
-    assert sum(item.startswith('open-mail-') for item in page.evaluate('events'))==3
-    assert page.evaluate('status').startswith('Hoàn tất: 3 thư mở, 4 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
-    print('Browser passed: automatic scan advances to the next Gmail results page')
-    page.evaluate('''() => {events=[];report=[];finished=false;document.getElementById('app').innerHTML='<p>Không tìm thấy thư nào phù hợp với tìm kiếm</p>';listener({type:'run-session',runId:String(Math.random()),limit:100,automatic:true});}''')
-    wait_finished(timeout=5000)
-    assert page.evaluate('status')=='Đã kiểm tra Gmail: không có thư PDF mới.'
-    print('Browser passed: an empty Gmail search is a successful no-op')
-    page.evaluate('''() => {
-      processedMails={};failures=[];events=[];report=[];finished=false;
-      showMail=i=>{
-        history.replaceState(null,'','#inbox/FMfcgzAAAA00000'+i);
-        originalShowMail(i);
-      };
-      showList=()=>{
-        history.replaceState(null,'','#inbox');
-        document.getElementById('app').innerHTML=[0,1].map(i=>
-          `<div class="zA" style="padding:14px;width:600px">Công văn số ${i+1} · PDF đính kèm</div>`).join('');
-        document.querySelectorAll('.zA').forEach((row,i)=>row.onclick=()=>showMail(i));
-      };
-      showList();listener({type:'run-session',runId:String(Math.random()),limit:20});
-    }''')
-    wait_finished(timeout=60000)
-    assert sum(item.startswith('download-') for item in page.evaluate('events'))==3
-    assert len(page.evaluate('processedMails'))==2
-    assert all(e['detail'].startswith('ID từ URL') for e in page.evaluate('report') if e['phase']=='kiem-tra-thu')
-    page.evaluate('''() => {events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:20});}''')
-    wait_finished(timeout=30000)
-    assert not any(item.startswith('download-') for item in page.evaluate('events'))
-    assert page.evaluate('status').startswith('Hoàn tất: 2 thư mở, 0 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
-    print('Browser passed: Gmail URL identifies mails when result rows have no thread ID')
-    page.evaluate('''() => {
-      processedMails={};failures=[];events=[];report=[];finished=false;history.replaceState(null,'','#advanced-search/test');
-      showList=()=>{
-        document.getElementById('app').innerHTML='<div class="zA" style="padding:14px;width:600px"><span class="zF" email="office@example.gov.vn">Cơ quan</span><span class="bog">Công văn ổn định</span><span class="xW"><span title="17/10/2026 15:00">15:00</span></span></div>';
-        document.querySelector('.zA').onclick=()=>originalShowMail(0);
-      };
-      showList();listener({type:'run-session',runId:String(Math.random()),limit:1});
-    }''')
-    wait_finished(timeout=30000)
-    assert sum(item.startswith('download-') for item in page.evaluate('events'))==2
-    assert len(page.evaluate('processedMails'))==1
-    page.evaluate('''() => {events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:1});}''')
-    wait_finished(timeout=30000)
-    assert not any(item.startswith('download-') for item in page.evaluate('events'))
-    assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 0 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
-    assert all('ID từ danh sách' in e['detail'] for e in page.evaluate('report') if e['phase']=='kiem-tra-thu')
-    print('Browser passed: sender, subject and full date provide a stable fallback when Gmail exposes no IDs')
-    page.evaluate('''() => {
-      processedMails={};failures=[];events=[];report=[];finished=false;
-      showList=()=>{
-        document.getElementById('app').innerHTML='<div class="zA" data-legacy-thread-id="delayed-mail" style="padding:14px;width:600px">Thư có tệp tải chậm</div>';
+        location.hash='shared-list';
+        document.getElementById('app').innerHTML='<div class="zA" data-legacy-thread-id="shared-thread" style="padding:20px">Office — shared PDF message metadata</div>';
         document.querySelector('.zA').onclick=()=>{
-          document.getElementById('app').innerHTML='<button aria-label="Quay lại" style="padding:15px">Trở về</button><span class="aV3" style="display:inline-block;padding:20px">First.pdf</span>';
+          location.hash='mail/sharedmessage000001';
+          document.getElementById('app').innerHTML='<button aria-label="Quay lại" style="padding:15px">Back</button><section data-message-id="shared-parent">'+sharedNames.map(name=>`<span class="aV3" style="display:inline-block;padding:20px">${name}</span>`).join('')+'</section>';
           document.querySelector('button').onclick=event=>{if(event.isTrusted)showList();};
-          document.querySelector('.aV3').onclick=()=>showViewer('First.pdf');
-          setTimeout(()=>{const tile=document.createElement('span');tile.className='aV3';tile.style='display:inline-block;padding:20px';tile.textContent='Late.pdf';tile.onclick=()=>showViewer('Late.pdf');document.getElementById('app').append(tile);},450);
+          document.querySelectorAll('.aV3').forEach(tile=>tile.onclick=()=>showViewer(tile.textContent));
         };
       };
       showList();listener({type:'run-session',runId:String(Math.random()),limit:1});
     }''')
     wait_finished(timeout=30000)
-    assert 'download-First.pdf' in page.evaluate('events')
-    assert 'download-Late.pdf' in page.evaluate('events')
-    assert page.evaluate('status').startswith('Hoàn tất: 1 thư mở, 2 PDF mới, 0 PDF đã có, 0 lỗi.'), page.evaluate('status')
-    print('Browser passed: waits for a stable attachment list and includes a PDF rendered late')
+    assert len(page.evaluate("processedMails['shared-thread'].files"))==2
+    assert sum(item.startswith('download-') for item in page.evaluate('events'))==2
+    print('Browser passed: PDFs under a shared message ID have separate saved identities')
+    page.evaluate('''()=>{sharedNames.push('Shared-C.pdf');events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:1});}''')
+    wait_finished(timeout=30000)
+    assert [item for item in page.evaluate('events') if item.startswith('download-')]==['download-Shared-C.pdf']
+    print('Browser passed: a new PDF under the same parent message ID is not skipped')
+    page.evaluate('''()=>{sharedNames=['Shared-A.pdf','Shared-B.pdf'];processedMails={};failures=[];events=[];report=[];finished=false;suppressClick='Shared-A.pdf';showList();listener({type:'run-session',runId:String(Math.random()),limit:1});}''')
+    wait_finished(timeout=30000)
+    assert [item for item in page.evaluate('events') if item.startswith('download-')]==['download-Shared-B.pdf']
+    assert len(page.evaluate('failures'))==1
+    print('Browser passed: a failed PDF stays incomplete when another PDF with the same parent ID succeeds')
+    page.evaluate('''()=>{suppressClick=null;events=[];report=[];finished=false;showList();listener({type:'run-session',runId:String(Math.random()),limit:1});}''')
+    wait_finished(timeout=30000)
+    assert [item for item in page.evaluate('events') if item.startswith('download-')]==['download-Shared-A.pdf']
+    assert page.evaluate('failures')==[]
+    assert page.evaluate("processedMails['shared-thread'].complete") is True
+    print('Browser passed: retry saves only the failed shared-parent PDF and clears its failure')
     assert not errors,errors
     browser.close()

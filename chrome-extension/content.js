@@ -57,11 +57,20 @@ function mailRouteKey(listURL) {
 function pdfTiles() {
  const nodes = [...document.querySelectorAll('.aV3')];
  const counts=new Map();
- return nodes.filter(node => {const r=node.getBoundingClientRect(),css=getComputedStyle(node);return /\.pdf\b/i.test(clean(node.textContent)) && r.width>=10 && r.height>=10 && css.visibility!=='hidden' && css.display!=='none' && !/drive/i.test(label(node.closest('[role="button"],button')));}).map((node,index) => {
+ const tiles=nodes.filter(node => {const r=node.getBoundingClientRect(),css=getComputedStyle(node);return /\.pdf\b/i.test(clean(node.textContent)) && r.width>=10 && r.height>=10 && css.visibility!=='hidden' && css.display!=='none' && !/drive/i.test(label(node.closest('[role="button"],button')));}).map((node,index) => {
   const name=clean(node.textContent),occurrence=counts.get(name)||0;counts.set(name,occurrence+1);
   const metadata=node.closest('[data-attachment-id],[data-message-id],[data-id],a[href]');
   const stable=metadata?.getAttribute('data-attachment-id')||metadata?.getAttribute('data-message-id')||metadata?.getAttribute('data-id')||metadata?.getAttribute('href')||'';
-  return {node,name,index,legacyKey:JSON.stringify([name,occurrence]),fileKey:stable?'gmail:'+stable:JSON.stringify([name,occurrence])};
+  const messageMetadata=metadata?.hasAttribute('data-message-id')&&!metadata.hasAttribute('data-attachment-id');
+  return {node,name,index,legacyKey:JSON.stringify([name,occurrence]),stable,messageMetadata};
+ });
+ const identities=new Map();
+ for(const tile of tiles)if(tile.stable)identities.set(tile.stable,(identities.get(tile.stable)||0)+1);
+ return tiles.map(({stable,messageMetadata,...tile})=>{
+  // A parent message ID can be shared by every attachment. It cannot stand
+  // alone as a PDF identity: one success would hide other PDFs or new files.
+  const shared=messageMetadata||identities.get(stable)>1;
+  return {...tile,fileKey:stable?(shared?'gmail-shared:'+shortHash(stable)+':'+tile.legacyKey:'gmail:'+stable):tile.legacyKey};
  });
 }
 async function stablePdfTiles(cancelled) {
