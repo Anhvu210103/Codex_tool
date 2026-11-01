@@ -111,6 +111,26 @@ class ExtensionTests(unittest.TestCase):
         self.assertEqual(result.get_json()['categories'],['Cần xem lại'])
         self.assertEqual(self.client.get('/api/notes?source=ai').get_json()['total'],1)
 
+    def test_local_import_preserves_original_name_instead_of_chrome_duplicate_suffix(self):
+        downloads=self.root/'Downloads';downloads.mkdir()
+        writer=PdfWriter();writer.add_blank_page(width=600,height=800)
+        target=downloads/'Báo cáo (7).pdf'
+        with target.open('wb') as stream:writer.write(stream)
+        with patch('mailnotes.linux_downloads.download_directory',return_value=downloads):
+            result=self.client.post('/extension/import-local',json={'path':str(target),'filename':'Báo cáo.pdf'},headers=self.headers)
+        self.assertEqual(result.status_code,200)
+        data=result.get_json();self.assertEqual(data['filename'],'Báo cáo.pdf')
+        self.assertTrue(all(Path(path).name=='Báo cáo.md' for path in data['local_markdown_paths']))
+        self.assertEqual(self.client.get('/api/notes?source=ai').get_json()['notes'][0]['subject'],'Báo cáo.pdf')
+
+    def test_local_import_rejects_invalid_original_names_before_processing(self):
+        with patch('mailnotes.linux_downloads.read_download',return_value=(b'%PDF-test','scan.pdf')),patch.object(self.app.extensions['admin'],'process_pdf') as process:
+            for filename in ('../scan.pdf','..\\scan.pdf','scan.txt',None,'scan\x00.pdf'):
+                with self.subTest(filename=filename):
+                    result=self.client.post('/extension/import-local',json={'path':'/Downloads/scan.pdf','filename':filename},headers=self.headers)
+                    self.assertEqual(result.status_code,400)
+            process.assert_not_called()
+
     def test_delete_and_clear_ai_documents_reset_extension_history(self):
         writer=PdfWriter();writer.add_blank_page(width=600,height=800);pdf=io.BytesIO();writer.write(pdf);data=pdf.getvalue()
         first=self.client.post('/extension/pdf',data={'file':(io.BytesIO(data),'one.pdf')},headers=self.headers)

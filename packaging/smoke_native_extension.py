@@ -136,13 +136,19 @@ def main():
                     retried=wait_done()
                     assert admin.notes('ai')['total']==21,retried
                     assert len(list((admin.root/'ai/Theo-nhom').rglob('*.md')))==21
-                    assert len(list(downloads.glob('*.pdf')))==22,'Only the failed PDF should be downloaded a second time'
+                    assert len(list((admin.root/'ai/Theo-nhom').rglob('native-mail-4.md')))==1,'Retry must keep the Gmail filename instead of the Chrome (1) suffix'
+                    history=worker.evaluate('()=>chrome.downloads.search({})')
+                    assert len(history)==22,{'error':'Only the failed PDF should be downloaded a second time','downloads':history,'report':retried}
+                    # CDP download redirection may replace the existing file;
+                    # Chrome history measures actual downloads in either mode.
+                    file_count=len(list(downloads.glob('*.pdf')))
                     assert worker.evaluate("async()=>(await chrome.storage.local.get('failures')).failures")==[]
                     page.locator('#back').click()
                     worker.evaluate('(tab)=>beginRun({id:tab},20)',tab)
                     duplicate=wait_done()
                     assert admin.notes('ai')['total']==21,duplicate
-                    assert len(list(downloads.glob('*.pdf')))==22,'A duplicate run downloaded the same attachments again'
+                    assert len(list(downloads.glob('*.pdf')))==file_count,'A duplicate run wrote another attachment'
+                    assert len(worker.evaluate('()=>chrome.downloads.search({})'))==22,'A duplicate run downloaded the same attachments again'
                     detached=worker.evaluate("async tab=>{try{await chrome.debugger.sendCommand({tabId:tab},'Runtime.evaluate',{expression:'1'});return false;}catch{return true;}}",tab)
                     assert detached,'The extension still owns the debugger after finishing'
                     worker.evaluate('(tab)=>beginRun({id:tab},20)',tab)

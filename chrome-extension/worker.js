@@ -247,7 +247,7 @@ async function handleDownload(item,expectedRun){
  if(!pending||pending.result||pending.error||Date.now()-run.started>3600000)return;
  if(item.startTime&&new Date(item.startTime).getTime()<pending.armedAt)return;
  if(pending.downloadId!==null&&pending.downloadId!==item.id)return;
- if(pending.downloadId===null&&Date.now()-pending.armedAt>15000)return;
+ if(pending.downloadId===null&&Date.now()-pending.armedAt>15000&&!pending.candidates?.includes(item.id))return;
  try{
   const url=new URL(item.url);
   const gmailBlob=item.url.startsWith('blob:https://mail.google.com/');
@@ -268,12 +268,12 @@ async function handleDownload(item,expectedRun){
   await chrome.storage.local.set({status:'Đang chuyển PDF về tool...'});
   const {capabilities}=await chrome.storage.local.get('capabilities');let result;
   if(!await changePending(run,current=>current.downloadId===item.id&&!current.error?current:undefined))return;
-  if((capabilities?.includes('local-download-pdf')||capabilities?.includes('linux-local-pdf'))&&item.filename){result=await api('/extension/import-local',{path:item.filename});if(!result.available)result=null;}
+  if((capabilities?.includes('local-download-pdf')||capabilities?.includes('linux-local-pdf'))&&item.filename){result=await api('/extension/import-local',{path:item.filename,filename:pending.expectedName});if(!result.available)result=null;}
   if(!result){
    if(gmailBlob)throw Error('Chrome lưu PDF dưới dạng blob; hãy chọn file vừa tải trong tiện ích để đưa vào sổ.');
    const response=await fetch(url.href,{credentials:'include'});if(!response.ok)throw Error('Không đọc lại được file tải xuống. Chọn PDF bằng tay trong tiện ích.');
    const length=Number(response.headers.get('content-length'));if(length>20*1024*1024)throw Error('PDF vượt 20 MB.');
-   result=await upload(await response.blob(),(item.filename||'Gmail.pdf').split(/[\\/]/).pop());
+   result=await upload(await response.blob(),pending.expectedName);
   }
   const updated=await changePending(run,current=>current.downloadId===item.id?{...current,result}:undefined);
   if(updated){await chrome.storage.local.set({status:resultMessage(result)});await appendReport({phase:'chrome-xong',file:(item.filename||'').split(/[\\/]/).pop(),detail:'Lượt tải '+item.id+' đã nhập vào tool'});}

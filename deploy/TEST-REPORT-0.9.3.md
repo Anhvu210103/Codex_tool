@@ -34,6 +34,8 @@ Trang quản trị cũng có thời hạn 15 giây, riêng tải/đọc lại PD
 
 Thanh công cụ PDF ưu tiên nút có nhãn, sau đó biểu tượng tải nằm giữa In và Thêm, cuối cùng mới dùng nút tải duy nhất ở bố cục khác. Ca có liên kết “Tải xuống” trong nội dung trang được tái hiện trước sửa và được thêm vào bộ 14 trường hợp DOM.
 
+Lượt tải đã được nhận diện ngay từ đầu vẫn được theo dõi khi Chrome mất hơn 15 giây để cung cấp tên file. ID tải bằng 0 trong nhánh đến muộn không làm bấm tải lại. Tiện ích gửi tên PDF gốc bên cạnh đường dẫn Downloads để Markdown mới không bị đổi tên theo hậu tố “(1)” của Chrome; backend kiểm tra tên trước khi xử lý.
+
 ## Phục hồi và tải lớn
 
 - Cache AI lỗi được thay bằng kết quả hợp lệ ở lần thử lại, không ghi một cache hit miễn phí giả. Phản hồi API sai cấu trúc vẫn được ghi usage đã trả về và không tạo ghi chép sai.

@@ -32,3 +32,20 @@ vm.createContext(ctx);vm.runInContext(FUNCTION,ctx);
 
     def test_no_download_still_times_out_after_thirty_seconds(self):
         self.exercise('no-start')
+
+    def test_late_download_with_id_zero_is_waited_for_without_clicking_again(self):
+        source=(Path(__file__).resolve().parents[1]/'chrome-extension/content.js').read_text(encoding='utf-8')
+        function=source[source.index('async function clickAndWaitDownload('):source.index('async function clickAndWaitDirect(')]
+        script=r'''
+const vm=require('node:vm'),assert=require('node:assert/strict');let observe,armed=0,waits=0;
+const button={contains:()=>false};
+const ctx={clickPoint:()=>({x:10,y:10}),pause:async()=>{},viewerOpen:()=>true,downloadButtonDisabled:()=>false,trace:async()=>{},
+ document:{addEventListener(type,fn){observe=fn;},removeEventListener(){}},
+ send:async data=>{if(data.type==='arm-download')armed++;if(data.type==='trusted-click')observe({target:button,isTrusted:true});return {downloadId:0};},
+ waitDownload:async()=>{if(++waits===1)throw Error('Chrome chưa bắt đầu tải PDF');return {added:1};},
+ readyDownload:async()=>{throw Error('A late active download must not be clicked again');}};
+vm.createContext(ctx);vm.runInContext(FUNCTION,ctx);
+ctx.clickAndWaitDownload(button,()=>false,1,'zero.pdf').then(result=>{assert.equal(result.added,1);assert.equal(armed,1);assert.equal(waits,2);}).catch(error=>{console.error(error);process.exitCode=1;});
+'''.replace('FUNCTION',json.dumps(function))
+        result=subprocess.run([shutil.which('node'),'-e',script],capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stderr)

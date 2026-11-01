@@ -284,7 +284,7 @@ async function clickAndWaitDownload(button,cancelled,mail,file) {
    const state=await send({type:'download-state'});
    if(state.error)throw Error(state.error);
    if(state.result){await trace('tai-den-tre',mail,file,'Chrome bắt đầu tải sau thời gian chờ đầu tiên');return state.result;}
-   if(state.downloadId){await trace('tai-den-tre',mail,file,'Chrome đang tải sau thời gian chờ đầu tiên');return await waitDownload(cancelled);}
+   if(Number.isInteger(state.downloadId)){await trace('tai-den-tre',mail,file,'Chrome đang tải sau thời gian chờ đầu tiên');return await waitDownload(cancelled);}
    if(!viewerOpen())throw Error('Trình xem PDF đã đóng trước khi thử tải lại.');
    button=await readyDownload(cancelled,mail,file);
    if(!button)throw Error('Nút tải PDF chưa sẵn sàng để thử lại.');

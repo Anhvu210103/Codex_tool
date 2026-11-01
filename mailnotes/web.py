@@ -347,11 +347,15 @@ def create_app(base=None, data_root=None, public_url=None):
     @app.post('/extension/import-local')
     def extension_import_local():
         from .linux_downloads import read_download
-        downloaded = read_download(payload().get('path'))
+        data = payload()
+        downloaded = read_download(data.get('path'))
         if downloaded is None:
             return jsonify(available=False)
+        filename = data.get('filename', downloaded[1])
+        if not isinstance(filename, str) or not filename.strip() or len(filename) > 500 or any(character in filename for character in ('/','\\','\x00')) or not filename.lower().endswith('.pdf'):
+            raise ValueError('Tên PDF gốc không hợp lệ.')
         try:
-            return jsonify(available=True, **store_ai_document(*downloaded))
+            return jsonify(available=True, **store_ai_document(downloaded[0], filename))
         except Exception as error:
             return jsonify(error=private_error('Tiện ích nhập PDF đã tải', error)), 400
 

@@ -40,7 +40,7 @@ class PDFEdgeCasesTests(unittest.TestCase):
                 def render(command,**kwargs):
                     self.assertEqual(command[0],executable)
                     return render_page(command,**kwargs)
-                with patch('mailnotes.documents.sys.platform','darwin'),patch('mailnotes.documents.shutil.which',return_value=None),patch('mailnotes.documents.os.access',return_value=True),patch.object(Path,'is_file',lambda path:str(path)==executable),patch('mailnotes.documents.subprocess.run',side_effect=render),patch('mailnotes.core.request_json',return_value=ocr('Scan content from a Finder-launched Mac application.')):
+                with patch('mailnotes.documents.sys.platform','darwin'),patch('mailnotes.documents.shutil.which',return_value=None),patch('mailnotes.documents.os.access',return_value=True),patch.object(Path,'is_file',lambda path:path.as_posix()==executable),patch('mailnotes.documents.subprocess.run',side_effect=render),patch('mailnotes.core.request_json',return_value=ocr('Scan content from a Finder-launched Mac application.')):
                     text,warning=pdf_text(document(None),ocr=True,api_key='test-key',endpoint='https://provider.example')
                 self.assertIn('Finder-launched',text)
                 self.assertNotIn('thất bại',warning)

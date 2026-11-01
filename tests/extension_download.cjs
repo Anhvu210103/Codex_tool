@@ -109,6 +109,12 @@ function begin(id, capabilities = [], expectedName = 'report.pdf') {
   const completing=listeners.changed({id:17,filename:{current:item.filename},state:{current:'complete'}});
   await Promise.all([creating,completing]);
   assert(session.run.pending.result,'Concurrent filename/complete events must wait until onCreated has recorded the candidate');
+  begin(18,['local-download-pdf']);
+  await listeners.created({...item});
+  session.run.pending.armedAt-=20000;
+  item.filename='/Downloads/report.pdf';item.state='complete';
+  await listeners.changed({id:18,filename:{current:item.filename},state:{current:'complete'}});
+  assert(session.run.pending.result,'A download seen immediately must still be imported if Chrome reports its filename after 20 seconds');
   begin(13);
   activeTab = 2;
   item.url = 'https://example.org/unrelated.pdf'; item.filename = '/Downloads/unrelated.pdf'; item.state = 'complete';
