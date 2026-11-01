@@ -9,7 +9,7 @@ import unittest
 class ExtensionBatchTests(unittest.TestCase):
     def exercise(self,retry=False):
         source=(Path(__file__).resolve().parents[1]/'chrome-extension/content.js').read_text(encoding='utf-8')
-        function=source[source.index('async function run('):source.index('chrome.runtime.onMessage.addListener')]
+        function=source[source.index('async function run('):source.index('return {run};')]
         harness=r'''
 const vm=require('node:vm'),assert=require('node:assert/strict');
 const list='https://mail.google.com/mail/u/0/#search/pdf',ledger={},failures=[],attempts=[];

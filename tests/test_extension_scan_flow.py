@@ -10,7 +10,7 @@ import unittest
 class ExtensionScanFlowTests(unittest.TestCase):
     def _run_scan(self, direct, backend_failure=False):
         source=(Path(__file__).resolve().parents[1]/'chrome-extension/content.js').read_text()
-        function=source[source.index('async function run('):source.index('chrome.runtime.onMessage.addListener')]
+        function=source[source.index('async function run('):source.index('return {run};')]
         harness=r'''
 const vm=require('node:vm'),assert=require('node:assert/strict');
 const events=[],attachment={name:'one.pdf',index:0,fileKey:'gmail:file1',legacyKey:'one'},viewer=!DIRECT;

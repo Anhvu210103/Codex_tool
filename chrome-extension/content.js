@@ -1,12 +1,20 @@
 'use strict';
-if (!globalThis.mailnotesPilotInstalled) {
-globalThis.mailnotesPilotInstalled = true;
-let stopped = true, epoch = 0;
+if (!globalThis.mailnotesPilotSessionInstalled) {
+globalThis.mailnotesPilotSessionInstalled = true;
+let stopped = true, epoch = 0, activeRunId = '';
+function createPilot(runId) {
+let sessionCancelled=()=>false;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const clean = value => String(value || '').normalize('NFC').trim().replace(/\s+/g, ' ');
 const downloadName = /download|tải xuống|tải về/i;
 const dangerous = /compose|soạn thư|send|gửi|delete|xóa|archive|lưu trữ|spam|reply|trả lời|forward|chuyển tiếp/i;
-async function send(data) { const answer = await chrome.runtime.sendMessage(data); if (answer?.error) throw Error(answer.error); return answer; }
+async function send(data) {
+ if(sessionCancelled())throw Error('Lượt thử đã dừng/hết hạn.');
+ const answer=await chrome.runtime.sendMessage({...data,runId});
+ if(sessionCancelled())throw Error('Lượt thử đã dừng/hết hạn.');
+ if(answer?.error)throw Error(answer.error);
+ return answer;
+}
 function label(node) { return clean(node?.getAttribute('aria-label') || node?.getAttribute('data-tooltip') || node?.getAttribute('title') || node?.innerText); }
 function visible(node) {
  if (!node?.isConnected) return false;
@@ -88,6 +96,7 @@ async function openTile(node,cancelled) {
  for(let i=0;i<5&&!cancelled();i++){
   node.scrollIntoView({block:'center'});
   await pause(250);
+  if(cancelled())return;
   check=tileReady(node);
   if(check.ok){node.click();return;}
  }
@@ -180,10 +189,6 @@ function downloadControl() {
  // Fail closed on ambiguity rather than download the wrong attachment.
  if(named.length===1)return named[0];
  if(named.length>1)return null;
- const visibleNamed=downloadCandidates().filter(button=>visible(button)&&safe(button)&&!downloadButtonDisabled(button));
- // Some Gmail layouts put the viewer toolbar at the left edge or inside a
- // narrower pane. A single visible, safe Download control is unambiguous.
- if(visibleNamed.length===1)return visibleNamed[0];
  // Icon-only fallback requires semantic Print and More neighbours, never a
  // guessed screen coordinate. Resizing/reordered toolbars stay supported.
  const controls=[...document.querySelectorAll('button,[role="button"],a[tabindex],div[tabindex="0"]')]
@@ -198,9 +203,13 @@ function downloadControl() {
    const r=button.getBoundingClientRect();
    return button!==print&&button!==end&&r.left>=pr.right&&r.right<=er.left&&Math.abs(r.top-pr.top)<=12&&r.width<=80;
   });
-  if(between.length===1&&!label(between[0])&&safe(between[0])&&!downloadButtonDisabled(between[0]))matches.add(between[0]);
+  if(between.length===1&&(!label(between[0])||/^[↓⇩⤓]$/u.test(label(between[0])))&&safe(between[0])&&!downloadButtonDisabled(between[0]))matches.add(between[0]);
  }
- return matches.size===1?[...matches][0]:null;
+ if(matches.size)return matches.size===1?[...matches][0]:null;
+ // Prefer the semantically identified header icon over a Download link in
+ // the document body. A unique named control is the final layout fallback.
+ const visibleNamed=downloadCandidates().filter(button=>visible(button)&&safe(button)&&!downloadButtonDisabled(button));
+ return visibleNamed.length===1?visibleNamed[0]:null;
 }
 async function readyDownload(cancelled,mail,file) {
  const button=await until(()=>{revealToolbar();return downloadControl();},12000,cancelled);
@@ -335,6 +344,7 @@ async function restoreMailAfterViewer(mailURL,listURL,cancelled,mail,file) {
   if(await until(()=>!viewerOpen(),1500,cancelled)){await trace('an-trinh-xem',mail,file,'Gmail không đóng trình xem; đã ẩn lớp phủ để tiếp tục');return true;}
  }
  let mailTarget,listTarget;
+ if(cancelled())return false;
  try{mailTarget=new URL(mailURL);listTarget=new URL(listURL);}catch{return false;}
  if(mailTarget.origin!==location.origin||mailTarget.pathname!==location.pathname||!mailTarget.hash||!listTarget.hash||mailTarget.hash===listTarget.hash)return false;
  // Gmail sometimes keeps its PDF overlay mounted even after Close and Escape.
@@ -342,6 +352,7 @@ async function restoreMailAfterViewer(mailURL,listURL,cancelled,mail,file) {
  // This resets the overlay without reloading the tab or losing the active run.
  location.hash=listTarget.hash;
  if(!await until(()=>!viewerOpen()&&mailRows().some(item=>visible(item.node)),10000,cancelled))return false;
+ if(cancelled())return false;
  location.hash=mailTarget.hash;
  const restored=await until(()=>!viewerOpen()&&pdfTiles().length>0,12000,cancelled);
  if(restored)await trace('da-phuc-hoi-thu',mail,file,'Đã mở lại thư để xử lý PDF tiếp theo');
@@ -363,6 +374,7 @@ async function backToList(listURL,cancelled) {
  // of relying only on the viewer's Close button or browser history.
  if(target.origin===location.origin && target.pathname===location.pathname && target.hash && location.hash!==target.hash){
   await trace('quay-lai-danh-sach',0,'','Khôi phục bộ lọc Gmail đã mở');
+  if(cancelled())return false;
   location.hash=target.hash;
   if(await until(() => mailRows().some(item=>visible(item.node)),10000,cancelled))return true;
  }
@@ -375,8 +387,10 @@ async function backToList(listURL,cancelled) {
  // short route bounce forces the saved result list to render again.
  if(!cancelled() && target.hash && location.hash===target.hash){
   await trace('tai-lai-danh-sach',0,'','Đúng URL tìm kiếm nhưng Gmail chưa hiện hàng thư; mở lại bộ lọc');
+  if(cancelled())return false;
   location.hash='#all';
   await pause(500);
+  if(cancelled())return false;
   location.hash=target.hash;
   if(await until(() => mailRows().some(item=>visible(item.node)),12000,cancelled))return true;
  }
@@ -394,6 +408,7 @@ function nextPageButton(){
 }
 async function run(limit,only=[],automatic=false) {
  stopped=false; const current=++epoch, cancelled=()=>stopped||epoch!==current;
+ sessionCancelled=cancelled;
  let mails=0, files=0, newFiles=0, duplicateFiles=0, errors=0, duplicateMails=0, scanSucceeded=false; const faults=[];
  const rememberFailure=async(stage,entry,error,file=null)=>{const failure={stage,rowIndex:entry.index,key:entry.key||'',text:entry.text||'',fileIndex:file?.index??-1,name:file?.name||'',fileKey:file?.fileKey,error:error.message||String(error)};await send({type:'failure',failure}).catch(()=>{});};
  try {
@@ -505,8 +520,16 @@ async function run(limit,only=[],automatic=false) {
   await trace('hoan-tat',mails,'',newFiles+' PDF mới, '+duplicateFiles+' PDF đã có, '+duplicateMails+' thư bỏ qua, '+errors+' lỗi');
   await progress('Hoàn tất: '+mails+' thư mở, '+newFiles+' PDF mới, '+duplicateFiles+' PDF đã có, '+errors+' lỗi.'+(pageLimitReached?'\nĐã chạm giới hạn 20 trang Gmail; kiểm tra báo cáo.':'')+(faults.length?'\nXem Báo cáo lần chạy trong tiện ích để biết từng file lỗi.':''));
   scanSucceeded=automatic&&errors===0&&!pageLimitReached;
- } catch (error) {await trace('dung',mails,'',error.message);await progress('Đã lưu '+files+' PDF từ '+mails+' thư. Dừng: '+error.message+'\nMở Báo cáo lần chạy trong tiện ích.').catch(()=>{});}
- finally {if(epoch===current){stopped=true;if(automatic)await send({type:'scan-complete',success:scanSucceeded}).catch(()=>{});await send({type:'finish'}).catch(()=>{});}}
+ } catch (error) {if(!cancelled()){await trace('dung',mails,'',error.message);await progress('Đã lưu '+files+' PDF từ '+mails+' thư. Dừng: '+error.message+'\nMở Báo cáo lần chạy trong tiện ích.').catch(()=>{});}}
+ finally {if(epoch===current){if(automatic)await send({type:'scan-complete',success:scanSucceeded}).catch(()=>{});await send({type:'finish'}).catch(()=>{});if(epoch===current)stopped=true;}}
 }
-chrome.runtime.onMessage.addListener(message=>{if(message.type==='run')run(message.limit===1?1:message.limit===100?100:20,message.only||[],message.automatic===true);if(message.type==='stop'){stopped=true;epoch++;}});
+return {run};
+}
+chrome.runtime.onMessage.addListener(message=>{
+ if(message.type==='run-session'&&typeof message.runId==='string'){
+  activeRunId=message.runId;
+  createPilot(message.runId).run(message.limit===1?1:message.limit===100?100:20,message.only||[],message.automatic===true);
+ }
+ if(message.type==='stop'&&(!message.runId||message.runId===activeRunId)){stopped=true;epoch++;}
+});
 }

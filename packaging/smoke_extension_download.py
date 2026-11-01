@@ -6,7 +6,8 @@ from playwright.sync_api import sync_playwright
 
 def main():
     source=(Path(__file__).resolve().parents[1]/'chrome-extension/content.js').read_text()
-    source=source.rstrip()[:-1]+"\nglobalThis.downloadTest={downloadControl,readyDownload};\n}"
+    source=source.replace("return {run};","globalThis.downloadTest={downloadControl,readyDownload};return {run};")
+    source=source.rstrip()[:-1]+"\ncreatePilot('dom-test');\n}"
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path=shutil.which('chromium'),headless=True,args=['--no-sandbox'])
         page=browser.new_page(viewport={'width':2000,'height':800})
@@ -35,13 +36,15 @@ def main():
         check('<button id="download" aria-label="Download" style="left:1200px;top:400px"></button>','download')
         check('<button id="a" aria-label="Download" style="left:1200px;top:100px"></button><button id="b" aria-label="Download" style="left:1250px;top:100px"></button>',None)
         check('<button aria-label="In" style="left:1100px;top:100px"></button><button id="download" style="left:1150px;top:100px"></button><button aria-label="Thêm" style="left:1200px;top:100px"></button>','download')
+        check('<button aria-label="In" style="left:1100px;top:100px"></button><button id="download" style="left:1150px;top:100px"></button><button aria-label="Thêm" style="left:1200px;top:100px"></button><button id="body-download" aria-label="Tải xuống" style="left:800px;top:400px"></button>','download')
+        check('<button aria-label="In" style="left:1100px;top:100px"></button><button id="download" style="left:1150px;top:100px">↓</button><button aria-label="Thêm" style="left:1200px;top:100px"></button>','download')
         check('<button style="left:1100px;top:100px"></button><button id="unknown" style="left:1150px;top:100px"></button><button style="left:1200px;top:100px"></button>',None)
         check('<button id="download" aria-label="Download" disabled style="left:1200px;top:100px"></button>',None)
         page.evaluate("setTimeout(()=>document.querySelector('#download').disabled=false,500)")
         assert page.evaluate('async()=> (await downloadTest.readyDownload(()=>false,1,"sample.pdf"))?.id')=='download'
         assert not errors,errors
         browser.close()
-    print('Download DOM selection: OK (12 cases; live Gmail not exercised)')
+    print('Download DOM selection: OK (14 cases; live Gmail not exercised)')
 
 
 if __name__=='__main__':

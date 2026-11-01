@@ -55,7 +55,7 @@ async function stop({preserveManual=false,onlyAutomatic=false,expectedRun=null}=
   stopped=current;return null;
  });
  if(stopped){
-  await chrome.tabs.sendMessage(stopped.tab,{type:'stop'}).catch(()=>{});
+  await chrome.tabs.sendMessage(stopped.tab,{type:'stop',runId:stopped.runId}).catch(()=>{});
   const pending=debuggerOperations>0,cleanup=detach(stopped.tab,stopped.generation,true);
   if(pending)cleanup.catch(()=>{});else await cleanup;
  }
@@ -99,6 +99,7 @@ async function beginRun(tab,limit,only=[],automatic=false,accountIndex='0',scanS
  const generation=++startGeneration,autoTicket=ticket.autoGeneration??autoGeneration;
  const check=()=>{if(generation!==startGeneration||(automatic&&autoTicket!==autoGeneration)||(ticket.manualGeneration!==undefined&&ticket.manualGeneration!==manualGeneration))throw cancelledStart();};
  const running={tab:tab.id,started:Date.now(),generation,limit,automatic,accountIndex,scanStartedAt};
+ running.runId=running.started+':'+generation;
  let attached=false;
  try{
   if(!await chrome.permissions.contains({permissions:['debugger']}))throw Error('Chrome chưa cấp quyền điều khiển tab PDF.');
@@ -108,7 +109,7 @@ async function beginRun(tab,limit,only=[],automatic=false,accountIndex='0',scanS
   check();
   await chrome.scripting.executeScript({target:{tabId:tab.id},files:['content.js']});
   check();const current=(await chrome.storage.session.get('run')).run;if(!sameRun(current,running))throw cancelledStart();check();
-  await chrome.tabs.sendMessage(tab.id,{type:'run',limit,only,automatic});
+  await chrome.tabs.sendMessage(tab.id,{type:'run-session',runId:running.runId,limit,only,automatic});
  }catch(error){await changeRun(current=>sameRun(current,running)?null:undefined);if(attached)await detach(tab.id,generation);throw error;}
 }
 let autoStarting=false;
@@ -174,7 +175,7 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
   }
   if(message.type==='stop'){await stop();return {};}
   if(message.type==='upload'){if(sender.tab)throw Error('Thao tác chỉ từ tiện ích.');const result=await upload(new Blob([new Uint8Array(message.bytes)],{type:'application/pdf'}),message.name);const status=resultMessage(result);await chrome.storage.local.set({status});return {...result,status};}
-  const {run}=await chrome.storage.session.get('run');if(!run||sender.tab?.id!==run.tab||Date.now()-run.started>3600000)throw Error('Lượt thử đã dừng/hết hạn.');
+  const {run}=await chrome.storage.session.get('run');if(!run||sender.tab?.id!==run.tab||typeof run.runId!=='string'||message.runId!==run.runId||Date.now()-run.started>3600000)throw Error('Lượt thử đã dừng/hết hạn.');
   if(message.type==='mail-state'){
    const {key,fingerprint}=mailIdentity(message),records=await ledger(),row=records[key];
    if(row&&row.fingerprint!==fingerprint&&fingerprint===key&&/^[0-9a-f]{16}:\d+$/.test(row.fingerprint||'')){

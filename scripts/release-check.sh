@@ -19,6 +19,7 @@ node tests/extension_download_race.cjs
 node tests/extension_lifecycle_race.cjs
 "$PYTHON" packaging/smoke_extension_ui.py
 "$PYTHON" packaging/smoke_extension_download.py
+"$PYTHON" packaging/smoke_extension_sessions.py
 "$PYTHON" packaging/smoke_admin_ui.py
 
 echo "Go-live checks passed. Gmail thật, GreenNode thật và máy Windows/iMac khách vẫn cần nghiệm thu theo deploy/GO-LIVE.md."

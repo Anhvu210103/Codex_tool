@@ -23,14 +23,25 @@ let savedTextSize='comfortable';try{savedTextSize=localStorage.getItem('mailnote
 applyTextSize(savedTextSize);
 $('text-size')?.addEventListener('change',()=>applyTextSize($('text-size').value));
 async function api(path, options = {}) {
-  const response = await fetch(path, {credentials:'same-origin', ...options, headers:{'Content-Type':'application/json','X-CSRF-Token':csrf,...options.headers}});
-  if(!response.headers.get('content-type')?.includes('application/json'))throw new Error(response.status===404?'Tool đang chạy bản cũ hoặc sai địa chỉ/cổng. Tắt hẳn phiên tool cũ rồi mở bản mới trong đúng thư mục.':'Tool trả về trang HTML thay vì dữ liệu. Kiểm tra địa chỉ, tắt phiên cũ và mở lại tool.');
-  let data;try{data=await response.json();}catch{throw new Error('Phản hồi từ tool không hợp lệ. Tắt phiên cũ và mở lại tool.');}
-  if (!response.ok) {
-    if (response.status === 401 && path !== '/api/login') await boot();
-    throw new Error(data.error || 'Không thực hiện được yêu cầu.');
-  }
-  return data;
+  const route=path.split('?')[0],long=['/api/pdf','/api/notes/reprocess'].includes(route);
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),long?360000:15000);
+  const headers={'X-CSRF-Token':csrf,...options.headers};
+  if(!(options.body instanceof FormData))headers['Content-Type']='application/json';
+  try {
+    const response = await fetch(path, {credentials:'same-origin', ...options, headers,signal:controller.signal});
+    if(!response.headers.get('content-type')?.includes('application/json'))throw new Error(response.status===404?'Tool đang chạy bản cũ hoặc sai địa chỉ/cổng. Tắt hẳn phiên tool cũ rồi mở bản mới trong đúng thư mục.':'Tool trả về trang HTML thay vì dữ liệu. Kiểm tra địa chỉ, tắt phiên cũ và mở lại tool.');
+    let data;try{data=await response.json();}catch(error){if(controller.signal.aborted)throw error;throw new Error('Phản hồi từ tool không hợp lệ. Tắt phiên cũ và mở lại tool.');}
+    if(!data||typeof data!=='object')throw new Error('Phản hồi từ tool không hợp lệ. Tắt phiên cũ và mở lại tool.');
+    if (!response.ok) {
+      if (response.status === 401 && path !== '/api/login') await boot();
+      throw new Error(data.error || 'Không thực hiện được yêu cầu.');
+    }
+    return data;
+  } catch(error) {
+    if(controller.signal.aborted)throw new Error(long?'Tool chưa trả kết quả sau 6 phút. Tài liệu có thể vẫn đang xử lý; kiểm tra sổ trước khi thử lại.':'Tool chưa phản hồi. Kiểm tra tool đang mở rồi tải lại trang.');
+    if(error instanceof TypeError)throw new Error('Mất kết nối với tool. Mở lại Sổ ghi chép rồi tải lại trang.');
+    throw error;
+  } finally {clearTimeout(timer);}
 }
 const post = (path, body = {}) => api(path,{method:'POST',body:JSON.stringify(body)});
 function notice(message, error = false) {
@@ -369,8 +380,7 @@ action('upload-pdf',async()=>{
   if(file.size>20*1024*1024)throw new Error('PDF tối đa 20 MB.');
   const form=new FormData();form.append('file',file);form.append('reprocess',$('pdf-reprocess').checked?'true':'false');
   notice('Đang đọc PDF và xử lý theo cấu hình đã lưu. Vui lòng chờ…');
-  const response=await fetch('/api/pdf',{method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':csrf},body:form});
-  const data=await response.json();if(!response.ok)throw new Error(data.error || 'Không xử lý được PDF.');
+  const data=await api('/api/pdf',{method:'POST',body:form});
   $('pdf-file').value='';$('notes-source').value='pdf';$('dashboard-source').value='pdf';rememberSource('pdf');$('notes-day').value='';$('notes-category').value='';
   notice(data.added?'Đã ghi/cập nhật PDF vào sổ.':'PDF này đã xử lý, không gọi AI lại.');await loadNotes();
 });

@@ -2,11 +2,11 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 
 function deferred(){let release;const promise=new Promise(resolve=>{release=resolve;});return {promise,release};}
 function harness(pause){
- const local={base:'http://localhost:8080',token:'test-token',autoEnabled:pause!=='mirror',autoFilter:{period:'all'}},session={},events=[];let onDetach;
+ const local={base:'http://localhost:8080',token:'test-token',autoEnabled:pause!=='mirror',autoFilter:{period:'all'}},session={},events=[];let onDetach,onMessage;
  const reached=deferred(),gate=deferred();let hold=true,attached=false;
  const storage=obj=>({async get(keys){return structuredClone(Array.isArray(keys)?Object.fromEntries(keys.map(key=>[key,obj[key]])):{[keys]:obj[keys]});},async set(value){Object.assign(obj,structuredClone(value));},async remove(key){for(const item of [].concat(key))delete obj[item];},async setAccessLevel(){}});
  const chrome={storage:{local:storage(local),session:storage(session)},
-  runtime:{onMessage:{addListener(){}},onStartup:{addListener(){}},onInstalled:{addListener(){}}},
+  runtime:{onMessage:{addListener(listener){onMessage=listener;}},onStartup:{addListener(){}},onInstalled:{addListener(){}}},
   alarms:{onAlarm:{addListener(){}},async create(){events.push('alarm');},async clear(){events.push('clear');}},
   permissions:{async contains(){return true;}},
   tabs:{async query(){return [{id:1,url:'https://mail.google.com/mail/u/0/#inbox'}];},async get(id){return {id,status:'complete',url:'https://mail.google.com/mail/u/0/#inbox'};},async create(value){events.push('new-tab');return {id:1,status:'complete',...value};},async update(id,value){return {id,status:'complete',...value};},async reload(){},async sendMessage(id,message){events.push(message.type);}},
@@ -16,7 +16,7 @@ function harness(pause){
  const context={chrome,console,URL,Blob,FormData,Response,TextDecoder,Date,AbortController,setTimeout,clearTimeout,
   async fetch(url,options){const payload=JSON.parse(options.body);if(pause==='mirror'&&url.endsWith('/extension/automation-state')&&payload.action==='save'&&hold){hold=false;reached.release();await gate.promise;}return new Response(JSON.stringify(url.endsWith('/extension/ping')?{app:'mailnotes-extension',protocol:1,capabilities:[]}:{ok:true}),{headers:{'content-type':'application/json'}});}};
  vm.createContext(context);vm.runInContext(fs.readFileSync('chrome-extension/worker.js','utf8'),context);
- return {context,local,session,events,reached:reached.promise,release:gate.release,restore(){attached=true;session.run={tab:1,started:Date.now(),generation:500};},attached:()=>attached,detachEvent:source=>onDetach(source)};
+ return {context,local,session,events,reached:reached.promise,release:gate.release,restore(){attached=true;session.run={tab:1,started:Date.now(),generation:500};},attached:()=>attached,detachEvent:source=>onDetach(source),fromTab:message=>new Promise(resolve=>onMessage(message,{tab:{id:1}},resolve))};
 }
 
 (async()=>{
@@ -27,18 +27,18 @@ function harness(pause){
   if(automatic)await test.context.setAuto(false);else await test.context.stop();
   test.release();await starting.catch(()=>{});
   assert(!test.session.run,`${automatic?'Automatic':'Manual'} scan must not start after it was stopped during Chrome attachment`);
-  assert(!test.events.includes('run'),'Cancelled startup must not send a run command to Gmail');
+  assert(!test.events.includes('run-session'),'Cancelled startup must not send a run command to Gmail');
  }
  const test=harness('mirror'),enabling=test.context.setAuto(true);
  await test.reached;await test.context.setAuto(false);test.release();await enabling;
  assert.equal(test.local.autoEnabled,false,'An older enable operation must not override the newer disable action');
- assert(!test.events.includes('run'));
+ assert(!test.events.includes('run-session'));
  const restarting=harness('attach'),first=restarting.context.beginRun({id:1},20);
  await restarting.reached;await restarting.context.stop();
  const second=restarting.context.beginRun({id:1},20);const secondOutcome=second.then(()=>null,error=>error);
  restarting.release();await first.catch(()=>{});assert.equal(await secondOutcome,null);
  assert(restarting.session.run,'A new start must recover after cancelling a pending Chrome attachment');
- assert.equal(restarting.events.filter(event=>event==='run').length,1);
+ assert.equal(restarting.events.filter(event=>event==='run-session').length,1);
  await restarting.context.stop();assert.equal(restarting.attached(),false);
  const restored=harness('none');restored.restore();await restored.context.stop();
  assert.equal(restored.attached(),false,'Stop must detach Chrome after the service worker restores a persisted run');
@@ -53,5 +53,13 @@ function harness(pause){
   gate.release();await Promise.all([pending,saving]);
   assert.equal(changed.session.run?.generation,501,`An old ${action} action must not stop a newer manual scan`);
  }
- console.log('Extension lifecycle races passed: stop during Chrome attachment, disable during schedule setup.');
+ const stale=harness('none');
+ stale.session.run={tab:1,started:Date.now(),generation:502,runId:'new-run'};
+ for(const message of [{type:'progress',text:'old status'},{type:'finish'}]){
+  const reply=await stale.fromTab({...message,runId:'old-run'});
+  assert(reply.error,'Messages from an earlier scan in the same Gmail tab must be rejected');
+  assert.equal(stale.session.run?.generation,502,'An old content script must not finish the new run');
+  assert.notEqual(stale.local.status,'old status');
+ }
+ console.log('Extension lifecycle races passed: cancellation, schedule changes and stale content messages.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

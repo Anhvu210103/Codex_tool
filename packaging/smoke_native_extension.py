@@ -31,11 +31,26 @@ from mailnotes.web import create_app
 
 PAGE='''<!doctype html><meta charset="utf-8"><title>Synthetic Gmail test</title>
 <style>body{font:20px Arial;padding:60px}.zA{padding:20px;border:1px solid #777;cursor:pointer}.aZo{display:inline-flex;flex-direction:column;width:220px;margin:24px;padding:16px;border:1px solid #777}.aV3{height:90px}a[role=button]{display:block;width:50px;height:50px;padding:8px;background:#ddd}svg{width:30px;height:30px}</style>
-<div id="list"><div class="zA" data-legacy-thread-id="native-thread" data-legacy-message-id="native-message">Office — two PDF attachments for native test</div></div>
-<div id="mail" hidden><button id="back" aria-label="Quay lại danh sách">Back</button>
-<div class="aZo" data-attachment-id="one"><div class="aV3">native-one.pdf</div><a role="button" data-fixture="one" aria-label="Tải xuống tệp đính kèm native-one.pdf" href="#" download="native-one.pdf"><svg><path d="M15 0v25m-10-10 10 10 10-10" stroke="black" fill="none"/></svg></a></div>
-<div class="aZo" data-attachment-id="two"><div class="aV3">native-two.pdf</div><a role="button" data-fixture="two" aria-label="Tải xuống tệp đính kèm native-two.pdf" href="#" download="native-two.pdf"><svg><path d="M15 0v25m-10-10 10 10 10-10" stroke="black" fill="none"/></svg></a></div></div>
-<script>const documents=__DOCUMENTS__;for(const link of document.querySelectorAll('[data-fixture]')){const bytes=Uint8Array.from(atob(documents[link.dataset.fixture]),character=>character.charCodeAt(0));link.href=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));}document.querySelector('.zA').onclick=()=>{document.querySelector('#list').hidden=true;document.querySelector('#mail').hidden=false;location.hash='search/native/message0000000001';};document.querySelector('#back').onclick=()=>{document.querySelector('#list').hidden=false;document.querySelector('#mail').hidden=true;location.hash='search/native';};</script>'''
+<div id="list"></div>
+<div id="mail" hidden><button id="back" aria-label="Quay lại danh sách">Back</button><div id="attachments"></div></div>
+<script>
+const documents=__DOCUMENTS__,keys=Object.keys(documents),threads=[keys.slice(0,2),...keys.slice(2).map(key=>[key])],urls={};
+for(const [key,value] of Object.entries(documents)){
+ const bytes=Uint8Array.from(atob(value),character=>character.charCodeAt(0));
+ urls[key]=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+}
+threads.forEach((files,index)=>{
+ const row=document.createElement('div');row.className='zA';row.dataset.legacyThreadId='native-thread-'+index;row.dataset.legacyMessageId='native-message-'+index;row.textContent='Office document '+index+' — PDF attachments';
+ row.onclick=()=>{
+  document.querySelector('#list').hidden=true;document.querySelector('#mail').hidden=false;
+  document.querySelector('#attachments').innerHTML=files.map(key=>`<div class="aZo" data-attachment-id="${key}"><div class="aV3">native-${key}.pdf</div><a role="button" data-fixture="${key}" aria-label="Tải xuống tệp đính kèm native-${key}.pdf" download="native-${key}.pdf"><svg><path d="M15 0v25m-10-10 10 10 10-10" stroke="black" fill="none"/></svg></a></div>`).join('');
+  for(const link of document.querySelectorAll('[data-fixture]'))link.href=urls[link.dataset.fixture];
+  location.hash='search/native/message000000000'+index;
+ };
+ document.querySelector('#list').append(row);
+});
+document.querySelector('#back').onclick=()=>{document.querySelector('#list').hidden=false;document.querySelector('#mail').hidden=true;location.hash='search/native';};
+</script>'''
 
 
 class QuietHandler(WSGIRequestHandler):
@@ -81,15 +96,15 @@ def main():
                     requests=[]
                     def route(request):
                         requests.append(request.request.url)
-                        payload={name:base64.b64encode(pdf(name)).decode('ascii') for name in ('one','two')}
+                        payload={name:base64.b64encode(pdf(name)).decode('ascii') for name in ('one','two',*(f'mail-{index}' for index in range(2,21)))}
                         request.fulfill(status=200,content_type='text/html',body=PAGE.replace('__DOCUMENTS__',json.dumps(payload)))
                     context.route('https://mail.google.com/**',route)
                     page=context.new_page();page.goto('https://mail.google.com/mail/u/0/#search/native');page.bring_to_front()
-                    assert page.locator('a[download]').evaluate_all("links=>links.every(link=>link.href.startsWith('blob:https://mail.google.com/'))")
+                    assert page.locator('.zA').count()==20
                     cdp=context.new_cdp_session(page)
                     cdp.send('Browser.setDownloadBehavior',{'behavior':'allow','downloadPath':str(downloads),'eventsEnabled':True})
                     tab=worker.evaluate("async()=>{const tabs=await chrome.tabs.query({url:'https://mail.google.com/*'});return tabs[0].id;}")
-                    def wait_done(timeout=25):
+                    def wait_done(timeout=90):
                         deadline=time.monotonic()+timeout
                         while time.monotonic()<deadline:
                             saved=worker.evaluate("async()=>({run:(await chrome.storage.session.get('run')).run,local:await chrome.storage.local.get(['status','report'])})")
@@ -100,20 +115,21 @@ def main():
                                      'download_events':worker.evaluate('()=>nativeDownloadEvents'),
                                      'targets':worker.evaluate('()=>chrome.debugger.getTargets()')}
                         raise RuntimeError('Native extension did not finish: '+json.dumps(diagnostics,ensure_ascii=False))
-                    worker.evaluate('(tab)=>beginRun({id:tab},1)',tab)
+                    worker.evaluate('(tab)=>beginRun({id:tab},20)',tab)
                     result=wait_done()
-                    assert admin.notes('ai')['total']==2,result
-                    assert sorted(path.name for path in downloads.glob('*.pdf'))==['native-one.pdf','native-two.pdf'],result
-                    assert len(list((admin.root/'ai/Theo-nhom').rglob('*.md')))==2
+                    assert admin.notes('ai')['total']==21,result
+                    assert len(list(downloads.glob('*.pdf')))==21,result
+                    assert len(list((admin.root/'ai/Theo-nhom').rglob('*.md')))==21
+                    assert sum(event['phase']=='mo-thu' for event in result.get('report',[]))==20,result
                     assert not any(event['phase'] in ('loi','dung') for event in result.get('report',[])),result
                     page.locator('#back').click()
-                    worker.evaluate('(tab)=>beginRun({id:tab},1)',tab)
+                    worker.evaluate('(tab)=>beginRun({id:tab},20)',tab)
                     duplicate=wait_done()
-                    assert admin.notes('ai')['total']==2,duplicate
-                    assert len(list(downloads.glob('*.pdf')))==2,'A duplicate run downloaded the same attachments again'
+                    assert admin.notes('ai')['total']==21,duplicate
+                    assert len(list(downloads.glob('*.pdf')))==21,'A duplicate run downloaded the same attachments again'
                     detached=worker.evaluate("async tab=>{try{await chrome.debugger.sendCommand({tabId:tab},'Runtime.evaluate',{expression:'1'});return false;}catch{return true;}}",tab)
                     assert detached,'The extension still owns the debugger after finishing'
-                    worker.evaluate('(tab)=>beginRun({id:tab},1)',tab)
+                    worker.evaluate('(tab)=>beginRun({id:tab},20)',tab)
                     page.close()
                     deadline=time.monotonic()+5
                     while time.monotonic()<deadline and worker.evaluate("async()=>!!(await chrome.storage.session.get('run')).run"):
@@ -121,7 +137,7 @@ def main():
                     assert not worker.evaluate("async()=>!!(await chrome.storage.session.get('run')).run"),'Closing the tab did not release scan state'
                 finally:context.close()
         finally:server.shutdown();thread.join(timeout=5);server.server_close()
-    print('Native Chrome extension passed: debugger clicks, two PDF downloads -> local import -> Markdown, duplicate skip, detach and tab-close recovery (synthetic Gmail, no AI request).')
+    print('Native Chrome extension passed: debugger clicks, 20 mails, 21 PDF downloads -> local import -> Markdown, duplicate skip, detach and tab-close recovery (synthetic Gmail, no AI request).')
 
 
 if __name__=='__main__':

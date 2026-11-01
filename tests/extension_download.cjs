@@ -42,7 +42,7 @@ global.fetch = async (url, options) => {
 vm.runInThisContext(fs.readFileSync('chrome-extension/worker.js', 'utf8'));
 function begin(id, capabilities = [], expectedName = 'report.pdf') {
   activeTab = 1; requests = []; local.capabilities = capabilities;
-  session.run = {tab: 1, started: Date.now(), pending: {armedAt: Date.now(), downloadId: null, candidates: [], expectedName, result: null, error: null}};
+  session.run = {runId: 'test-run', tab: 1, started: Date.now(), pending: {armedAt: Date.now(), downloadId: null, candidates: [], expectedName, result: null, error: null}};
   item = {id, url: 'https://mail.google.com/mail/u/0/?view=att', referrer: '', filename: '', mime: '', state: 'in_progress'};
 }
 (async () => {
@@ -115,7 +115,7 @@ function begin(id, capabilities = [], expectedName = 'report.pdf') {
   await listeners.created({...item});
   assert.equal(session.run.pending.downloadId, null, 'Unrelated downloads must not be imported');
   assert(local.report.some(entry=>entry.phase==='chrome-bo-qua' && entry.detail.includes('nguồn tải không thuộc Gmail')));
-  const fromTab = data => new Promise(resolve => listeners.message(data,{tab:{id:1}},resolve));
+  const fromTab = data => new Promise(resolve => listeners.message({...data,runId:session.run.runId},{tab:{id:1}},resolve));
   let reply=await fromTab({type:'trace',event:{phase:'loi',mail:1,file:'blocked.pdf',detail:'Ô PDF bị che'}});
   assert.deepEqual(reply,{});
   assert(local.report.some(entry=>entry.file==='blocked.pdf' && entry.phase==='loi'));
@@ -163,10 +163,10 @@ function begin(id, capabilities = [], expectedName = 'report.pdf') {
   assert.equal(local.autoEnabled,true);
   assert(local.autoEnabledAt);
   const scanStartedAt=session.run.scanStartedAt;
-  await new Promise(resolve => listeners.message({type:'scan-complete',success:true},{tab:{id:session.run.tab}},resolve));
+  await new Promise(resolve => listeners.message({type:'scan-complete',success:true,runId:session.run.runId},{tab:{id:session.run.tab}},resolve));
   assert.equal(local.scanCursors['1'],scanStartedAt,'Only a successful automatic scan advances the catch-up cursor');
   session.run.scanStartedAt=scanStartedAt+60000;
-  await new Promise(resolve => listeners.message({type:'scan-complete',success:false},{tab:{id:session.run.tab}},resolve));
+  await new Promise(resolve => listeners.message({type:'scan-complete',success:false,runId:session.run.runId},{tab:{id:session.run.tab}},resolve));
   assert.equal(local.scanCursors['1'],scanStartedAt,'A failed automatic scan must be retried from the prior cursor');
   delete session.run;
   await listeners.alarm({name:listeners.alarmSpec.name});
