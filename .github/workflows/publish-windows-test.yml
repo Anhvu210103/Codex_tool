@@ -1,0 +1,88 @@
+name: Publish Windows download
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/admin-web']
+    paths: ['.github/workflows/publish-windows-test.yml']
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: windows-test-release-0.9.3
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: '41284282268'
+      SOURCE_SHA: b797e246a1056c94192686e620a9df95f90eb9ae
+      RELEASE_TAG: windows-v0.9.3
+    steps:
+      - name: Verify the tested build
+        run: |
+          gh run view "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --json conclusion,headSha > source.json
+          python3 - <<'PY'
+          import json,os
+          source=json.load(open('source.json',encoding='utf-8'))
+          assert source['conclusion']=='success', 'The source build must pass all checks.'
+          assert source['headSha']==os.environ['SOURCE_SHA'], 'Unexpected source revision.'
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ env.SOURCE_RUN }}
+          name: SoGhiChep-Windows-x86_64
+          path: tested-windows
+      - name: Create a ZIP that needs one extraction
+        run: |
+          python3 - <<'PY'
+          import hashlib,shutil,struct,zipfile
+          from pathlib import Path
+          root=Path('tested-windows')
+          executable=root/'SoGhiChep.exe'
+          with executable.open('rb') as stream:
+              header=stream.read(64)
+              assert header[:2]==b'MZ', 'Missing Windows executable.'
+              offset=struct.unpack_from('<I',header,60)[0]
+              stream.seek(offset)
+              assert stream.read(4)==b'PE\x00\x00', 'Invalid PE header.'
+              assert struct.unpack('<H',stream.read(2))[0]==0x8664, 'Expected Windows x86_64.'
+          output=Path('SoGhiChep-Windows-x86_64.zip')
+          with zipfile.ZipFile(output,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as archive:
+              for name in ('SoGhiChep.exe','HUONG-DAN.txt'):
+                  info=zipfile.ZipInfo(name,date_time=(2026,11,1,0,0,0))
+                  info.compress_type=zipfile.ZIP_DEFLATED
+                  with (root/name).open('rb') as source,archive.open(info,'w') as destination:
+                      shutil.copyfileobj(source,destination)
+          with zipfile.ZipFile(output) as archive:
+              assert archive.testzip() is None
+              assert set(archive.namelist())=={'SoGhiChep.exe','HUONG-DAN.txt'}
+          with output.open('rb') as stream:
+              digest=hashlib.sha256()
+              for chunk in iter(lambda:stream.read(1024*1024),b''):
+                  digest.update(chunk)
+              checksum=digest.hexdigest()
+          Path('SHA256SUMS.txt').write_text(checksum+'  '+output.name+'\n',encoding='ascii')
+          PY
+      - name: Publish the public Windows ZIP
+        run: |
+          cat > release-notes.md <<'EOF'
+          Gói test Sổ ghi chép Windows 0.9.3, từ mã nguồn b797e24 đã kiểm thử.
+
+          Tải SoGhiChep-Windows-x86_64.zip bên dưới, giải nén toàn bộ bằng Extract All, rồi mở SoGhiChep.exe. Không cần cài Python hoặc Docker.
+
+          Dữ liệu cũ tại %LOCALAPPDATA%\SoGhiChep được giữ nguyên khi thay EXE. Nếu cần đọc PDF scan, quản trị viên cài Poppler trước khi mở tool. Gmail và GreenNode cần nghiệm thu bằng tài khoản thực tế.
+          EOF
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" SoGhiChep-Windows-x86_64.zip SHA256SUMS.txt --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" SoGhiChep-Windows-x86_64.zip SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" --title 'Sổ ghi chép Windows 0.9.3 — Bản test' --notes-file release-notes.md --prerelease
+          fi
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url
