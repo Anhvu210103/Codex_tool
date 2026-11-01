@@ -139,8 +139,10 @@ function directDownloadControl(node,name) {
  return named.length===1?named[0]:null;
 }
 async function readyDirectDownload(node,name,cancelled) {
+ const card=node.closest('.aZo')||node.closest('.aQH');
+ if(!card)return null;
  node.scrollIntoView({block:'center'});
- const card=node.closest('.aZo')||node.closest('.aQH')||node,r=card.getBoundingClientRect();
+ const r=card.getBoundingClientRect();
  await send({type:'trusted-move',x:Math.min(innerWidth-1,Math.max(0,r.left+r.width/2)),y:Math.min(innerHeight-1,Math.max(0,r.top+r.height/2))});
  return await until(()=>{revealTile(node);return directDownloadControl(node,name);},3000,cancelled);
 }

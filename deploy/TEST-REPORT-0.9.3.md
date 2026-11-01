@@ -32,6 +32,8 @@ Kiểm tra cục bộ: 142 bài unittest Python đạt; ba bộ Node về tải 
 
 ID của phần tử chứa thư không được dùng làm ID duy nhất cho các PDF bên trong. Khóa mới phân biệt từng tệp, giữ ổn định khi thêm tệp khác, và không đánh dấu tệp lỗi là đã xử lý khi tệp cùng thư thành công. Lịch sử cũ dùng ID chung phải được kiểm tra lại một lần; hash PDF ở backend ngăn tạo ghi chép hoặc gọi AI trùng cho bản đã lưu.
 
+Khi bố cục Gmail không có thẻ đính kèm hỗ trợ nút tải trực tiếp, chuyển ngay sang trình xem PDF; không chờ 3 giây cho một nút không thể xuất hiện trong bố cục ấy. Nhánh này có phép thử DOM và được đi qua trong bộ batch.
+
 ## Giới hạn thời gian chờ
 
 Yêu cầu điều khiển từ tiện ích tới localhost có thời hạn 15 giây; chọn thao tác AI có 90 giây; nhập và xử lý PDF có 6 phút. Thời hạn bao gồm đọc thân phản hồi. Lỗi trả thông báo có thể xử lý và luôn giải phóng bộ hẹn giờ; không treo tiện ích vô hạn khi máy chủ ngừng trả dữ liệu.

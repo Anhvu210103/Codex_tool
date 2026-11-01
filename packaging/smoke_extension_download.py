@@ -6,7 +6,7 @@ from playwright.sync_api import sync_playwright
 
 def main():
     source=(Path(__file__).resolve().parents[1]/'chrome-extension/content.js').read_text()
-    source=source.replace("return {run};","globalThis.downloadTest={downloadControl,readyDownload,pdfTiles};return {run};")
+    source=source.replace("return {run};","globalThis.downloadTest={downloadControl,readyDownload,pdfTiles,readyDirectDownload};return {run};")
     source=source.rstrip()[:-1]+"\ncreatePilot('dom-test');\n}"
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path=shutil.which('chromium'),headless=True,args=['--no-sandbox'])
@@ -49,6 +49,7 @@ def main():
         assert page.evaluate('()=>downloadTest.pdfTiles()[0].fileKey')==keys[0],'Adding another PDF to a shared message must not change the first PDF identity'
         page.locator('[data-message-id]').evaluate('node=>node.innerHTML+=\'<span class="aV3" style="display:block;padding:20px">one.pdf</span>\'')
         assert len(set(page.evaluate('()=>downloadTest.pdfTiles().map(item=>item.fileKey)')))==2,'Same-name PDFs still need separate identities'
+        assert page.evaluate('''async()=>{events=[];const result=await downloadTest.readyDirectDownload(document.querySelector('.aV3'),'one.pdf',()=>false);return result===null&&!events.some(event=>event.type==='trusted-move');}'''),'A layout without an attachment card must fall back immediately instead of waiting for an impossible direct control'
         assert not errors,errors
         browser.close()
     print('Download DOM selection: OK (14 control cases and shared PDF identity checks; live Gmail not exercised)')
