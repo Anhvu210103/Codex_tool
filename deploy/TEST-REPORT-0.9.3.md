@@ -8,10 +8,12 @@ Mã nguồn `b797e24`; [CI 41284282268](https://github.com/Anhvu210103/Codex_too
 | --- | --- |
 | Windows x86_64 | [ZIP công khai, không cần đăng nhập](https://github.com/Anhvu210103/Codex_tool/releases/download/windows-v0.9.3/SoGhiChep-Windows-x86_64.zip) |
 | Linux x86_64 | [SoGhiChep-Linux-x86_64](https://github.com/Anhvu210103/Codex_tool/actions/runs/41284282268/artifacts/13074732880) |
-| Mac Apple Silicon | [SoGhiChep-macOS-AppleSilicon](https://github.com/Anhvu210103/Codex_tool/actions/runs/41284282268/artifacts/13073993305) |
-| Mac Intel | [SoGhiChep-macOS-Intel](https://github.com/Anhvu210103/Codex_tool/actions/runs/41284282268/artifacts/13074209674) |
+| Mac Apple Silicon | [DMG công khai, không cần đăng nhập](https://github.com/Anhvu210103/Codex_tool/releases/download/macos-v0.9.3/SoGhiChep-macOS-AppleSilicon.dmg) |
+| Mac Intel | [DMG công khai, không cần đăng nhập](https://github.com/Anhvu210103/Codex_tool/releases/download/macos-v0.9.3/SoGhiChep-macOS-Intel.dmg) |
 
-Windows được phát hành lại từ đúng artifact đã kiểm thử bởi [CI xuất bản 41312888897](https://github.com/Anhvu210103/Codex_tool/actions/runs/41312888897). Link công khai đã được tải thử không có thông tin đăng nhập: HTTP 200, ZIP 14.996.600 byte, CRC/SHA256 hợp lệ, chỉ có `SoGhiChep.exe` x86_64 và `HUONG-DAN.txt`. Artifact Linux/Mac vẫn cần đăng nhập GitHub.
+Windows được phát hành lại từ đúng artifact đã kiểm thử bởi [CI xuất bản 41312888897](https://github.com/Anhvu210103/Codex_tool/actions/runs/41312888897). Link công khai đã được tải thử không có thông tin đăng nhập: HTTP 200, ZIP 14.996.600 byte, CRC/SHA256 hợp lệ, chỉ có `SoGhiChep.exe` x86_64 và `HUONG-DAN.txt`. Artifact Linux vẫn cần đăng nhập GitHub.
+
+Hai DMG được giữ nguyên từ bản dựng đã kiểm thử bởi [CI xuất bản Mac 41324420260](https://github.com/Anhvu210103/Codex_tool/actions/runs/41324420260). Tải ẩn danh trả HTTP 200; SHA256 và đuôi UDIF hợp lệ. Apple Silicon: 14.364.673 byte, đọc trực tiếp Mach-O trong DMG xác nhận CPU arm64 (`0x0100000c`). Intel: 14.970.567 byte, xác nhận CPU x86_64 (`0x01000007`). Chỉ giải nén để kiểm tra kiến trúc, không sửa ảnh đĩa hoặc chữ ký ứng dụng.
 
 Các phép thử không dùng tài khoản Gmail khách hoặc gọi API GreenNode thật; hai phần này vẫn cần nghiệm thu tại máy khách.
 

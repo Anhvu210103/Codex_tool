@@ -2,12 +2,14 @@
 
 ## Chọn đúng bản
 
-- iMac Apple Silicon M1/M2/M3/M4: **SoGhiChep-macOS-AppleSilicon**.
-- iMac Intel: **SoGhiChep-macOS-Intel**.
+- Chip Apple M1/M2/M3/M4…: [Tải SoGhiChep-macOS-AppleSilicon.dmg](https://github.com/Anhvu210103/Codex_tool/releases/download/macos-v0.9.3/SoGhiChep-macOS-AppleSilicon.dmg).
+- Bộ xử lý Intel: [Tải SoGhiChep-macOS-Intel.dmg](https://github.com/Anhvu210103/Codex_tool/releases/download/macos-v0.9.3/SoGhiChep-macOS-Intel.dmg).
+
+Hai link tải trực tiếp không cần đăng nhập GitHub. Nếu chưa biết chip, mở menu ** → About This Mac**. [Trang tải dự phòng](https://github.com/Anhvu210103/Codex_tool/releases/tag/macos-v0.9.3): chọn đúng file `.dmg` trong **Assets**, không chọn **Source code**.
 
 ## Cài một lần
 
-1. Tải artifact đúng chip, mở `SoGhiChep.dmg`, kéo `SoGhiChep.app` vào **Applications**.
+1. Tải file `.dmg` đúng chip rồi mở file. Nếu bản cũ đang chạy, bấm **Tắt tool** trước khi thay app. Kéo `SoGhiChep.app` vào **Applications**. Bản app này không cần cài Python hoặc Docker.
 2. Mở app. Nếu bản nội bộ chưa notarize bị macOS chặn, vào **System Settings → Privacy & Security**, kiểm tra đúng ứng dụng do đơn vị triển khai cung cấp rồi chọn mở. Không tắt Gatekeeper.
 3. Tool tự mở trình duyệt tại localhost; lần đầu tạo mật khẩu quản trị từ 12 ký tự.
 4. Trong Cài đặt, lưu GreenNode / VNG Cloud API key và cài tiện ích Chrome v0.9.3.
