@@ -79,6 +79,29 @@ class DocumentAITests(unittest.TestCase):
         with patch('mailnotes.core.request_json',return_value=ai_result()):
             self.assertEqual(process([self.mail],self.config,'gmail'),1)
 
+    def test_corrupted_local_ai_cache_is_replaced_without_recording_a_false_cache_hit(self):
+        with patch('mailnotes.core.request_json',return_value=ai_result()) as request:
+            process([self.mail],self.config,'gmail')
+            with connect(self.root/'notes.sqlite3') as connection:
+                connection.execute('UPDATE ai_cache SET result=?',('{broken',))
+            self.assertEqual(process([{**self.mail,'id':'cache-recovery'}],self.config,'gmail'),1)
+            self.assertEqual(request.call_count,2)
+        with connect(self.root/'notes.sqlite3') as connection:
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM ai_usage WHERE cache_hit=1').fetchone()[0],0)
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM notes').fetchone()[0],2)
+
+    def test_invalid_api_envelopes_keep_usage_and_allow_retry(self):
+        for response in (None,[],{'choices':'invalid'},{'choices':[None]},{'choices':[{'message':None}]}):
+            with self.subTest(response=response),tempfile.TemporaryDirectory() as directory:
+                config={**self.config,'data_dir':directory}
+                with patch('mailnotes.core.request_json',return_value=response):
+                    with self.assertRaises(ValueError):process([self.mail],config,'gmail')
+                with connect(Path(directory)/'notes.sqlite3') as connection:
+                    self.assertEqual(connection.execute('SELECT COUNT(*) FROM notes').fetchone()[0],0)
+                    self.assertEqual(connection.execute('SELECT COUNT(*) FROM ai_usage').fetchone()[0],1)
+                with patch('mailnotes.core.request_json',return_value=ai_result()):
+                    self.assertEqual(process([self.mail],config,'gmail'),1)
+
     def test_incomplete_ai_response_retries_with_larger_output(self):
         incomplete={'choices':[{'finish_reason':'length','message':{'content':'{"categories":["Work"],'}}],
                     'usage':{'prompt_tokens':10,'completion_tokens':1200,'total_tokens':1210}}

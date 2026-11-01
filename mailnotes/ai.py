@@ -7,6 +7,18 @@ from .providers import provider
 REVIEW = 'Cần xem lại'
 
 
+def response_choice(response):
+    choices = response.get('choices') if isinstance(response, dict) else None
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        raise ValueError('AI chưa trả kết quả hợp lệ. Kiểm tra model, hạn mức hoặc thử lại tài liệu.')
+    return choices[0]
+
+
+def choice_content(choice):
+    message = choice.get('message')
+    return message.get('content') if isinstance(message, dict) else None
+
+
 def parse_result(content):
     if not isinstance(content, str):
         raise ValueError('Invalid AI response')
@@ -63,11 +75,18 @@ def analyze(message, config, connection):
     signature = hashlib.sha256(json.dumps([provider_name, model, system, payload], ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     connection.execute('CREATE TABLE IF NOT EXISTS ai_cache (signature TEXT PRIMARY KEY, result TEXT NOT NULL)')
     cached = connection.execute('SELECT result FROM ai_cache WHERE signature=?', (signature,)).fetchone()
+    if cached:
+        try:
+            result = parse_result(cached[0])
+        except ValueError:
+            # A broken or obsolete local cache must not poison every retry.
+            connection.execute('DELETE FROM ai_cache WHERE signature=?',(signature,))
+            connection.commit()
+            cached = None
     from .usage import record_usage
     prices = settings.get('pricing', {})
     if cached:
         record_usage(connection, {}, provider_name, model, message.get('id'), prices, cache_hit=True)
-        result = json.loads(cached[0])
     else:
         request = {'model': model, 'temperature': 0, 'max_tokens': 2000,
                                    'response_format': {'type': 'json_object'}, 'messages': [
@@ -76,10 +95,8 @@ def analyze(message, config, connection):
         response = request_json(gateway['endpoint'], data=request,
                                 headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'})
         record_usage(connection, response, provider_name, model, message.get('id'), prices)
-        if not response.get('choices'):
-            raise ValueError('AI chưa trả kết quả. Nội dung có thể bị chặn hoặc model không đọc được tài liệu; xem quota và model đã chọn.')
-        choice = response['choices'][0]
-        try:result=parse_result(choice.get('message',{}).get('content'))
+        choice = response_choice(response)
+        try:result=parse_result(choice_content(choice))
         except ValueError as first_error:
             if choice.get('finish_reason') in (None,'stop') and str(first_error)!='Incomplete AI response':raise
             retry={**request,'max_tokens':3000,'messages':[
@@ -87,8 +104,7 @@ def analyze(message, config, connection):
                 request['messages'][1]]}
             response=request_json(gateway['endpoint'],data=retry,headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'})
             record_usage(connection,response,provider_name,model,message.get('id'),prices)
-            if not response.get('choices'):raise ValueError('Incomplete AI response') from None
-            result=parse_result(response['choices'][0].get('message',{}).get('content'))
+            result=parse_result(choice_content(response_choice(response)))
         connection.execute('INSERT OR IGNORE INTO ai_cache VALUES (?,?)', (signature, json.dumps(result, ensure_ascii=False)))
         connection.commit()
     allowed = {rule['category'] for rule in config['rules']}

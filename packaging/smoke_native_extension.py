@@ -74,14 +74,16 @@ def main():
                     assert worker.url.endswith('/worker.js'),worker.url
                     keeper=context.pages[0] if context.pages else context.new_page()
                     worker.evaluate('(config)=>chrome.storage.local.set(config)',{'base':origin,'token':token,'capabilities':['local-download-pdf']})
+                    requests=[]
                     def route(request):
+                        requests.append(request.request.url)
                         query=parse_qs(urlsplit(request.request.url).query)
                         if query.get('view')==['att']:
                             name=query.get('fixture',['one'])[0]
                             request.fulfill(status=200,headers={'Content-Type':'application/pdf','Content-Disposition':f'attachment; filename="native-{name}.pdf"'},body=pdf(name))
                         else:request.fulfill(status=200,content_type='text/html',body=PAGE)
                     context.route('https://mail.google.com/**',route)
-                    page=context.new_page();page.goto('https://mail.google.com/mail/u/0/#search/native')
+                    page=context.new_page();page.goto('https://mail.google.com/mail/u/0/#search/native');page.bring_to_front()
                     cdp=context.new_cdp_session(page)
                     cdp.send('Browser.setDownloadBehavior',{'behavior':'allow','downloadPath':str(downloads),'eventsEnabled':True})
                     tab=worker.evaluate("async()=>{const tabs=await chrome.tabs.query({url:'https://mail.google.com/*'});return tabs[0].id;}")
@@ -91,7 +93,10 @@ def main():
                             saved=worker.evaluate("async()=>({run:(await chrome.storage.session.get('run')).run,local:await chrome.storage.local.get(['status','report'])})")
                             if not saved.get('run'):return saved['local']
                             page.wait_for_timeout(100)
-                        raise RuntimeError('Native extension did not finish: '+str(saved))
+                        diagnostics={'state':saved,'page_url':page.url,'requests':requests,'files':[path.name for path in downloads.iterdir()],
+                                     'chrome_downloads':worker.evaluate('()=>chrome.downloads.search({})'),
+                                     'targets':worker.evaluate('()=>chrome.debugger.getTargets()')}
+                        raise RuntimeError('Native extension did not finish: '+json.dumps(diagnostics,ensure_ascii=False))
                     worker.evaluate('(tab)=>beginRun({id:tab},1)',tab)
                     result=wait_done()
                     assert admin.notes('ai')['total']==2,result
