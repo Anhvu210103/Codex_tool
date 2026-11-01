@@ -1,11 +1,11 @@
 # Nghiệm thu Linux trước khi bàn giao
 
-Phạm vi bản 0.9.2: chạy tay tối đa 20 thư mỗi lượt. Lịch tiện ích chạy ngay khi bật rồi kiểm tra mỗi 30 phút, tối đa 100 thư mỗi trang và 20 trang mỗi lượt. Mỗi PDF được chuyển thành Markdown, GreenNode / VNG Cloud phân nhóm và tóm tắt, sau đó bản `.md` được lưu theo nhóm. Gmail API là một nguồn riêng, không dùng chung lịch với tiện ích.
+Phạm vi bản 0.9.3: chạy tay tối đa 20 thư mỗi lượt. Lịch tiện ích chạy ngay khi bật rồi kiểm tra mỗi 30 phút, tối đa 100 thư mỗi trang và 20 trang mỗi lượt. Mỗi PDF được chuyển thành Markdown, GreenNode / VNG Cloud phân nhóm và tóm tắt, sau đó bản `.md` được lưu theo nhóm. Gmail API là một nguồn riêng, không dùng chung lịch với tiện ích.
 
 ## Kiểm tra một lần trên máy khách
 
 1. Mở tool và Chrome. Trong Cài đặt, lưu GreenNode / VNG Cloud API key, kiểm tra model `deepseek/deepseek-v4.1-flash-thirdparty` và danh sách nhóm.
-2. Cài tiện ích đúng bản **0.9.2**, ghép nối với đúng địa chỉ localhost của tool. Sau mỗi lần cập nhật, bấm Reload tại `chrome://extensions` và tải lại Gmail.
+2. Cài tiện ích đúng bản **0.9.3**, ghép nối với đúng địa chỉ localhost của tool. Sau mỗi lần cập nhật, bấm Reload tại `chrome://extensions` và tải lại Gmail.
 3. Mở danh sách Gmail có một thư chứa ít nhất hai PDF. Bấm **Thử 1 thư**. Không bấm hỗ trợ trong lúc chạy.
 4. Báo cáo phải có `bam-tai-truc-tiep` hoặc `tim-nut-tai`, tiếp theo là `chrome-bat-dau`, `chrome-xong` và `da-luu` cho từng file. Một file lỗi phải được bỏ qua để file sau vẫn chạy.
 5. Trong **Sổ ghi chép → AI thao tác**, kiểm tra tiêu đề, nội dung ngắn, nhóm và đường dẫn `.md`. Thư mục `Theo-nhom/` chỉ chứa Markdown đã phân loại; `Can-xem-lai/` chứa Markdown cần kiểm tra. PDF nguồn nằm trong vùng dữ liệu nội bộ để tool đọc lại và không được hiển thị làm đường dẫn kết quả.

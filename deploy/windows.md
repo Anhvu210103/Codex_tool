@@ -6,7 +6,7 @@
 2. Mở **Downloads**, chuột phải file ZIP vừa tải → **Extract All… / Giải nén tất cả** → **Extract**. Mở thư mục vừa giải nén, bên trong có `SoGhiChep.exe` và `HUONG-DAN.txt`.
 3. Bấm đúp `SoGhiChep.exe`. Tool tự mở trình duyệt tại localhost; lần đầu tạo mật khẩu quản trị từ 12 ký tự. Không cần cài Python hoặc Docker để mở bản EXE.
 4. Nếu SmartScreen cảnh báo, kiểm tra file đúng artifact do đơn vị triển khai cung cấp. Bản nội bộ chưa ký Microsoft code-signing có thể vẫn hiện cảnh báo.
-5. Trong Cài đặt, lưu GreenNode / VNG Cloud API key và kiểm tra model. Cài cùng tiện ích Chrome v0.9.2 như hướng dẫn trong tool.
+5. Trong Cài đặt, lưu GreenNode / VNG Cloud API key và kiểm tra model. Cài cùng tiện ích Chrome v0.9.3 như hướng dẫn trong tool.
 6. Nếu cần OCR PDF scan, quản trị viên cài Poppler cho Windows và bảo đảm lệnh `pdftoppm.exe` có trong PATH trước khi mở tool.
 
 ## Dùng và dữ liệu

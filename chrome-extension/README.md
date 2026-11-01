@@ -1,4 +1,4 @@
-# Tiện ích Sổ ghi chép Gmail — 0.9.2
+# Tiện ích Sổ ghi chép Gmail — 0.9.3
 
 Tiện ích tự bấm trên Gmail đang đăng nhập trong Chrome để tải PDF vào Sổ ghi chép. Giao diện dùng chữ 18px, nút tối thiểu 50px, trạng thái nằm đầu cửa sổ. Phiên bản luôn hiện ở đầu để kiểm tra đã nạp đúng bản mới.
 
@@ -21,7 +21,7 @@ Trạng thái đầu cửa sổ tóm tắt lượt đang chạy. Thông báo đ�
 
 ## Cập nhật bản đã cài
 
-Tải ZIP tiện ích mới trong Cài đặt của tool, giải nén vào thư mục cố định. Mở `chrome://extensions`, nạp đúng thư mục có `manifest.json` hoặc thay nội dung thư mục Chrome đang dùng rồi bấm **Reload**. Đầu popup phải hiện **v0.9.2**. Chỉ Reload một thư mục cũ trong Downloads không tải mã mới. Không cần tạo mã ghép nối lại nếu vẫn dùng cùng tiện ích và cùng tool; khi nạp thành một tiện ích mới thì ghép nối lại.
+Tải ZIP tiện ích mới trong Cài đặt của tool, giải nén vào thư mục cố định. Mở `chrome://extensions`, nạp đúng thư mục có `manifest.json` hoặc thay nội dung thư mục Chrome đang dùng rồi bấm **Reload**. Đầu popup phải hiện **v0.9.3**. Chỉ Reload một thư mục cũ trong Downloads không tải mã mới. Không cần tạo mã ghép nối lại nếu vẫn dùng cùng tiện ích và cùng tool; khi nạp thành một tiện ích mới thì ghép nối lại.
 
 ## Cơ chế và giới hạn
 
@@ -56,3 +56,5 @@ Bản 0.9.0 hỗ trợ toolbar PDF nằm lệch trái hoặc trong khung hẹp k
 Bản 0.9.1 không tải lại PDF khi Chrome đã tải xong nhưng GreenNode hoặc backend trả lỗi; file được giữ trong hàng đợi thử lại. Báo cáo cuối lượt tách rõ PDF mới, PDF đã có và PDF lỗi.
 
 Bản 0.9.2 ngăn sự kiện tải Chrome đến muộn khôi phục lượt đã dừng hoặc nhập nhầm vào lượt mới. Trạng thái lượt quét được ghi tuần tự. Nút Thử lại tìm thư lỗi trên toàn trang trước khi áp dụng giới hạn 20 thư. Kiểm thử: `node tests/extension_download_race.cjs` và bài quét nhiều thư trong `tests/test_extension_batches.py`.
+
+Bản 0.9.3 hủy đúng lượt đang xin quyền điều khiển Chrome khi bấm Dừng, ưu tiên thao tác bật/tắt lịch mới nhất và cho chạy lại sau khi hủy kết nối dở dang. Kiểm thử: `node tests/extension_lifecycle_race.cjs`. `python packaging/smoke_native_extension.py` kiểm tra thêm API Chrome thật và trang Gmail giả lập; cần Chromium cho phép nạp tiện ích nội bộ.

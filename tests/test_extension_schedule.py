@@ -15,7 +15,7 @@ class ExtensionScheduleTests(unittest.TestCase):
 const vm=require('node:vm'),assert=require('node:assert/strict');
 async function exercise(failMirror){
  const stored={autoEnabled:false},calls=[];
- const ctx={Date,AUTO_ALARM:'test-alarm',api:async()=>({}),mirrorAutomationState:async()=>{if(failMirror)throw Error('offline');},autoScan:async()=>{assert.equal(stored.autoEnabled,true);calls.push('scan');},stop:async()=>calls.push('stop'),chrome:{permissions:{contains:async()=>true},tabs:{query:async()=>[{url:'https://mail.google.com/mail/u/1/'}]},storage:{local:{get:async()=>({...stored}),set:async value=>Object.assign(stored,value)},session:{get:async()=>({})}},alarms:{create:async()=>calls.push('alarm'),clear:async()=>calls.push('clear')}}};
+ const ctx={Date,AUTO_ALARM:'test-alarm',autoGeneration:0,changeAuto:async(generation,change)=>change(),api:async()=>({}),mirrorAutomationState:async()=>{if(failMirror)throw Error('offline');},autoScan:async()=>{assert.equal(stored.autoEnabled,true);calls.push('scan');},stop:async()=>calls.push('stop'),chrome:{permissions:{contains:async()=>true},tabs:{query:async()=>[{url:'https://mail.google.com/mail/u/1/'}]},storage:{local:{get:async()=>({...stored}),set:async value=>Object.assign(stored,value)},session:{get:async()=>({})}},alarms:{create:async()=>calls.push('alarm'),clear:async()=>calls.push('clear')}}};
  vm.createContext(ctx);vm.runInContext(FUNCTION,ctx);
  if(failMirror){await assert.rejects(ctx.setAuto(true));assert.equal(stored.autoEnabled,false);assert.deepEqual(calls,[]);}
  else{await ctx.setAuto(true);assert.equal(stored.autoEnabled,true);assert.deepEqual(calls,['alarm','scan']);await ctx.setAuto(false);assert.equal(stored.autoEnabled,false);assert.deepEqual(calls,['alarm','scan','clear']);}
