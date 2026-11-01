@@ -106,8 +106,10 @@ class MarkdownArchiveTests(unittest.TestCase):
             self.admin.process_pdf(raw,'first.pdf',source='ai')
             first=next((self.root/'ai/Theo-nhom').rglob('first.md'))
             first.write_text(first.read_text(encoding='utf-8')+'\nManual annotation from the operator.\n',encoding='utf-8')
-            self.admin.process_pdf(pdf('Second document with different content.'),'second.pdf',source='ai')
+            second=pdf('Second document with different content.')
+            self.admin.process_pdf(second,'second.pdf',source='ai')
             self.assertEqual(self.admin.process_pdf(raw,'first.pdf',source='ai'),0)
+            self.admin.delete_note('ai','ai:'+hashlib.sha256(second).hexdigest())
         self.assertIn('Manual annotation from the operator.',first.read_text(encoding='utf-8'))
 
     def test_corrupt_export_manifest_and_missing_copy_can_be_repaired_without_ai(self):

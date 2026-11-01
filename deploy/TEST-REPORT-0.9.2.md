@@ -15,12 +15,14 @@
 
 Chạy `bash scripts/release-check.sh` sau khi cài `requirements-build.txt` và Chromium của Playwright.
 
-- 104 kiểm thử Python.
+- 105 kiểm thử Python.
 - Hai bộ kiểm tra Node: tải nhiều file, trạng thái lỗi, lịch tự động; và sự kiện tải đến muộn khi Dừng/chạy lại.
 - Kiểm tra popup tiện ích và 12 tình huống chọn nút PDF bằng DOM giả lập.
 - Trình duyệt Chromium với server Flask thật: tạo mật khẩu, đọc PDF, sửa nhóm, tải Markdown, tìm kiếm, lưu cỡ chữ, xóa, đăng xuất; kiểm tra bố cục 1366/1024/768/390 px với cỡ chữ rất lớn.
 - Poppler được chạy thật trong phép thử PDF trộn trang; phản hồi OCR được giả lập để không gửi dữ liệu hoặc phát sinh phí API.
 - GitHub Actions dựng và mở ứng dụng trên Windows x64, Linux x64, macOS Intel và macOS Apple Silicon; kiểm tra PDF → Markdown và nhập PDF tải từ Downloads.
+
+Kiểm tra bổ sung: sửa nhóm khi đang quét trả thông báo bận ngay; xóa một tài liệu không ghi đè ghi chú Markdown của các tài liệu khác.
 
 ## Phạm vi cần nghiệm thu thật
 

@@ -429,7 +429,9 @@ class Admin:
             allowed.add(self.config()['unmatched_category'])
         if any(not isinstance(item, str) or item not in allowed for item in categories):
             raise ValueError('Nhóm không tồn tại trong cấu hình.')
-        with self.run_lock:
+        if not self.run_lock.acquire(blocking=False):
+            raise ValueError('Đang xử lý tài liệu. Chờ hoàn tất rồi sửa nhóm.')
+        try:
             database = self.root / source / 'notes.sqlite3'
             if not database.exists():
                 raise ValueError('Không tìm thấy ghi chép.')
@@ -442,6 +444,8 @@ class Admin:
                 render_notes(connection, database.parent / 'notebooks', self.config()['timezone'])
                 from .archive import render_archive
                 render_archive(connection, database.parent, identifiers=[identifier])
+        finally:
+            self.run_lock.release()
 
     def _reset_extension_history(self):
         path = self.private / 'extension-history.json'
@@ -468,14 +472,13 @@ class Admin:
                 connection.execute('DELETE FROM notes WHERE id=?', (identifier,))
                 still_used = bool(digest and connection.execute('SELECT 1 FROM notes WHERE file_hash=? LIMIT 1', (digest,)).fetchone())
                 connection.commit()
-                from .archive import remove_document_export, render_archive
+                from .archive import remove_document_export
                 remove_document_export(root, identifier)
                 if digest and not still_used:
                     (root / 'files' / (digest + '.pdf')).unlink(missing_ok=True)
                     (root / 'Markdown' / (digest + '.md')).unlink(missing_ok=True)
                 shutil.rmtree(root / 'notebooks', ignore_errors=True)
                 render_notes(connection, root / 'notebooks', self.config()['timezone'])
-                render_archive(connection, root)
             if source == 'ai':
                 self._reset_extension_history()
             return 1

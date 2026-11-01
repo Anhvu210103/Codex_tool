@@ -62,6 +62,21 @@ class AdminTests(unittest.TestCase):
         self.assertEqual(other.get('/api/settings').status_code, 401)
         self.assertEqual(self.client.get('/api/settings').status_code, 401)
 
+    def test_editing_groups_during_scan_returns_busy_instead_of_blocking_ui(self):
+        completed=threading.Event();result=[]
+        def edit():
+            try:self.admin.edit_categories('pdf','missing',['Cần xem lại'])
+            except ValueError as error:result.append(str(error))
+            finally:completed.set()
+        self.admin.run_lock.acquire()
+        thread=threading.Thread(target=edit,daemon=True);thread.start()
+        try:
+            immediate=completed.wait(timeout=1)
+        finally:
+            self.admin.run_lock.release();thread.join(timeout=3)
+        self.assertTrue(immediate,'Editing must not wait for a slow AI request to finish')
+        self.assertEqual(result,['Đang xử lý tài liệu. Chờ hoàn tất rồi sửa nhóm.'])
+
     def test_settings_persist_reject_invalid_and_preserve_default_file(self):
         self.setup_login()
         original = (BASE / 'config.json').read_bytes()
