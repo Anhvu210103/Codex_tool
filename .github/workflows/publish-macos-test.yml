@@ -1,0 +1,88 @@
+name: Publish macOS downloads
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/admin-web']
+    paths: ['.github/workflows/publish-macos-test.yml']
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: macos-test-release-0.9.3
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: '41284282268'
+      SOURCE_SHA: b797e246a1056c94192686e620a9df95f90eb9ae
+      RELEASE_TAG: macos-v0.9.3
+    steps:
+      - name: Verify the tested build
+        run: |
+          gh run view "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --json conclusion,headSha > source.json
+          python3 - <<'PY'
+          import json,os
+          source=json.load(open('source.json',encoding='utf-8'))
+          assert source['conclusion']=='success', 'The source build must pass all checks.'
+          assert source['headSha']==os.environ['SOURCE_SHA'], 'Unexpected source revision.'
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ env.SOURCE_RUN }}
+          name: SoGhiChep-macOS-AppleSilicon
+          path: tested-macos/AppleSilicon
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ env.SOURCE_RUN }}
+          name: SoGhiChep-macOS-Intel
+          path: tested-macos/Intel
+      - name: Prepare the unchanged, verified DMG files
+        run: |
+          python3 - <<'PY'
+          import hashlib,shutil
+          from pathlib import Path
+          checksums=[]
+          for chip in ('AppleSilicon','Intel'):
+              source=Path('tested-macos')/chip/'SoGhiChep.dmg'
+              assert source.stat().st_size>512, 'Missing or truncated DMG.'
+              with source.open('rb') as stream:
+                  stream.seek(-512,2)
+                  assert stream.read(4)==b'koly', 'Expected an Apple UDIF disk image.'
+              output=Path('SoGhiChep-macOS-'+chip+'.dmg')
+              shutil.copyfile(source,output)
+              digest=hashlib.sha256()
+              with output.open('rb') as stream:
+                  for chunk in iter(lambda:stream.read(1024*1024),b''):
+                      digest.update(chunk)
+              checksums.append(digest.hexdigest()+'  '+output.name)
+          Path('SHA256SUMS.txt').write_text('\n'.join(checksums)+'\n',encoding='ascii')
+          PY
+      - name: Publish public macOS downloads
+        run: |
+          cat > release-notes.md <<'EOF'
+          Gói test Sổ ghi chép macOS 0.9.3, từ mã nguồn b797e24 đã kiểm thử trên Mac Apple Silicon và Intel. Hai file DMG được giữ nguyên từ bản dựng đã qua hdiutil verify; chỉ đổi tên file để phân biệt chip.
+
+          - Chip Apple M1/M2/M3/M4…: tải SoGhiChep-macOS-AppleSilicon.dmg.
+          - Bộ xử lý Intel: tải SoGhiChep-macOS-Intel.dmg.
+
+          Mở DMG, kéo SoGhiChep.app vào Applications rồi mở app. Không cần cài Python hoặc Docker. Nếu bản cũ đang chạy, bấm Tắt tool trước khi thay ứng dụng.
+
+          Bản test chưa notarize có thể cần cho phép mở một lần trong System Settings → Privacy & Security. Không tắt Gatekeeper. Nếu cần đọc PDF scan, quản trị viên cài Poppler trước khi mở tool. Gmail và GreenNode cần nghiệm thu bằng tài khoản thực tế.
+          EOF
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" SoGhiChep-macOS-AppleSilicon.dmg SoGhiChep-macOS-Intel.dmg SHA256SUMS.txt --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" SoGhiChep-macOS-AppleSilicon.dmg SoGhiChep-macOS-Intel.dmg SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" --title 'Sổ ghi chép macOS 0.9.3 — Bản test' --notes-file release-notes.md --prerelease
+          fi
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url
