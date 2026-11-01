@@ -5,6 +5,7 @@ Run one process per data directory. OAuth and secrets stay in private local file
 import copy
 import hashlib
 import hmac
+import heapq
 import json
 import math
 import os
@@ -258,21 +259,12 @@ class Admin:
                     'ai_provider': self.settings['summary']['provider']}
 
     def usage(self, now=None):
-        rows = []
-        for source in ('gmail', 'pdf', 'ai', 'folder', 'demo'):
-            database = self.root / source / 'notes.sqlite3'
-            if not database.exists():
-                continue
-            with connect(f'{database.as_uri()}?mode=ro', uri=True) as connection:
-                connection.row_factory = sqlite3.Row
-                if not connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ai_usage'").fetchone():
-                    continue
-                rows.extend({**dict(row), 'source': source} for row in connection.execute('SELECT * FROM ai_usage'))
         totals = {'api_calls': 0, 'local_cache_hits': 0, 'input_tokens': 0, 'cached_tokens': 0, 'output_tokens': 0, 'total_tokens': 0, 'estimated_usd': 0.0, 'unknown_usage_calls': 0, 'unpriced_calls': 0}
         today = {name: 0 for name in totals}
         zone = ZoneInfo(self.config()['timezone'])
         today_date = (now or datetime.now(timezone.utc)).astimezone(zone).date()
         groups = {}
+        recent_heap = []
         def accumulate(target, row):
             if row['cache_hit']:
                 target['local_cache_hits'] += 1
@@ -286,15 +278,31 @@ class Admin:
                 target['unpriced_calls'] += 1
             else:
                 target['estimated_usd'] += row['estimated_usd']
-        for row in rows:
-            accumulate(totals, row)
-            if datetime.fromisoformat(row['created_at']).astimezone(zone).date() == today_date:
-                accumulate(today, row)
-            key = (row['provider'], row['model'])
-            if key not in groups:
-                groups[key] = {name: 0 for name in totals}
-            accumulate(groups[key], row)
-        recent = sorted(rows, key=lambda row:(row['created_at'],row['id']), reverse=True)[:50]
+        columns='id,created_at,provider,model,cache_hit,input_tokens,cached_tokens,output_tokens,total_tokens,estimated_usd'
+        for source_index,source in enumerate(('gmail','pdf','ai','folder','demo')):
+            database = self.root / source / 'notes.sqlite3'
+            if not database.exists():
+                continue
+            with connect(f'{database.as_uri()}?mode=ro',uri=True) as connection:
+                connection.row_factory=sqlite3.Row
+                if not connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ai_usage'").fetchone():
+                    continue
+                # Keep only the 50 displayed rows. Price snapshots and note IDs
+                # are never read into RAM just to refresh dashboard counters.
+                for row in connection.execute('SELECT '+columns+' FROM ai_usage'):
+                    accumulate(totals,row)
+                    if datetime.fromisoformat(row['created_at']).astimezone(zone).date()==today_date:
+                        accumulate(today,row)
+                    key=(row['provider'],row['model'])
+                    if key not in groups:
+                        groups[key]={name:0 for name in totals}
+                    accumulate(groups[key],row)
+                    order=(row['created_at'],row['id'],-source_index)
+                    if len(recent_heap)<50:
+                        heapq.heappush(recent_heap,(order,{**dict(row),'source':source}))
+                    elif order>recent_heap[0][0]:
+                        heapq.heapreplace(recent_heap,(order,{**dict(row),'source':source}))
+        recent=[row for _,row in sorted(recent_heap,key=lambda item:item[0],reverse=True)]
         # Return counters only, no stored price payload, email text or identifiers.
         return {'totals': totals, 'today': today, 'models': [{'provider': provider, 'model': model, **values} for (provider, model), values in groups.items()],
                 'recent': [{key: row[key] for key in ('created_at','provider','model','source','cache_hit','input_tokens','cached_tokens','output_tokens','total_tokens','estimated_usd')} for row in recent]}
@@ -554,9 +562,9 @@ class Admin:
                 if not config['summary']['ai_consent']:
                     raise MissingAIConsent()
                 incoming = messages(config, self.credentials, self.token)
-            added = process(incoming, config, source)
+            added = process(incoming, config, source,should_stop=self.stop.is_set)
             with self.lock:
-                self.state.update(last_added=added, error=None)
+                self.state.update(last_added=added, error='Lượt quét đã tạm dừng; chạy lại để đọc các tài liệu còn lại.' if self.stop.is_set() else None)
         except Exception as error:
             with self.lock:
                 self.state.update(last_added=None, error=error_message(error))

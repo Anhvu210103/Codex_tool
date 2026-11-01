@@ -14,7 +14,7 @@ class RecoveryStateTests(unittest.TestCase):
     def test_pdf_run_is_journaled_before_processing_and_restarts_as_interrupted(self):
         with tempfile.TemporaryDirectory() as directory:
             admin=Admin(BASE,Path(directory))
-            def process(*args):
+            def process(*args,**kwargs):
                 saved=json.loads((admin.private/'status.json').read_text(encoding='utf-8'))
                 self.assertTrue(saved['running']);self.assertEqual(saved['last_source'],'ai');self.assertEqual(saved['last_added'],0)
                 restarted=Admin(BASE,Path(directory))
@@ -30,7 +30,7 @@ class RecoveryStateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             admin=Admin(BASE,Path(directory));private_json(admin.key_path('vngcloud'),{'key':'test-key'})
             snapshots=[]
-            def process(*args):
+            def process(*args,**kwargs):
                 snapshots.append(json.loads((admin.private/'status.json').read_text(encoding='utf-8')))
                 return 0
             with patch('mailnotes.admin.messages',return_value=[]),patch('mailnotes.admin.process',side_effect=process):

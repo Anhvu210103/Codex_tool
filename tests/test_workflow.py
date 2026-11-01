@@ -1,6 +1,7 @@
 import base64
 import json
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -55,6 +56,27 @@ class WorkflowTests(unittest.TestCase):
             with patch('mailnotes.core.summarize',return_value='Recovered summary') as summary:
                 self.assertEqual(process([first,{**first,'id':'two'}],config,'demo'),1)
             self.assertEqual(summary.call_count,1)
+
+    def test_shutdown_does_not_pull_another_gmail_message_after_current_commit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            stop=threading.Event();pulled=[]
+            config={'data_dir':directory,'rules':[],'unmatched_category':'Khác'}
+            mail={'id':'one','sender':'office','subject':'First document','body':'Readable content','received_at':'2026-10-13T00:00:00+00:00'}
+            def incoming():
+                pulled.append('one');yield mail
+                raise AssertionError('Must not request or download another Gmail message after shutdown')
+            def summarize(*args):stop.set();return 'First summary'
+            with patch('mailnotes.core.summarize',side_effect=summarize):
+                self.assertEqual(process(incoming(),config,'gmail',should_stop=stop.is_set),1)
+            self.assertEqual(pulled,['one'])
+            self.assertIn('First summary',(Path(directory)/'notebooks/2026-10-13.md').read_text(encoding='utf-8'))
+
+    def test_already_stopped_run_does_not_read_the_input_iterator(self):
+        with tempfile.TemporaryDirectory() as directory:
+            def incoming():
+                raise AssertionError('Input iterator must not be consumed')
+                yield
+            self.assertEqual(process(incoming(),{'data_dir':directory},'gmail',should_stop=lambda:True),0)
 
 
 if __name__ == '__main__':

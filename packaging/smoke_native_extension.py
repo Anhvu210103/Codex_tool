@@ -74,6 +74,7 @@ def main():
                     assert worker.url.endswith('/worker.js'),worker.url
                     keeper=context.pages[0] if context.pages else context.new_page()
                     worker.evaluate('(config)=>chrome.storage.local.set(config)',{'base':origin,'token':token,'capabilities':['local-download-pdf']})
+                    worker.evaluate("()=>{globalThis.nativeDownloadEvents=[];chrome.downloads.onChanged.addListener(change=>{nativeDownloadEvents.push(change);if(nativeDownloadEvents.length>100)nativeDownloadEvents.shift();});}")
                     requests=[]
                     def route(request):
                         requests.append(request.request.url)
@@ -93,6 +94,7 @@ def main():
                             page.wait_for_timeout(100)
                         diagnostics={'state':saved,'page_url':page.url,'requests':requests,'files':[path.name for path in downloads.iterdir()],
                                      'chrome_downloads':worker.evaluate('()=>chrome.downloads.search({})'),
+                                     'download_events':worker.evaluate('()=>nativeDownloadEvents'),
                                      'targets':worker.evaluate('()=>chrome.debugger.getTargets()')}
                         raise RuntimeError('Native extension did not finish: '+json.dumps(diagnostics,ensure_ascii=False))
                     worker.evaluate('(tab)=>beginRun({id:tab},1)',tab)

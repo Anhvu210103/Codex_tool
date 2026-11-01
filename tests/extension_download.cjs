@@ -103,6 +103,12 @@ function begin(id, capabilities = [], expectedName = 'report.pdf') {
   await listeners.created({...item});
   assert.equal(session.run.pending.downloadId,16,'Chrome removing whitespace before .pdf must not hide a real Gmail download');
   assert(session.run.pending.result);
+  begin(17,['local-download-pdf']);
+  const creating=listeners.created({...item});
+  item.filename='/Downloads/report.pdf';item.state='complete';
+  const completing=listeners.changed({id:17,filename:{current:item.filename},state:{current:'complete'}});
+  await Promise.all([creating,completing]);
+  assert(session.run.pending.result,'Concurrent filename/complete events must wait until onCreated has recorded the candidate');
   begin(13);
   activeTab = 2;
   item.url = 'https://example.org/unrelated.pdf'; item.filename = '/Downloads/unrelated.pdf'; item.state = 'complete';

@@ -137,13 +137,18 @@ def render_notes(connection, directory, timezone='Asia/Ho_Chi_Minh', days=None):
         temporary.replace(target)
 
 
-def process(messages, config, source):
+def process(messages, config, source, *, should_stop=None):
     root = Path(config['data_dir'])
     root.mkdir(parents=True, exist_ok=True)
     with connect(root / 'notes.sqlite3') as connection:
         ensure_schema(connection)
         added = 0
-        for message in messages:
+        incoming=iter(messages)
+        while should_stop is None or not should_stop():
+            try:
+                message=next(incoming)
+            except StopIteration:
+                break
             identifier = source + ':' + message['id']
             if connection.execute('SELECT 1 FROM notes WHERE id=?', (identifier,)).fetchone() and identifier != config.get('_reprocess_id'):
                 continue

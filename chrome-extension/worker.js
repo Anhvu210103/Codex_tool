@@ -200,6 +200,8 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
  })().then(reply).catch(error=>reply({error:error.message}));return true;
 });
 const claimedDownloads=new Set();
+const downloadEvents=new Map();
+function queueDownload(id,task){const operation=(downloadEvents.get(id)||Promise.resolve()).catch(()=>{}).then(task);downloadEvents.set(id,operation);const clear=()=>{if(downloadEvents.get(id)===operation)downloadEvents.delete(id);};operation.then(clear,clear);return operation;}
 function comparableName(path){return String(path||'').split(/[\\/]/).pop().normalize('NFC').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').replace(/\s*\(\d+\)(?=\s*\.pdf$)/i,'').replace(/\s+(?=\.pdf$)/i,'').replace(/\s+/g,' ').trim().toLocaleLowerCase('vi');}
 async function handleDownload(item,expectedRun){
  const {run}=await chrome.storage.session.get('run');let pending=run?.pending;
@@ -242,7 +244,7 @@ async function handleDownload(item,expectedRun){
   if(updated)await chrome.storage.local.set({status:e.message});
  }
 }
-chrome.downloads.onCreated.addListener(async item=>{
+chrome.downloads.onCreated.addListener(item=>queueDownload(item.id,async()=>{
  const before=(await chrome.storage.session.get('run')).run;
  if(!before?.pending)return;
  await handleDownload(item,before);
@@ -252,7 +254,7 @@ chrome.downloads.onCreated.addListener(async item=>{
   const url=new URL(item.url),claimed=after?.pending?.downloadId===item.id;
   if(after?.pending&&!claimed){const google=item.url.startsWith('blob:https://mail.google.com/')||(url.protocol==='https:'&&(url.hostname==='mail.google.com'||url.hostname.endsWith('.googleusercontent.com')));await appendReport({phase:google?'chrome-cho-ten':'chrome-bo-qua',detail:'lượt '+item.id+' · '+url.protocol+' · '+url.hostname+' · '+item.state+' · '+(google?'đang chờ Chrome cung cấp đúng tên '+after.pending.expectedName:'nguồn tải không thuộc Gmail/Google'),file:(item.filename||'').split(/[\\/]/).pop()});}
  }catch{}
-});
-chrome.downloads.onChanged.addListener(async change=>{if(!change.filename&&!change.mime&&!change.state)return;const {run}=await chrome.storage.session.get('run');const pending=run?.pending;if(!pending)return;if(pending.downloadId!==change.id&&!pending.candidates?.includes(change.id))return;const [item]=await chrome.downloads.search({id:change.id});if(item)await handleDownload(item,run);});
+}));
+chrome.downloads.onChanged.addListener(change=>queueDownload(change.id,async()=>{if(!change.filename&&!change.mime&&!change.state)return;const {run}=await chrome.storage.session.get('run');const pending=run?.pending;if(!pending)return;if(pending.downloadId!==change.id&&!pending.candidates?.includes(change.id))return;const [item]=await chrome.downloads.search({id:change.id});if(item)await handleDownload(item,run);}));
 
 chrome.debugger.onDetach.addListener(async source=>{const {run}=await chrome.storage.session.get('run');if(run?.tab===source.tabId){await appendReport({phase:'chrome-ngat',detail:'Chrome đã ngắt quyền điều khiển tab'});await chrome.storage.local.set({status:'Chrome đã ngắt quyền điều khiển tab. Thử lại lượt quét.'});await stop();}});
