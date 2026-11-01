@@ -13,17 +13,20 @@ def inbox_directory():
     return Path(configured).expanduser().resolve() if configured else (Path.home() / 'Downloads' / 'So-Ghi-Chep-Inbox').resolve()
 
 
-def ready_pdfs(root=None, minimum_age=3, now=None):
+def iter_ready_pdfs(root=None, minimum_age=3, now=None, errors=None):
     root = Path(root or inbox_directory()).resolve()
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     current = time.time() if now is None else now
-    ready, errors = [], []
+    errors = errors if errors is not None else []
     for path in sorted(root.glob('*'), key=lambda item: item.name.casefold()):
         if path.suffix.lower() != '.pdf' or path.is_symlink():
             continue
         try:
             before = path.stat()
-            if not stat.S_ISREG(before.st_mode) or before.st_size == 0 or before.st_size > MAX_PDF_BYTES or current - before.st_mtime < minimum_age:
+            if not stat.S_ISREG(before.st_mode) or current - before.st_mtime < minimum_age:
+                continue
+            if before.st_size == 0 or before.st_size > MAX_PDF_BYTES:
+                errors.append({'file':path.name, 'error':'PDF đang trống hoặc vượt giới hạn 20 MB; chưa xử lý tệp này.'})
                 continue
             flags = os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0) | getattr(os, 'O_NOFOLLOW', 0)
             descriptor = os.open(path, flags)
@@ -38,10 +41,14 @@ def ready_pdfs(root=None, minimum_age=3, now=None):
             if len(data) > MAX_PDF_BYTES or not data.startswith(b'%PDF-'):
                 errors.append({'file':path.name, 'error':'Tệp có đuôi PDF nhưng nội dung không phải PDF hợp lệ.'})
                 continue
-            ready.append((path, data, hashlib.sha256(data).hexdigest()))
+            yield path, data, hashlib.sha256(data).hexdigest()
         except OSError:
             errors.append({'file':path.name, 'error':'Chưa đọc được tệp; sẽ thử lại ở lượt sau.'})
-    return ready, errors
+
+
+def ready_pdfs(root=None, minimum_age=3, now=None):
+    errors = []
+    return list(iter_ready_pdfs(root, minimum_age, now, errors)), errors
 
 
 def archive_processed(path, digest, root=None):
@@ -58,10 +65,15 @@ def archive_processed(path, digest, root=None):
         raise ValueError('PDF đã thay đổi trong lúc xử lý; sẽ đọc lại ở lượt sau.')
     destination = root / 'Da-xu-ly'
     destination.mkdir(parents=True, exist_ok=True, mode=0o700)
-    target = destination / f'{digest[:12]}-{path.name}'
+    def target_name(counter=None):
+        prefix = digest[:12] + (f'-{counter}' if counter is not None else '') + '-'
+        # A legal 255-byte input name no longer fits after adding our prefix.
+        stem = path.stem.encode('utf-8')[:250-len(prefix)].decode('utf-8', errors='ignore')
+        return prefix + stem + path.suffix
+    target = destination / target_name()
     counter = 1
     while target.exists():
-        target = destination / f'{digest[:12]}-{counter}-{path.name}'
+        target = destination / target_name(counter)
         counter += 1
     path.replace(target)
     return target

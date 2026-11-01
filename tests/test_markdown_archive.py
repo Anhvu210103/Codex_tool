@@ -84,6 +84,7 @@ class MarkdownArchiveTests(unittest.TestCase):
 
     def test_mixed_pdf_reports_unread_image_pages_and_names_cannot_escape(self):
         config=self.admin.runtime_config('pdf')
+        config['pdf_ocr']=False
         document=pdf_message(pdf('Report with one text page.',mixed=True),'mixed.pdf',config,id='mixed',sender='PDF',received_at='2026-10-16T08:00:00+07:00')
         self.assertIn('1 trang không có lớp chữ',document['review_reason'])
         self.assertNotIn('/',component('../../outside'))
@@ -91,6 +92,37 @@ class MarkdownArchiveTests(unittest.TestCase):
         self.assertLess(len(component('Ngân sách nhà nước ' * 40).encode('utf-8')),200)
         self.assertEqual(original_markdown_name('Công văn số 01.PDF'),'Công văn số 01.md')
         self.assertEqual(original_markdown_name('../../outside.pdf'),'-..-outside.md')
+
+    def test_windows_reserved_output_names_are_safe_on_every_os(self):
+        for title in ('CON.pdf', 'aux.pdf', 'NUL.archive.pdf', 'COM1.pdf', 'LPT9.pdf', 'COM¹.pdf'):
+            with self.subTest(title=title):
+                self.assertTrue(original_markdown_name(title).startswith('_'))
+        self.assertEqual(original_markdown_name('CONTRACT.pdf'), 'CONTRACT.md')
+
+    def test_importing_new_document_keeps_existing_markdown_annotations(self):
+        response={'choices':[{'message':{'content':json.dumps({'categories':['Kinh tế'],'summary':'Short summary','confidence':.9,'needs_review':False,'review_reason':''})}}]}
+        with patch('mailnotes.core.request_json',return_value=response):
+            raw=pdf('First document about monthly budgets.')
+            self.admin.process_pdf(raw,'first.pdf',source='ai')
+            first=next((self.root/'ai/Theo-nhom').rglob('first.md'))
+            first.write_text(first.read_text(encoding='utf-8')+'\nManual annotation from the operator.\n',encoding='utf-8')
+            self.admin.process_pdf(pdf('Second document with different content.'),'second.pdf',source='ai')
+            self.assertEqual(self.admin.process_pdf(raw,'first.pdf',source='ai'),0)
+        self.assertIn('Manual annotation from the operator.',first.read_text(encoding='utf-8'))
+
+    def test_corrupt_export_manifest_and_missing_copy_can_be_repaired_without_ai(self):
+        response={'choices':[{'message':{'content':json.dumps({'categories':['Kinh tế'],'summary':'Short summary','confidence':.9,'needs_review':False,'review_reason':''})}}]}
+        raw=pdf('Document to recover after a missing export.')
+        with patch('mailnotes.core.request_json',return_value=response) as request:
+            self.admin.process_pdf(raw,'recover.pdf',source='ai')
+            output=next((self.root/'ai/Theo-nhom').rglob('recover.md'))
+            manifest=next((self.root/'ai/exports').glob('*.json'))
+            for bad in ('{','{}','[null,"","../outside.md"]'):
+                output.unlink();manifest.write_text(bad,encoding='utf-8')
+                self.assertEqual(self.admin.process_pdf(raw,'recover.pdf',source='ai'),0)
+                self.assertIn('Document to recover',output.read_text(encoding='utf-8'))
+                self.assertIsInstance(json.loads(manifest.read_text(encoding='utf-8')),list)
+            self.assertEqual(request.call_count,1)
 
     def test_markdown_download_and_local_folder_action(self):
         config=self.admin.config();config['summary']['mode']='extractive';config['classification_mode']='rules';self.admin.save_settings(config)
@@ -103,7 +135,8 @@ class MarkdownArchiveTests(unittest.TestCase):
         self.assertGreaterEqual(len(note['local_markdown_paths']),1)
         self.assertTrue(Path(note['local_markdown_paths'][0]['path']).is_file())
         response=client.get('/api/document',query_string={'source':'ai','id':note['id'],'format':'markdown'})
-        self.assertEqual(response.status_code,200);self.assertIn('Text available',response.get_data(as_text=True));response.close()
+        self.assertEqual(response.status_code,200);self.assertIn('Text available',response.get_data(as_text=True))
+        self.assertIn('text.md',response.headers['Content-Disposition']);response.close()
         self.assertEqual(client.get('/api/archive?source=../../outside').status_code,400)
         for platform, command in (('linux','xdg-open'),('darwin','open')):
             with self.subTest(platform=platform),patch('sys.platform',platform),patch('subprocess.Popen') as opened:

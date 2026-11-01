@@ -133,16 +133,18 @@ function dateText(value) {
 async function refreshStatus() {
   const status=await api('/api/status?provider='+encodeURIComponent($('provider').value || 'vngcloud'));
   const folder=status.folder_inbox||{},busy=status.running||folder.running;
+  const latestIsFolder=folder.running||(!status.running&&folder.last_finished&&(!status.last_finished||new Date(folder.last_finished)>new Date(status.last_finished)));
+  const latest=latestIsFolder?folder:status;
   $('stop-app').hidden=!status.desktop_mode;
-  $('run-state').textContent=busy?'Đang xử lý':status.error?'Cần kiểm tra':'Sẵn sàng';
-  $('run-detail').textContent=status.last_finished?'Hoàn tất: '+dateText(status.last_finished):'Chưa có lượt xử lý';
-  $('added-count').textContent=status.last_added ?? '—';
-  $('last-source').textContent=({gmail:'Gmail API',folder:'Thư mục PDF',pdf:'PDF tải lên',ai:'Gmail qua tiện ích',demo:'Lượt thử cũ'})[status.last_source] || 'Chưa có dữ liệu';
+  $('run-state').textContent=busy?'Đang xử lý':latest.error?'Cần kiểm tra':'Sẵn sàng';
+  $('run-detail').textContent=latest.last_finished?'Hoàn tất: '+dateText(latest.last_finished):'Chưa có lượt xử lý';
+  $('added-count').textContent=latest.last_added ?? '—';
+  $('last-source').textContent=latestIsFolder?'Thư mục PDF':({gmail:'Gmail API',folder:'Thư mục PDF',pdf:'PDF tải lên',ai:'Gmail qua tiện ích',demo:'Lượt thử cũ'})[status.last_source] || 'Chưa có dữ liệu';
   $('schedule-state').textContent='Gmail '+(status.schedule_enabled?'bật':'tắt')+' · Thư mục '+(status.folder_inbox_enabled?'bật':'tắt');
   $('next-run').textContent=status.folder_inbox_enabled&&status.folder_next_run?'Thư mục quét tiếp: '+dateText(status.folder_next_run):status.schedule_enabled&&status.next_run?'Gmail quét tiếp: '+dateText(status.next_run):'Bạn có thể quét thủ công';
   const folderErrors=(folder.errors||[]).slice(0,5).map(item=>`\n• ${item.file}: ${item.error}`).join('');$('folder-inbox-status').textContent=folder.running?'Đang đọc PDF...':folder.last_finished?`Lần cuối: ${dateText(folder.last_finished)} · ${folder.last_processed||0} tệp · ${folder.last_added||0} ghi chép mới${folder.error?' · '+folder.error:''}${folderErrors}`:'Chưa quét thư mục.';
   $('run-now').hidden=config.source!=='gmail';$('run-now').disabled=busy;$('run-folder-inbox').disabled=busy;$('overview-scan').disabled=busy;
-  $('run-error').hidden=!status.error; $('run-error').textContent=status.error || '';
+  $('run-error').hidden=!latest.error; $('run-error').textContent=latest.error?(latest.error+(latestIsFolder?folderErrors:'')):'';
   $('source-name').textContent=config.source==='gmail'?'Gmail API':'Chưa cài nguồn tự động';
   $('source-badge').textContent=config.source==='gmail'?(status.gmail_connected?'Đã kết nối':'Cần kết nối'):'Chưa cài đặt';
   $('source-description').textContent=config.source==='gmail'?gmailFilterDescription(config.gmail_filter || {period:'advanced'}):'Bật Gmail API trong Cài đặt nếu muốn quét email tự động.';

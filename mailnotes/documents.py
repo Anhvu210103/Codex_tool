@@ -56,73 +56,96 @@ def pdf_text(data, ocr=False, api_key=None, model='deepseek/deepseek-v4.1-flash-
         if reader.is_encrypted and not reader.decrypt(''):
             return '', 'PDF có mật khẩu; cần mở khóa trước.'
         pages = len(reader.pages)
-        chunks = [normalize_document_text(page.extract_text() or '') for page in reader.pages[:100]]
-        text = normalize_document_text('\n\n'.join(chunks))
+        chunks = []
+        extraction_errors = []
+        for index, page in enumerate(reader.pages[:100]):
+            try:
+                chunks.append(normalize_document_text(page.extract_text() or ''))
+            except Exception:
+                chunks.append('')
+                extraction_errors.append(index + 1)
     except Exception:
         return '', 'Không đọc được PDF; kiểm tra file hỏng hoặc mật khẩu.'
-    warning = 'PDF vượt 100 trang; chỉ đọc 100 trang đầu.' if pages > 100 else ''
-    extracted_text = text[:100000]
-    damaged = broken_text_layer(extracted_text)
-    if text.strip() and not (ocr and damaged):
-        warnings = [warning] if warning else []
-        missing = sum(not chunk.strip() for chunk in chunks)
-        if missing:
-            warnings.append(f'{missing} trang không có lớp chữ; phần scan hoặc trang trắng chưa được đọc.')
-        if len(text) > 100000:
-            warnings.append('Nội dung vượt 100.000 ký tự; đã giới hạn phần đọc.')
-        if damaged:warnings.append('Lớp chữ PDF có dấu hiệu lỗi font hoặc khoảng cách; cần kiểm tra bản gốc.')
-        return extracted_text, ' '.join(warnings)
-    if not ocr:
-        return '', 'PDF không có lớp chữ, có thể là bản scan. Cần xem lại; luồng này không chạy OCR.'
-    if not api_key:
-        return '', 'OCR qua GreenNode / VNG Cloud cần API key; hãy lưu key trước khi xử lý PDF scan.'
-    try:
+    if not pages:
+        return '', 'PDF không có trang; cần kiểm tra file gốc.'
+    warnings = ['PDF vượt 100 trang; chỉ đọc 100 trang đầu.'] if pages > 100 else []
+    damaged = {index for index, chunk in enumerate(chunks) if chunk and broken_text_layer(chunk)}
+    missing = {index for index, chunk in enumerate(chunks) if not chunk}
+    targets = sorted(damaged | missing)
+    completed = set()
+    failed = []
+    truncated = []
+    if targets and ocr and api_key:
         deadline = time.monotonic() + 180
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'input.pdf').write_bytes(data)
-            subprocess.run(['pdftoppm', '-f', '1', '-l', str(min(pages, 20)), '-scale-to', '1800', '-png', str(root / 'input.pdf'), str(root / 'page')], check=True, timeout=60, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            texts = []
-            for image in sorted(root.glob('page-*.png')):
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise TimeoutError('OCR deadline')
-                image_data = base64.b64encode(image.read_bytes()).decode('ascii')
-                from .core import request_json
-                response = request_json(
-                    endpoint,
-                    data={
-                        'model': model,
-                        'temperature': 0,
-                        'max_tokens': 4000,
-                        'messages': [
-                            {'role': 'system', 'content': OCR_INSTRUCTION},
-                            {'role': 'user', 'content': [
-                                {'type': 'text', 'text': OCR_INSTRUCTION},
-                                {'type': 'image_url', 'image_url': {
-                                    'url': 'data:image/png;base64,' + image_data
-                                }}
-                            ]}
-                        ]
-                    },
-                    headers={'Authorization': 'Bearer ' + api_key, 'Content-Type': 'application/json'})
-                if usage_callback:
-                    usage_callback(response)
-                choices = response.get('choices', [])
-                if not choices:
-                    raise ValueError('GreenNode / VNG Cloud không trả kết quả OCR.')
-                content = choices[0].get('message', {}).get('content')
-                if not isinstance(content, str):
-                    raise ValueError('GreenNode / VNG Cloud trả kết quả OCR không hợp lệ.')
-                texts.append(content.strip())
-            text = normalize_document_text('\n\n'.join(texts))
-        if len(text.strip()) < 40:
-            return '', 'OCR không đọc được đủ nội dung; cần kiểm tra file gốc.'
-        return text[:100000], ('Lớp chữ PDF bị lỗi font/khoảng cách nên đã OCR lại qua GreenNode / VNG Cloud; cần đối chiếu bản gốc.' if damaged else 'Nội dung được OCR qua GreenNode / VNG Cloud; cần đối chiếu bản gốc.') + (' Chỉ đọc 20 trang đầu.' if pages > 20 else '')
-    except (OSError, subprocess.SubprocessError, TimeoutError, ValueError, HTTPError, URLError):
-        if extracted_text.strip():
-            return extracted_text, 'Lớp chữ PDF có dấu hiệu lỗi font/khoảng cách và OCR thất bại; cần kiểm tra bản gốc.'
-        return '', 'OCR qua GreenNode / VNG Cloud thất bại hoặc quá thời gian; kiểm tra API key, model hỗ trợ hình ảnh và kết nối mạng.'
+            for index in targets[:20]:
+                try:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        failed.extend(page + 1 for page in targets[:20] if page >= index)
+                        break
+                    prefix = root / f'page-{index + 1}'
+                    options = {'creationflags':subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
+                    subprocess.run(['pdftoppm', '-f', str(index + 1), '-l', str(index + 1), '-scale-to', '1800', '-png', str(root / 'input.pdf'), str(prefix)], check=True, timeout=min(60, remaining), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **options)
+                    images = list(root.glob(prefix.name + '-*.png'))
+                    if len(images) != 1:
+                        raise ValueError('Không tạo được ảnh trang PDF.')
+                    image_data = base64.b64encode(images[0].read_bytes()).decode('ascii')
+                    images[0].unlink()
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise TimeoutError('OCR deadline')
+                    from .core import request_json
+                    response = request_json(
+                        endpoint,
+                        data={'model': model, 'temperature': 0, 'max_tokens': 4000,
+                              'messages': [
+                                  {'role': 'system', 'content': OCR_INSTRUCTION},
+                                  {'role': 'user', 'content': [
+                                      {'type': 'text', 'text': OCR_INSTRUCTION},
+                                      {'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,' + image_data}}
+                                  ]}]},
+                        headers={'Authorization': 'Bearer ' + api_key, 'Content-Type': 'application/json'},
+                        timeout=min(60, remaining))
+                    if usage_callback:
+                        usage_callback(response)
+                    choices = response.get('choices', []) if isinstance(response, dict) else []
+                    choice = choices[0] if choices and isinstance(choices[0], dict) else {}
+                    message = choice.get('message')
+                    content = message.get('content') if isinstance(message, dict) else None
+                    if not isinstance(content, str) or not content.strip():
+                        raise ValueError('GreenNode / VNG Cloud không trả chữ OCR hợp lệ.')
+                    chunks[index] = normalize_document_text(content)
+                    completed.add(index)
+                    if choice.get('finish_reason') == 'length':
+                        truncated.append(index + 1)
+                except (OSError, subprocess.SubprocessError, TimeoutError, ValueError, HTTPError, URLError):
+                    failed.append(index + 1)
+        if completed:
+            warnings.append('Nội dung được OCR qua GreenNode / VNG Cloud; cần đối chiếu bản gốc.')
+        if len(targets) > 20:
+            warnings.append(f'Chỉ OCR tối đa 20 trang mỗi tài liệu; còn {len(targets) - 20} trang cần kiểm tra.')
+        if failed:
+            warnings.append('OCR qua GreenNode / VNG Cloud thất bại hoặc quá thời gian ở trang ' + ', '.join(map(str, failed)) + '; kiểm tra API key, model hỗ trợ hình ảnh và kết nối mạng.')
+        if truncated:
+            warnings.append('OCR bị giới hạn đầu ra ở trang ' + ', '.join(map(str, truncated)) + '; nội dung các trang này chưa đầy đủ.')
+    elif targets and ocr and not api_key:
+        warnings.append('OCR qua GreenNode / VNG Cloud cần API key; hãy lưu key trước khi xử lý PDF scan.')
+    remaining_missing = missing - completed
+    if remaining_missing:
+        warnings.append(f'{len(remaining_missing)} trang không có lớp chữ; phần scan hoặc trang trắng chưa được đọc.')
+        if not ocr:
+            warnings.append('Luồng này không chạy OCR.')
+    if damaged - completed:
+        warnings.append('Lớp chữ PDF có dấu hiệu lỗi font hoặc khoảng cách; cần kiểm tra bản gốc.')
+    if extraction_errors:
+        warnings.append('Lớp chữ không đọc được ở trang ' + ', '.join(map(str, extraction_errors)) + '; cần kiểm tra bản gốc.')
+    text = normalize_document_text('\n\n'.join(chunks))
+    if len(text) > 100000:
+        warnings.append('Nội dung vượt 100.000 ký tự; đã giới hạn phần đọc.')
+    return text[:100000], ' '.join(warnings)
 
 
 def save_pdf(data, root):

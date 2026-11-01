@@ -50,12 +50,14 @@ jobs:
       - run: python -m pip install -r requirements-build.txt
       - run: python packaging/run_tests.py
       - run: node tests/extension_download.cjs
+      - run: node tests/extension_download_race.cjs
       - name: Test Chrome extension UI and PDF controls
         if: runner.os == 'Linux'
         run: |
           python -m playwright install --with-deps chromium
           python packaging/smoke_extension_ui.py
           python packaging/smoke_extension_download.py
+          python packaging/smoke_admin_ui.py
       - run: python packaging/build.py
       - run: python packaging/smoke_app.py
       - name: Build Linux AppImage

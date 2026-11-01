@@ -1,5 +1,4 @@
 import argparse
-import hashlib
 import base64
 import hashlib
 import hmac
@@ -484,14 +483,16 @@ def create_app(base=None, data_root=None, public_url=None):
             return jsonify(error='Không tìm thấy PDF.'), 404
         import sqlite3
         with connect(database) as connection:
-            row = connection.execute('SELECT file_hash FROM notes WHERE id=?', (request.args.get('id'),)).fetchone()
+            row = connection.execute('SELECT file_hash,subject FROM notes WHERE id=?', (request.args.get('id'),)).fetchone()
         if not row or not row[0] or not re.fullmatch(r'[a-f0-9]{64}', row[0]):
             return jsonify(error='Không tìm thấy PDF.'), 404
         markdown = request.args.get('format') == 'markdown'
         path = database.parent / ('Markdown' if markdown else 'files') / (row[0] + ('.md' if markdown else '.pdf'))
         if not path.exists():
             return jsonify(error='File PDF đã bị xóa trên máy chủ.'), 404
-        return send_file(path, mimetype='text/markdown; charset=utf-8' if markdown else 'application/pdf', as_attachment=True, download_name='tai-lieu.md' if markdown else 'tai-lieu.pdf')
+        from .archive import original_markdown_name
+        filename = original_markdown_name(row[1])
+        return send_file(path, mimetype='text/markdown; charset=utf-8' if markdown else 'application/pdf', as_attachment=True, download_name=filename if markdown else filename[:-3] + '.pdf')
 
     @app.route('/api/archive', methods=['GET', 'POST'])
     def archive_folder():

@@ -89,6 +89,14 @@ class DocumentAITests(unittest.TestCase):
         self.assertEqual(request.call_args_list[0].kwargs['data']['max_tokens'],2000)
         self.assertEqual(request.call_args_list[1].kwargs['data']['max_tokens'],3000)
 
+    def test_long_model_summary_is_bounded_without_a_second_paid_call(self):
+        with patch('mailnotes.core.request_json',return_value=ai_result(summary='Nội dung cần xử lý trước ngày 30 tháng 11. '*40)) as request:
+            self.assertEqual(process([self.mail],self.config,'gmail'),1)
+        self.assertEqual(request.call_count,1)
+        self.assertLessEqual(len(self.row()[1]),350)
+        self.assertTrue(self.row()[1].endswith('…'))
+        self.assertIn('tối đa 350 ký tự',request.call_args.kwargs['data']['messages'][0]['content'])
+
     def test_ai_response_missing_safety_fields_goes_to_review(self):
         response={'choices':[{'finish_reason':'stop','message':{'content':json.dumps({'categories':'Work','short_summary':'Short result'})}}]}
         with patch('mailnotes.core.request_json',return_value=response):

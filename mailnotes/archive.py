@@ -21,6 +21,8 @@ def original_markdown_name(title):
         text = text[:-4]
     text = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '-', text).strip(' .')
     text = text.encode('utf-8')[:180].decode('utf-8', errors='ignore').rstrip(' .')
+    if re.fullmatch(r'(?i:CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])', text.split('.')[0].rstrip()):
+        text = '_' + text
     return (text or 'Tai-lieu') + '.md'
 
 
@@ -78,9 +80,26 @@ def remove_document_export(root, identifier):
     manifest.unlink(missing_ok=True)
 
 
-def render_archive(connection, root):
+def manifest_paths(path):
+    try:
+        value = json.loads(path.read_text(encoding='utf-8')) if path.exists() else []
+    except (OSError, ValueError):
+        return []
+    return [item for item in value if isinstance(item, str) and Path(item).parts
+            and Path(item).parts[0] in ('Theo-nhom', 'Can-xem-lai')
+            and not Path(item).is_absolute() and '..' not in Path(item).parts] if isinstance(value, list) else []
+
+
+def render_archive(connection, root, identifiers=None):
     root = Path(root).resolve()
-    rows = connection.execute('SELECT id,subject,sender,categories,summary,received_at,review_reason,file_hash FROM notes WHERE file_hash IS NOT NULL AND file_hash != ""').fetchall()
+    query = 'SELECT id,subject,sender,categories,summary,received_at,review_reason,file_hash FROM notes WHERE file_hash IS NOT NULL AND file_hash != ""'
+    arguments = []
+    if identifiers is not None:
+        arguments = list(dict.fromkeys(identifiers))
+        if not arguments:
+            return
+        query += ' AND id IN (' + ','.join('?' for _ in arguments) + ')'
+    rows = connection.execute(query, arguments).fetchall()
     for identifier, title, sender, raw_groups, summary, received, warning, digest in rows:
         original_md = markdown_path(root, digest)
         if not original_md.exists():
@@ -92,7 +111,7 @@ def render_archive(connection, root):
         categories = list(dict.fromkeys(json.loads(raw_groups)))
         markdown_paths = classified_markdown_paths(root, identifier, title, categories, digest)
         manifest = root / 'exports' / (key + '.json')
-        previous = json.loads(manifest.read_text(encoding='utf-8')) if manifest.exists() else []
+        previous = manifest_paths(manifest)
         exported = []
         for category, markdown_output in zip(categories, markdown_paths):
             relative = markdown_output.relative_to(root)

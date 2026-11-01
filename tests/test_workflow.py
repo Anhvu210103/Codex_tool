@@ -44,6 +44,18 @@ class WorkflowTests(unittest.TestCase):
                     process([mail], config, 'demo')
             self.assertEqual(process([mail], config, 'demo'), 1)
 
+    def test_later_failure_does_not_hide_notebook_for_already_committed_document(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config={'data_dir':directory,'rules':[],'unmatched_category':'Khác'}
+            first={'id':'one','sender':'office','subject':'First successful document','body':'Readable content','received_at':'2026-10-13T00:00:00+00:00'}
+            with patch('mailnotes.core.summarize',side_effect=['First summary',RuntimeError('Provider unavailable')]):
+                with self.assertRaises(RuntimeError):process([first,{**first,'id':'two'}],config,'demo')
+            notebook=Path(directory)/'notebooks/2026-10-13.md'
+            self.assertIn('First summary',notebook.read_text(encoding='utf-8'))
+            with patch('mailnotes.core.summarize',return_value='Recovered summary') as summary:
+                self.assertEqual(process([first,{**first,'id':'two'}],config,'demo'),1)
+            self.assertEqual(summary.call_count,1)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -349,7 +349,12 @@ class Admin:
         if not reprocess and database.exists():
             with connect(database) as connection:
                 ensure_schema(connection)
-                if connection.execute('SELECT 1 FROM notes WHERE id=?', (identifier,)).fetchone():
+                row = connection.execute('SELECT subject,categories,file_hash FROM notes WHERE id=?', (identifier,)).fetchone()
+                if row:
+                    from .archive import classified_markdown_paths, render_archive
+                    paths = classified_markdown_paths(Path(config['data_dir']),identifier,row[0],json.loads(row[1]),row[2])
+                    if any(not path.is_file() or not path.stat().st_size for path in paths):
+                        render_archive(connection, Path(config['data_dir']), identifiers=[identifier])
                     return 0
         if reprocess:
             config['_reprocess_id'] = identifier
@@ -366,9 +371,23 @@ class Admin:
         if not self.run_lock.acquire(blocking=False):
             raise ValueError('Đang có lượt xử lý. Chờ hoàn tất rồi tải PDF.')
         try:
-            return self._process_pdf_locked(data, filename, reprocess, source)
+            with self.lock:
+                self.state.update(running=True,last_started=datetime.now(timezone.utc).isoformat(),last_source=source,error=None)
+            added = self._process_pdf_locked(data, filename, reprocess, source)
+            with self.lock:
+                self.state.update(last_added=added,error=None)
+            return added
+        except Exception as error:
+            with self.lock:
+                self.state.update(last_added=None,error=error_message(error))
+            raise
         finally:
-            self.run_lock.release()
+            try:
+                with self.lock:
+                    self.state.update(running=False,last_finished=datetime.now(timezone.utc).isoformat())
+                    private_json(self.private/'status.json',self.state)
+            finally:
+                self.run_lock.release()
 
     def reprocess_note(self, source, identifier):
         from .documents import pdf_message
@@ -422,7 +441,7 @@ class Admin:
                 connection.commit()
                 render_notes(connection, database.parent / 'notebooks', self.config()['timezone'])
                 from .archive import render_archive
-                render_archive(connection, database.parent)
+                render_archive(connection, database.parent, identifiers=[identifier])
 
     def _reset_extension_history(self):
         path = self.private / 'extension-history.json'
@@ -579,18 +598,22 @@ class Admin:
         return False
 
     def _run_folder_import(self):
-        added=0;processed=0;errors=[]
+        added=0;processed=0;errors=[];interrupted=False
         try:
-            from .folder_inbox import archive_processed, inbox_directory, ready_pdfs
-            root=inbox_directory();candidates,errors=ready_pdfs(root)
+            from .folder_inbox import archive_processed, inbox_directory, iter_ready_pdfs
+            root=inbox_directory();candidates=iter_ready_pdfs(root,errors=errors)
             for path,data,digest in candidates:
+                if self.stop.is_set():
+                    interrupted=True
+                    break
                 try:
                     if not self._has_document_hash(digest):added += self._process_pdf_locked(data,path.name,False,'folder')
                     archive_processed(path,digest,root);processed += 1
                 except Exception as error:
                     errors.append({'file':path.name,'error':error_message(error)})
             with self.lock:
-                self.folder_state.update(last_added=added,last_processed=processed,error=None if not errors else f'{len(errors)} tệp cần thử lại.',errors=errors[-20:])
+                error='Lượt quét đã tạm dừng; các PDF còn lại sẽ được đọc ở lượt sau.' if interrupted else (f'{len(errors)} tệp cần thử lại.' if errors else None)
+                self.folder_state.update(last_added=added,last_processed=processed,error=error,errors=errors[-20:])
         except Exception as error:
             with self.lock:self.folder_state.update(last_added=None,error=error_message(error))
         finally:

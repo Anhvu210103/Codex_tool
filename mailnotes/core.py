@@ -12,10 +12,10 @@ from .database import connect
 from zoneinfo import ZoneInfo
 
 
-def request_json(url, *, data=None, headers=None):
+def request_json(url, *, data=None, headers=None, timeout=60):
     payload = json.dumps(data).encode() if data is not None else None
     request = urllib.request.Request(url, data=payload, headers=headers or {})
-    with urllib.request.urlopen(request, timeout=60) as response:
+    with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.load(response)
 
 
@@ -106,10 +106,10 @@ def ensure_schema(connection):
         raise
 
 
-def render_notes(connection, directory, timezone='Asia/Ho_Chi_Minh'):
+def render_notes(connection, directory, timezone='Asia/Ho_Chi_Minh', days=None):
     directory.mkdir(parents=True, exist_ok=True)
-    days = connection.execute('SELECT DISTINCT day FROM notes').fetchall()
-    for (day,) in days:
+    days = [row[0] for row in connection.execute('SELECT DISTINCT day FROM notes')] if days is None else sorted(set(days))
+    for day in days:
         rows = connection.execute('SELECT id,sender,subject,categories,summary,received_at,source,origin_id,review_reason,file_hash FROM notes WHERE day=? ORDER BY received_at,id', (day,)).fetchall()
         chunks = [f'# Sổ ghi chép — {day}\n\n',
                   f'{len(rows)} ghi chép · Giờ hiển thị: {timezone}\n\n',
@@ -168,7 +168,9 @@ def process(messages, config, source):
             connection.execute('INSERT INTO notes (id,sender,subject,categories,summary,received_at,day,source,content_hash,origin_id,review_reason,file_hash) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET categories=excluded.categories, summary=excluded.summary, review_reason=excluded.review_reason, file_hash=excluded.file_hash, content_hash=excluded.content_hash', (identifier, message['sender'], message['subject'], json.dumps(categories, ensure_ascii=False), summary, message['received_at'], day, source, digest, message.get('origin_id'), reason, message.get('file_hash')))
             connection.commit()
             added += 1
-        render_notes(connection, root / 'notebooks', config.get('timezone', 'Asia/Ho_Chi_Minh'))
-        from .archive import render_archive
-        render_archive(connection, root)
+            # Export each committed document before a later network request can
+            # fail. Previously a failed second document hid the first one's MD.
+            render_notes(connection, root / 'notebooks', config.get('timezone', 'Asia/Ho_Chi_Minh'), days=[day])
+            from .archive import render_archive
+            render_archive(connection, root, identifiers=[identifier])
     return added
