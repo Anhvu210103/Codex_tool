@@ -1,5 +1,7 @@
 # Kiểm thử 0.9.2 — 01/11/2026
 
+Bản mã nguồn `793a526` đã đạt toàn bộ bốn job trong [lượt build 41268421710](https://github.com/Anhvu210103/Codex_tool/actions/runs/41268421710): Windows x64, Linux x64, macOS Intel và macOS Apple Silicon. Các gói tải nằm tại [Artifacts](https://github.com/Anhvu210103/Codex_tool/actions/runs/41268421710#artifacts); cần đăng nhập GitHub để tải.
+
 ## Các lỗi được tái hiện và sửa
 
 - PDF trộn trang chữ/scan: giữ thứ tự trang, OCR riêng các trang thiếu chữ hoặc lỗi font. Một trang lỗi không xóa chữ đã lấy từ trang khác. Kết quả OCR bị cắt được báo rõ.
