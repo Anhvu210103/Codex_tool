@@ -55,4 +55,4 @@ Bản 0.9.0 hỗ trợ toolbar PDF nằm lệch trái hoặc trong khung hẹp k
 
 Bản 0.9.1 không tải lại PDF khi Chrome đã tải xong nhưng GreenNode hoặc backend trả lỗi; file được giữ trong hàng đợi thử lại. Báo cáo cuối lượt tách rõ PDF mới, PDF đã có và PDF lỗi.
 
-Bản 0.9.2 ngăn sự kiện tải Chrome đến muộn khôi phục lượt đã dừng hoặc nhập nhầm vào lượt mới. Trạng thái lượt quét được ghi tuần tự. Kiểm thử: `node tests/extension_download_race.cjs`.
+Bản 0.9.2 ngăn sự kiện tải Chrome đến muộn khôi phục lượt đã dừng hoặc nhập nhầm vào lượt mới. Trạng thái lượt quét được ghi tuần tự. Nút Thử lại tìm thư lỗi trên toàn trang trước khi áp dụng giới hạn 20 thư. Kiểm thử: `node tests/extension_download_race.cjs` và bài quét nhiều thư trong `tests/test_extension_batches.py`.

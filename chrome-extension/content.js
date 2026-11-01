@@ -410,7 +410,7 @@ async function run(limit,only=[],automatic=false) {
   }
   // Row text changes after reading; use a message ID when Gmail exposes it,
   // otherwise the stable thread ID. The PDF tile list still detects additions.
-  const listURL=location.href, queue=rows.slice(0, limit).map(row=>({key:row.key,text:row.text,fingerprint:row.version||row.key,index:row.index})).filter(row=>!only.length||only.some(item=>item.key&&row.key?item.key===row.key:item.rowIndex===row.index&&item.text===row.text));
+  const listURL=location.href, queue=rows.map(row=>({key:row.key,text:row.text,fingerprint:row.version||row.key,index:row.index})).filter(row=>!only.length||only.some(item=>item.key&&row.key?item.key===row.key:item.rowIndex===row.index&&item.text===row.text)).slice(0,limit);
   if(!queue.length)throw Error('Không thấy các thư lỗi trên trang Gmail hiện tại. Mở lại danh sách cũ rồi thử lại.');
   await progress('Đã thấy '+queue.length+' thư ở trang '+(page+1)+'. Đang xử lý lần lượt...');
   for (let position=0;position<queue.length;position++) {
