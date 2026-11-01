@@ -351,6 +351,8 @@ class Admin:
                 ensure_schema(connection)
                 row = connection.execute('SELECT subject,categories,file_hash FROM notes WHERE id=?', (identifier,)).fetchone()
                 if row:
+                    from .documents import save_pdf
+                    save_pdf(data,config['data_dir'])
                     from .archive import classified_markdown_paths, render_archive
                     paths = classified_markdown_paths(Path(config['data_dir']),identifier,row[0],json.loads(row[1]),row[2])
                     if any(not path.is_file() or not path.stat().st_size for path in paths):

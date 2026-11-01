@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import time
 import re
+import secrets
 import unicodedata
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -153,10 +154,18 @@ def save_pdf(data, root):
     directory = Path(root) / 'files'
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = directory / (digest + '.pdf')
-    if not path.exists():
-        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    if path.is_file() and path.stat().st_size == len(data):
+        with path.open('rb') as stream:
+            if hashlib.file_digest(stream,'sha256').hexdigest() == digest:
+                return digest
+    temporary = directory / (digest + '.' + secrets.token_hex(6) + '.tmp')
+    try:
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(descriptor, 'wb') as stream:
             stream.write(data)
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
     return digest
 
 

@@ -1,5 +1,7 @@
 import io
+import os
 import shutil
+import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -8,7 +10,7 @@ from urllib.error import URLError
 from pypdf import PdfReader, PdfWriter
 from pypdf._page import PageObject
 
-from mailnotes.documents import pdf_text
+from mailnotes.documents import pdf_text, save_pdf
 from test_documents_ai import sample_pdf
 
 
@@ -32,6 +34,34 @@ def ocr(content, finish='stop'):
 
 
 class PDFEdgeCasesTests(unittest.TestCase):
+    def test_partial_pdf_from_interrupted_older_save_is_repaired(self):
+        with tempfile.TemporaryDirectory() as directory:
+            raw=document('Original PDF content.')
+            digest=save_pdf(raw,directory);path=Path(directory)/'files'/(digest+'.pdf')
+            for damaged in (raw[:8],b'x'*len(raw)):
+                path.write_bytes(damaged)
+                self.assertEqual(save_pdf(raw,directory),digest)
+                self.assertEqual(path.read_bytes(),raw)
+
+    def test_failed_pdf_write_does_not_publish_a_partial_original(self):
+        original_fdopen=os.fdopen
+        def interrupted(descriptor,*args,**kwargs):
+            stream=original_fdopen(descriptor,*args,**kwargs)
+            class Writer:
+                def __enter__(self):return self
+                def __exit__(self,*exc):stream.close()
+                def write(self,data):
+                    stream.write(data[:8])
+                    raise OSError('Simulated disk write failure')
+            return Writer()
+        with tempfile.TemporaryDirectory() as directory:
+            raw=document('Document to save atomically.')
+            with patch('mailnotes.documents.os.fdopen',side_effect=interrupted):
+                with self.assertRaises(OSError):save_pdf(raw,directory)
+            self.assertEqual(list((Path(directory)/'files').iterdir()),[])
+            digest=save_pdf(raw,directory)
+            self.assertEqual((Path(directory)/'files'/(digest+'.pdf')).read_bytes(),raw)
+
     @unittest.skipUnless(shutil.which('pdftoppm'), 'Poppler integration requires pdftoppm')
     def test_actual_poppler_page_render_uses_the_expected_image_file(self):
         with patch('mailnotes.core.request_json',return_value=ocr('Actual image conversion reached the mocked OCR endpoint.')) as request:

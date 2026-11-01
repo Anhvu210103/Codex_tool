@@ -119,10 +119,13 @@ class MarkdownArchiveTests(unittest.TestCase):
             self.admin.process_pdf(raw,'recover.pdf',source='ai')
             output=next((self.root/'ai/Theo-nhom').rglob('recover.md'))
             manifest=next((self.root/'ai/exports').glob('*.json'))
+            original=self.root/'ai/files'/(hashlib.sha256(raw).hexdigest()+'.pdf')
+            original.write_bytes(b'%PDF-interrupted')
             for bad in ('{','{}','[null,"","../outside.md"]'):
                 output.unlink();manifest.write_text(bad,encoding='utf-8')
                 self.assertEqual(self.admin.process_pdf(raw,'recover.pdf',source='ai'),0)
                 self.assertIn('Document to recover',output.read_text(encoding='utf-8'))
+                self.assertEqual(original.read_bytes(),raw)
                 self.assertIsInstance(json.loads(manifest.read_text(encoding='utf-8')),list)
             self.assertEqual(request.call_count,1)
 
